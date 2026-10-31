@@ -179,15 +179,38 @@ El contraste sistemático entre el tráfico capturado en **Chrome DevTools** y e
 
 ### Características de la aplicación
 
+La plataforma **Notion**, a través de su especificación **Notion REST API (`Notion-Version: 2025-09-03`)**, presenta cuatro características arquitectónicas y funcionales principales sobre las cuales se fundamenta la estrategia de pruebas automatizadas del equipo:
+
+- **Gestión unificada de espacios de trabajo y contenido modular:** Estructura la información mediante una jerarquía desacoplada compuesta por páginas (`Pages`), árboles recursivos de bloques de contenido enriquecido (`Blocks`), contenedores de bases de datos (`Databases`) y fuentes de datos tabulares consultables (`Data sources`) con esquemas de propiedades fuertemente tipados.
+- **Control de identidad, directorio de usuarios y seguridad OAuth 2.0:** Administra las identidades de usuarios humanos (`person`) y cuentas automatizadas de integración (`bot`) mediante el módulo `Users`, articulándose con el estándar OAuth 2.0 (`OAuth`) para gestionar el ciclo completo de emisión, rotación, introspección y revocación segura de tokens de acceso en integraciones públicas.
+- **Capacidades transversales de colaboración y archivos:** Provee endpoints nativos para búsqueda global indexada con filtros por entidad (`Search`), gestión de hilos de discusión contextualizados en páginas o bloques (`Comments`) y carga transaccional multipaso de archivos binarios (`File uploads`).
+- **Contratos estandarizados de paginación, versionado y errores:** Implementa paginación determinista basada en cursores (`start_cursor`, `page_size` acotado entre `1` y `100`, `has_more`, `next_cursor`), versionado contractual obligatorio por cabecera (`Notion-Version: 2025-09-03`) y respuestas JSON tipadas tanto para entidades de dominio (`object`) como para el manejo estructurado de errores (`code`, `status`, `message`).
+
 ### Casos de uso por integrante
 
 | Integrante | Caso de uso o característica |
 |------------|------------------------------|
 | Valentina Molina Bustillos | |
-| Gabriel Marcos Guaman Ortuño | |
+| Gabriel Marcos Guaman Ortuño | Gestión de Identidad y Directorio de Usuarios (`Users`) y Ciclo de Vida de Autenticación/Autorización (`OAuth` 2.0) |
 | Karen Ivonne Cruz Alvarez | |
 | Sebastián Pereyra | |
 | Kevin Uruchi | |
+
+#### Detalle de Caso de Uso — Gabriel Marcos Guaman Ortuño (Módulos: Users & OAuth)
+
+El alcance asignado comprende dos módulos transversales de identidad y seguridad pertenecientes a la colección oficial de Postman **Notion API (`2025-09-03`)**:
+
+- **Módulo `Users` (Identidad del Bot y Directorio del Workspace):**
+  - `GET /v1/users/me` (*Retrieve your token's bot user*): Recupera el perfil `user` (`type: "bot"`) vinculado al token autenticado actual, exponiendo metadatos del propietario (`owner`), información del espacio de trabajo (`workspace_name`) y límites operativos del entorno (`workspace_limits`, como el tamaño máximo permitido para carga de archivos).
+  - `GET /v1/users/{user_id}` (*Retrieve a user*): Consulta el perfil detallado de un usuario específico del *workspace* —ya sea miembro humano (`type: "person"`) o integración (`type: "bot"`)— resolviendo su identificador único `UUIDv4` (con o sin guiones) conforme a las capacidades de visibilidad otorgadas al token.
+  - `GET /v1/users` (*List all users*): Retorna de forma paginada (`object: "list"`, con `page_size` máximo de `100`, `start_cursor`, `has_more` y `next_cursor`) el directorio completo de miembros y bots con acceso al *workspace* (excluyendo invitados externos o *guests*).
+
+- **Módulo `OAuth` (Ciclo de Vida de Tokens e Integraciones Públicas):**
+  - `POST /v1/oauth/token` (*Token*): Intercambia un código de autorización temporal de un solo uso (`grant_type: "authorization_code"`) o renueva una sesión mediante rotación de `refresh_token` (`grant_type: "refresh_token"`) para emitir un `access_token` activo y metadatos de vinculación (`bot_id`, `workspace_id`), exigiendo autenticación HTTP `Basic` (`base64(client_id:client_secret)`).
+  - `POST /v1/oauth/introspect` (*Introspect*): Inspecciona el estado operativo de una credencial (`active: true` o `active: false` bajo el estándar RFC 7662), permitiendo auditar su vigencia, marcas temporales (`iat`) y metadatos sin ejecutar mutaciones de negocio.
+  - `POST /v1/oauth/revoke` (*Revoke*): Revoca e invalida de forma inmediata e idempotente (RFC 7009) un `access_token` activo, cerrando el ciclo de sesión de la integración y bloqueando cualquier petición posterior hacia recursos protegidos.
+
+- **Valor para las pruebas de API:** La articulación conjunta de `OAuth` y `Users` permite diseñar una suite de pruebas altamente representativa que cubre validación estricta de contratos (`Notion-Version: 2025-09-03` y esquemas tipados), seguridad bajo **esquemas duales de autenticación** (`HTTP Basic Auth` con credenciales de cliente en `/v1/oauth/*` frente a `Bearer Token` en `/v1/users/*` y restricciones `403 restricted_resource` por capacidades), análisis de valores límite (*Boundary*) sobre cursores de paginación (`page_size` en `0`, `1`, `100` y `101`) y formatos `UUIDv4`, así como flujos **End-to-End (E2E)** completos de extremo a extremo (emisión de token en `/v1/oauth/token` → validación de `active: true` en `/v1/oauth/introspect` → verificación de identidad del bot en `/v1/users/me` → revocación en `/v1/oauth/revoke` → comprobación de `active: false` y rechazo determinista `401 Unauthorized` al reintentar el consumo de `/v1/users/me`).
 
 ---
 
