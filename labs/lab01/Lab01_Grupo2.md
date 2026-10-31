@@ -221,21 +221,56 @@ El alcance asignado comprende dos módulos transversales de identidad y segurida
 
 ### Criterios de aceptación
 
+#### Gabriel Marcos Guaman Ortuño — Módulos Users & OAuth
+
+La especificación completa en inglés de las Historias de Usuario (*User Stories*), Criterios de Aceptación detallados y tablas de Casos de Prueba para los 6 endpoints asignados se encuentra documentada en el archivo [`pruebas/GabrielGuamanTests.md`](./pruebas/GabrielGuamanTests.md). A continuación, se sintetizan los criterios de aceptación establecidos bajo el contrato `Notion-Version: 2025-09-03`:
+
+- **Módulo `Users` (`GET /v1/users/me`, `GET /v1/users/{user_id}`, `GET /v1/users`):**
+  - *Happy Path:* Autenticado con `Authorization: Bearer <token>` válido y `Notion-Version: 2025-09-03`, `/v1/users/me` retorna `200 OK` con el perfil `object: "user"`, `type: "bot"`, `owner` y `workspace_limits`; `/v1/users/{user_id}` resuelve perfiles `person` o `bot` existentes (`200 OK`); y `/v1/users` entrega una lista paginada (`object: "list"`, `results[]`, `has_more`, `next_cursor`) excluyendo usuarios invitados (*guests*).
+  - *Negative Scenarios:* Tokens ausentes, inválidos o revocados responden `401 Unauthorized` (`code: "unauthorized"`); la omisión del header `Notion-Version` retorna `400 Bad Request` (`code: "missing_version"`); tokens sin capacidad *Read user information* reciben `403 Forbidden` (`code: "restricted_resource"`); parámetros `UUID`, `page_size` o `start_cursor` malformados producen `400 Bad Request` (`code: "validation_error"`); y un `user_id` válido inexistente devuelve `404 Not Found` (`code: "object_not_found"`).
+  - *Boundary Cases:* En `/v1/users`, `page_size=1` (mínimo) y `page_size=100` (máximo) responden `200 OK`, mientras que `page_size=0` y `page_size=101` se rechazan con `400 validation_error`. En `/v1/users/{user_id}`, tanto el `UUIDv4` canónico de 36 caracteres con guiones como la cadena hexadecimal compacta de 32 caracteres sin guiones son aceptados y normalizados a formato con guiones (`200 OK`), mientras que longitudes de 31/33 caracteres fallan con `400 validation_error` y el UUID nulo (`00000000-0000-0000-0000-000000000000`) retorna `404 object_not_found`.
+
+- **Módulo `OAuth` (`POST /v1/oauth/token`, `POST /v1/oauth/revoke`, `POST /v1/oauth/introspect`):**
+  - *Happy Path:* Autenticado mediante `Authorization: Basic base64(client_id:client_secret)` y `Notion-Version: 2025-09-03`, `/v1/oauth/token` intercambia un `authorization_code` válido o rota un `refresh_token` activo devolviendo `200 OK` con `access_token`, `refresh_token`, `token_type: "bearer"`, `bot_id` y `workspace_id`; `/v1/oauth/introspect` retorna `200 OK` con `active: true` para tokens vigentes y `active: false` para tokens revocados o desconocidos (RFC 7662); y `/v1/oauth/revoke` invalida de inmediato el token activo con `200 OK`.
+  - *Negative Scenarios:* Credenciales `Basic Auth` ausentes o incorrectas retornan `401 Unauthorized` (`error: "invalid_client"` / `code: "unauthorized"`); omitir `Notion-Version` dispara `400 missing_version`; códigos expirados/forjados o `redirect_uri` no coincidente en `/token` devuelven `400 Bad Request` (`error: "invalid_grant"`); un `grant_type` no soportado retorna `400` (`error: "unsupported_grant_type"`); y la ausencia del campo `token`, tipos no *string* o JSON malformado en `/revoke` e `/introspect` responden `400` (`validation_error` / `invalid_json`).
+  - *Boundary Cases:* Cadenas vacías (`""`), solo espacios o cuerpos `{}` son rechazados con `400 Bad Request`; el reintento inmediato de un `authorization_code` de un solo uso ya consumido (`N = 2`) es bloqueado con `400 invalid_grant`; la doble revocación de un mismo token mantiene idempotencia (`200 OK` conforme a RFC 7009); y cadenas sobredimensionadas (`2048` caracteres) en `/introspect` se procesan de forma segura sin provocar errores `500`.
+
+- **Flujos End-to-End (`E2E`):**
+  - *Ciclo completo de credencial OAuth e identidad del Bot:* Emisión en `/v1/oauth/token` → verificación `active: true` en `/v1/oauth/introspect` → validación de correspondencia `id == bot_id` en `/v1/users/me` → invalidación en `/v1/oauth/revoke` → confirmación `active: false` y bloqueo inmediato `401 Unauthorized` en `/v1/users/me`, complementado con el flujo de rotación continua por `refresh_token` y descubrimiento paginado de usuarios (`/v1/users` → `/v1/users/{user_id}`).
+
 ### Escenarios de prueba
 
-| ID | Título | Tipo | Descripción |
-|----|--------|------|-------------|
-| | | | |
+*Escenarios correspondientes a **Gabriel Marcos Guaman Ortuño** — Módulos `Users` y `OAuth` (detalle completo de precondiciones, pasos, resultados esperados y prioridades en [`pruebas/GabrielGuamanTests.md`](./pruebas/GabrielGuamanTests.md)):*
+
 
 ### Uso de IA generativa
+
+#### Gabriel Marcos Guaman Ortuño — Módulos Users & OAuth
 
 **Prompt utilizado**
 
 ```text
-(Pega aquí el prompt)
+Act as a Senior QA Automation Engineer (SQE). Generate a comprehensive base list of API User Stories, Acceptance Criteria, and API Test Scenarios (covering Happy Path, Negative, Boundary, and End-to-End flows) in English for the Notion Public REST API (header Notion-Version: 2025-09-03), specifically targeting the official Postman collection modules "Users" and "OAuth":
+1. Users Module:
+   - GET /v1/users/me (Retrieve your token's bot user)
+   - GET /v1/users/{user_id} (Retrieve a user)
+   - GET /v1/users (List all users)
+2. OAuth Module:
+   - POST /v1/oauth/token (Token exchange and refresh rotation)
+   - POST /v1/oauth/revoke (Revoke an active access token)
+   - POST /v1/oauth/introspect (Inspect token active state and metadata)
+
+For each endpoint, include preconditions, authentication requirements, boundary values (pagination limits, UUID formats, empty/oversized strings), expected HTTP status codes, and exact JSON response attributes.
 ```
 
 **Procedimiento de filtrado y validación**
+
+La salida base generada por la IA fue auditada, depurada y contrastada manualmente contra la documentación oficial de *Notion Developers* y las respuestas empíricas observadas en la colección **Notion API (`2025-09-03`)** en Postman, aplicando cuatro criterios técnicos de validación:
+
+1. **Filtrado de métodos no soportados en `Users`:** Se descartaron escenarios genéricos `POST`, `PUT` y `DELETE` sugeridos sobre `/v1/users`, dado que en la API pública de Notion el directorio de usuarios es estrictamente de solo lectura (`GET`), concentrando las pruebas de mutación de estado transaccional en los endpoints `POST` del módulo `OAuth` (`/v1/oauth/token`, `/v1/oauth/introspect` y `/v1/oauth/revoke`).
+2. **Validación de esquemas de autenticación dual:** Se corrigieron y segmentaron las precondiciones de seguridad para distinguir con exactitud entre los endpoints del módulo `Users` —que exigen autenticación `Authorization: Bearer <token>` y capacidades explícitas de lectura de usuario (*Read user information*)— y los endpoints del módulo `OAuth`, que exigen autenticación de cliente mediante `Authorization: Basic` codificado en Base64 con `client_id:client_secret`.
+3. **Ajuste de valores límite (`Boundary`) reales:** Se verificó en la especificación oficial de Notion (`2025-09-03`) que `GET /v1/users` admite el parámetro `page_size` únicamente entre `1` (mínimo) y `100` (máximo), ajustando los casos fuera de rango (`page_size=0` y `page_size=101`) para esperar `400 Bad Request` (`code: "validation_error"`), además de validar la aceptación dual de identificadores `UUIDv4` con guiones (36 caracteres) y sin guiones (32 caracteres).
+4. **Estandarización de códigos de error propios de Notion:** Se validó que todos los resultados esperados contemplen la estructura real de error de Notion (`object: "error"`, `code: "unauthorized" | "validation_error" | "object_not_found" | "missing_version" | "restricted_resource" | "rate_limited"`), así como las respuestas específicas del estándar OAuth 2.0 (`error: "invalid_client" | "invalid_grant" | "unsupported_grant_type"` y `active: true/false`).
 
 ---
 
