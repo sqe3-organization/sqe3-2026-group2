@@ -190,10 +190,10 @@ La plataforma **Notion**, a través de su especificación **Notion REST API (`No
 
 | Integrante | Caso de uso o característica |
 |------------|------------------------------|
-| Valentina Molina Bustillos | |
+| Valentina Molina Bustillos | Gestión de Fuentes de Datos Tabulares (`Data sources`), Esquemas de Propiedades Dinámicas y Consultas Compuestas (`Query`) |
 | Gabriel Marcos Guaman Ortuño | Gestión de Identidad y Directorio de Usuarios (`Users`) y Ciclo de Vida de Autenticación/Autorización (`OAuth` 2.0) |
 | Karen Ivonne Cruz Alvarez | |
-| Sebastián Pereyra | |
+| Sebastián Pereyra | Contenedores de Bases de Datos (`Databases`) y Búsqueda Indexada Global (`Search`) |
 | Kevin Uruchi | Gestión del Ciclo de Vida de Páginas (`Pages`) |
 
 #### Detalle de Caso de Uso — Gabriel Marcos Guaman Ortuño (Módulos: Users & OAuth)
@@ -212,6 +212,31 @@ El alcance asignado comprende dos módulos transversales de identidad y segurida
 
 - **Valor para las pruebas de API:** La articulación conjunta de `OAuth` y `Users` permite diseñar una suite de pruebas altamente representativa que cubre validación estricta de contratos (`Notion-Version: 2025-09-03` y esquemas tipados), seguridad bajo **esquemas duales de autenticación** (`HTTP Basic Auth` con credenciales de cliente en `/v1/oauth/*` frente a `Bearer Token` en `/v1/users/*` y restricciones `403 restricted_resource` por capacidades), análisis de valores límite (*Boundary*) sobre cursores de paginación (`page_size` en `0`, `1`, `100` y `101`) y formatos `UUIDv4`, así como flujos **End-to-End (E2E)** completos de extremo a extremo (emisión de token en `/v1/oauth/token` → validación de `active: true` en `/v1/oauth/introspect` → verificación de identidad del bot en `/v1/users/me` → revocación en `/v1/oauth/revoke` → comprobación de `active: false` y rechazo determinista `401 Unauthorized` al reintentar el consumo de `/v1/users/me`).
 
+#### Detalle de Caso de Uso — Valentina Molina Bustillos (Módulo: Data Sources)
+
+El alcance asignado comprende el módulo de fuentes tabulares de la colección oficial de Postman **Notion API (`2025-09-03`)**:
+
+- **Módulo `Data sources` (Entidades Tabulares Consultables y Esquemas de Propiedades Dinámicas):**
+  - `POST /v1/data_sources` (*Create a data source*): En el modelo arquitectónico introducido en `2025-09-03`, las fuentes de datos tabulares (`data sources`) se alojan dentro de contenedores de base de datos (`database_id`), definiendo su propio esquema de propiedades tipadas (`properties`) y metadatos tabulares.
+  - `GET /v1/data_sources/{data_source_id}` (*Retrieve a data source*): Consulta la definición y el estado completo del esquema de una fuente de datos específica mediante su UUID, recuperando la relación de columnas tipadas y opciones de selección.
+  - `PATCH /v1/data_sources/{data_source_id}` (*Update a data source*): Modifica incrementalmente la definición de propiedades, permitiendo añadir nuevas columnas tipadas, renombrar atributos existentes o archivar columnas en el esquema activo sin alterar los registros existentes.
+  - `POST /v1/data_sources/{data_source_id}/query` (*Query a data source*): Ejecuta consultas tabulares y filtrado avanzado sobre los registros contenidos en la fuente de datos, admitiendo filtros compuestos lógicos (`and`/`or`), ordenamiento multidireccional (`sorts`) y paginación determinista por cursores (`page_size` de 1 a 100, `start_cursor`, `has_more`, `next_cursor`).
+
+- **Valor para las pruebas de API:** Permite validar el núcleo del procesamiento de datos en Notion bajo la versión `2025-09-03`, asegurando el desacoplamiento efectivo entre el contenedor y su fuente tabular. Facilita la verificación de esquemas dinámicos, consistencia de tipos de datos, análisis de valores límite en paginación (`page_size=0, 1, 100, 101`) y flujos E2E de consulta relacional compleja con operadores anidados.
+
+#### Detalle de Caso de Uso — Sebastián Pereyra (Módulos: Databases & Search)
+
+El alcance asignado comprende los módulos estructurales de contenedores y descubrimiento global de la colección oficial de Postman **Notion API (`2025-09-03`)**:
+
+- **Módulo `Databases` (Contenedores de Estructuras y Esquemas):**
+  - `POST /v1/databases` (*Create a database*): Crea un contenedor de base de datos bajo una página padre (`parent.page_id`), definiendo el título enriquecido y la configuración visual (`icon`, `cover`, `is_inline`), inicializando la estructura organizativa.
+  - `GET /v1/databases/{database_id}` (*Retrieve a database*): Recupera los metadatos completos del contenedor de base de datos por su identificador UUID, incluyendo título, descripción, icono, portada, relación de fuentes de datos asociadas (`data_sources`), estado de archivado y marcas temporales.
+  - `PATCH /v1/databases/{database_id}` (*Update a database*): Actualiza los metadatos del contenedor (título, descripción, icono, portada) o modifica su ciclo de vida enviándolo o restaurándolo de la papelera (`in_trash: true/false`).
+
+- **Módulo `Search` (Búsqueda Indexada Global en el Workspace):**
+  - `POST /v1/search` (*Search by title*): Realiza búsquedas globales indexadas por texto o título sobre todas las páginas y bases de datos compartidas con la integración, soportando filtros estrictos por tipo de entidad (`filter.value: "page" | "database"`), ordenamiento por fecha de edición (`sort.direction: "ascending" | "descending"`) y paginación basada en cursores.
+
+- **Valor para las pruebas de API:** Permite verificar la gobernanza de contenedores de datos y la capacidad de descubrimiento en el workspace. Facilita el diseño de pruebas de integridad referencial de padres, pruebas de mutación de metadatos vía `PATCH`, valores límite en paginación y ordenamiento de búsqueda, y flujos integrales **End-to-End (E2E)** (creación de contenedor → actualización de título e icono → indexación inmediata en búsqueda global → archivado y verificación de aislamiento).
 
 #### Detalle de Caso de Uso — Kevin Uruchi (Módulo Pages)
 
@@ -252,6 +277,33 @@ La especificación completa en inglés de las Historias de Usuario (*User Storie
 - **Flujos End-to-End (`E2E`):**
   - *Ciclo completo de credencial OAuth e identidad del Bot:* Emisión en `/v1/oauth/token` → verificación `active: true` en `/v1/oauth/introspect` → validación de correspondencia `id == bot_id` en `/v1/users/me` → invalidación en `/v1/oauth/revoke` → confirmación `active: false` y bloqueo inmediato `401 Unauthorized` en `/v1/users/me`, complementado con el flujo de rotación continua por `refresh_token` y descubrimiento paginado de usuarios (`/v1/users` → `/v1/users/{user_id}`).
 
+#### Valentina Molina Bustillos — Módulo Data Sources
+
+La especificación completa en inglés de las Historias de Usuario (*User Stories*), Criterios de Aceptación detallados y tablas de Casos de Prueba para los 4 endpoints asignados se encuentra documentada en el archivo [`pruebas/ValentinaMolinaTests.md`](./pruebas/ValentinaMolinaTests.md). A continuación, se sintetizan los criterios de aceptación establecidos bajo el contrato `Notion-Version: 2025-09-03`:
+
+- **Módulo `Data sources` (`POST /v1/data_sources`, `GET /v1/data_sources/{id}`, `PATCH /v1/data_sources/{id}`, `POST /v1/data_sources/{id}/query`):**
+  - *Happy Path:* `/v1/data_sources` registra una nueva fuente de datos asociada a un `database_id` devolviendo `200 OK` con `object: "data_source"`; `GET /{id}` recupera el esquema tipado completo (`properties`) y metadatos; `PATCH /{id}` permite añadir, renombrar y archivar columnas retornando el esquema actualizado; y `/query` ejecuta filtros lógicos simples y compuestos (`and`/`or`) junto con ordenamientos (`sorts`), retornando una lista paginada (`object: "list"`, `results[]`, `has_more`, `next_cursor`).
+  - *Negative Scenarios:* Consultar, actualizar o consultar una fuente de datos inexistente o no compartida retorna `404 object_not_found`; omitir el token o header de versión devuelve `401 Unauthorized` o `400 missing_version`; filtros con nombres de columna inexistentes o tipos incompatibles en `/query` responden `400 validation_error`; exceder la cuota de peticiones retorna `429 rate_limited`.
+  - *Boundary Cases:* En `/query`, `page_size=1` y `page_size=100` responden `200 OK`, mientras que `page_size=0` y `page_size=101` son rechazados con `400 validation_error`; fuentes de datos sin filas retornan `results: []` con `has_more: false`; y filtros anidados complejos se ejecutan correctamente sin provocar excepciones en el servidor.
+  - *Flujos End-to-End (`E2E`):* Creación de fuente de datos en base de datos → inserción de filas tipadas → ejecución de consultas con filtros compuestos → actualización dinámica de esquema vía `PATCH` → verificación de exclusión de registros archivados.
+
+#### Sebastián Pereyra — Módulos Databases & Search
+
+La especificación completa en inglés de las Historias de Usuario (*User Stories*), Criterios de Aceptación detallados y tablas de Casos de Prueba para los 4 endpoints asignados se encuentra documentada en el archivo [`pruebas/SebastianPereyraTests.md`](./pruebas/SebastianPereyraTests.md). A continuación, se sintetizan los criterios de aceptación establecidos bajo el contrato `Notion-Version: 2025-09-03`:
+
+- **Módulo `Databases` (`POST /v1/databases`, `GET /v1/databases/{id}`, `PATCH /v1/databases/{id}`):**
+  - *Happy Path:* Autenticado con `Authorization: Bearer <token>` válido y `Notion-Version: 2025-09-03`, al enviar `POST /v1/databases` con un `parent.page_id` válido y título, la API retorna `200 OK` con `object: "database"`, un nuevo identificador UUID y su fuente de datos por defecto; `GET /{id}` resuelve metadatos completos, icono, portada, relación de fuentes de datos y descripción; `PATCH /{id}` actualiza el título, descripción, icono y portada, o mueve la base a la papelera (`in_trash: true`) y la restaura (`in_trash: false`).
+  - *Negative Scenarios:* Omitir o enviar credenciales Bearer inválidas retorna `401 Unauthorized` (`code: "unauthorized"`); omitir el header de versión produce `400 Bad Request` (`code: "missing_version"`); un `parent.page_id` o `database_id` inexistente o no compartido devuelve `404 Not Found` (`code: "object_not_found"`); un esquema de propiedades con tipos inválidos responde `400 validation_error`.
+  - *Boundary Cases:* El identificador del contenedor se acepta tanto en formato UUID canónico de 36 caracteres con guiones como compacto de 32 caracteres; el título admite cadenas de hasta 2,000 caracteres Unicode y opciones múltiples; y `GET` sobre bases de datos en papelera responde `200 OK` con `in_trash: true`.
+
+- **Módulo `Search` (`POST /v1/search`):**
+  - *Happy Path:* Búsqueda con cuerpo vacío `{}` o consulta de texto `query` retorna `200 OK` con resultados paginados ordenados por relevancia o fecha de edición; el filtrado estricto por tipo de objeto (`filter: {"value": "database", "property": "object"}`) restringe exclusivamente los resultados a contenedores de bases de datos.
+  - *Negative Scenarios:* Token no autorizado retorna `401 Unauthorized`; valores no admitidos en el filtro de entidad responden `400 validation_error`.
+  - *Boundary Cases:* `page_size=1` y `page_size=100` son aceptados; `page_size=0` y `page_size=101` devuelven `400 validation_error`; consultas con cadenas de 2,000 caracteres o caracteres especiales no provocan errores `500` y retornan una lista vacía o coincidentes de forma segura.
+
+- **Flujos End-to-End (`E2E`):**
+  - *Ciclo integral de contenedor de datos, actualización y búsqueda global:* Creación de contenedor de base de datos (`POST /v1/databases`) → verificación de metadatos (`GET /v1/databases/{id}`) → actualización de título e icono (`PATCH /v1/databases/{id}`) → descubrimiento e indexación mediante búsqueda global (`POST /v1/search`) → archivado y verificación de aislamiento en búsqueda.
+
 #### Kevin Uruchi — Módulo Pages
 
 La especificación completa en inglés de las Historias de Usuario (*User Stories*), Criterios de Aceptación detallados y tablas de Casos de Prueba para los 5 endpoints asignados se encuentra documentada en el archivo [`pruebas/KevinUruchiTests.md`](./pruebas/KevinUruchiTests.md). A continuación, se sintetizan los criterios de aceptación establecidos bajo el contrato `Notion-Version: 2025-09-03`.
@@ -267,6 +319,10 @@ La especificación completa en inglés de las Historias de Usuario (*User Storie
 ### Escenarios de prueba
 
 *Escenarios correspondientes a **Gabriel Marcos Guaman Ortuño** — Módulos `Users` y `OAuth` (detalle completo de precondiciones, pasos, resultados esperados y prioridades en [`pruebas/GabrielGuamanTests.md`](./pruebas/GabrielGuamanTests.md)):*
+
+*Escenarios correspondientes a **Valentina Molina Bustillos** — Módulo `Data sources` (detalle completo de precondiciones, pasos, resultados esperados y prioridades en [`pruebas/ValentinaMolinaTests.md`](./pruebas/ValentinaMolinaTests.md)).*
+
+*Escenarios correspondientes a **Sebastián Pereyra** — Módulos `Databases` y `Search` (detalle completo de precondiciones, pasos, resultados esperados y prioridades en [`pruebas/SebastianPereyraTests.md`](./pruebas/SebastianPereyraTests.md)).*
 
 *Escenarios correspondientes a **Kevin Uruchi** — Módulo `Pages` (detalle completo de precondiciones, pasos, resultados esperados y prioridades en [`pruebas/KevinUruchiTests.md`](./pruebas/KevinUruchiTests.md)).*
 
@@ -298,6 +354,48 @@ La salida base generada por la IA fue auditada, depurada y contrastada manualmen
 2. **Validación de esquemas de autenticación dual:** Se corrigieron y segmentaron las precondiciones de seguridad para distinguir con exactitud entre los endpoints del módulo `Users` —que exigen autenticación `Authorization: Bearer <token>` y capacidades explícitas de lectura de usuario (*Read user information*)— y los endpoints del módulo `OAuth`, que exigen autenticación de cliente mediante `Authorization: Basic` codificado en Base64 con `client_id:client_secret`.
 3. **Ajuste de valores límite (`Boundary`) reales:** Se verificó en la especificación oficial de Notion (`2025-09-03`) que `GET /v1/users` admite el parámetro `page_size` únicamente entre `1` (mínimo) y `100` (máximo), ajustando los casos fuera de rango (`page_size=0` y `page_size=101`) para esperar `400 Bad Request` (`code: "validation_error"`), además de validar la aceptación dual de identificadores `UUIDv4` con guiones (36 caracteres) y sin guiones (32 caracteres).
 4. **Estandarización de códigos de error propios de Notion:** Se validó que todos los resultados esperados contemplen la estructura real de error de Notion (`object: "error"`, `code: "unauthorized" | "validation_error" | "object_not_found" | "missing_version" | "restricted_resource" | "rate_limited"`), así como las respuestas específicas del estándar OAuth 2.0 (`error: "invalid_client" | "invalid_grant" | "unsupported_grant_type"` y `active: true/false`).
+
+#### Valentina Molina Bustillos — Módulo Data Sources
+
+**Prompt utilizado**
+
+```text
+Act as a Senior QA Automation Engineer (SQE). Generate a comprehensive base list of API User Stories, Acceptance Criteria, and API Test Scenarios (covering Happy Path, Negative, Boundary, and End-to-End flows) in English for the Notion Public REST API (header Notion-Version: 2025-09-03), specifically targeting the official Postman collection module "Data sources":
+- POST /v1/data_sources (Create a data source in a database)
+- GET /v1/data_sources/{data_source_id} (Retrieve a data source schema and metadata)
+- PATCH /v1/data_sources/{data_source_id} (Update data source properties schema)
+- POST /v1/data_sources/{data_source_id}/query (Query a data source with compound filters, sorts, and cursor pagination)
+
+For each endpoint, include preconditions, Bearer token authentication requirements, boundary values (pagination page_size 0, 1, 100, 101, UUID canonical/compact formats, character limits), expected HTTP status codes, and exact Notion JSON response attributes.
+```
+
+**Procedimiento de filtrado y validación**
+
+1. **Desacoplamiento arquitectónico de consultas:** Se descartaron las propuestas iniciales de la IA que intentaban consultar bases de datos en `/v1/databases/{id}/query`, verificando que en `2025-09-03` las consultas pertenecen exclusivamente a `POST /v1/data_sources/{data_source_id}/query`.
+2. **Validación de tipos y operadores de filtro:** Se depuraron los filtros para que los operadores booleanos (`equals`, `contains`, `greater_than`, `is_empty`, etc.) coincidan con el tipo de columna estipulado (`checkbox`, `rich_text`, `number`, `date`, `status`), esperando `400 validation_error` en combinaciones incompatibles.
+3. **Control de límites en paginación tabular:** Se fijó el rango determinista de `page_size` entre `1` y `100`, asegurando que `0` y `101` disparen `400 validation_error` y que el cursor de paginación (`start_cursor`) mantenga coherencia sin registros duplicados ni omitidos.
+
+#### Sebastián Pereyra — Módulos Databases & Search
+
+**Prompt utilizado**
+
+```text
+Act as a Senior QA Automation Engineer (SQE). Generate a comprehensive base list of API User Stories, Acceptance Criteria, and API Test Scenarios (covering Happy Path, Negative, Boundary, and End-to-End flows) in English for the Notion Public REST API (header Notion-Version: 2025-09-03), specifically targeting the official Postman collection modules "Databases" and "Search":
+1. Databases Module:
+   - POST /v1/databases (Create a database container under a parent page)
+   - GET /v1/databases/{database_id} (Retrieve database metadata and data sources references)
+   - PATCH /v1/databases/{database_id} (Update database title, description, icon, cover, or in_trash)
+2. Search Module:
+   - POST /v1/search (Search workspace pages and databases by query string, entity filter, and sort direction)
+
+For each endpoint, include preconditions, Bearer token authentication requirements, boundary values (pagination page_size 0, 1, 100, 101, UUID canonical/compact formats, character limits, empty queries), expected HTTP status codes, and exact Notion JSON response attributes.
+```
+
+**Procedimiento de filtrado y validación**
+
+1. **Separación de responsabilidades de esquema:** Se ajustaron los escenarios de `PATCH /v1/databases/{id}` para clarificar que en `2025-09-03` las mutaciones de columnas y esquemas se delegan a las fuentes de datos, concentrando las pruebas del contenedor en metadatos visuales (`title`, `description`, `icon`, `cover`) y estado de ciclo de vida (`in_trash`).
+2. **Aislamiento en búsqueda global:** Se validaron los filtros restrictivos en `POST /v1/search` (`filter.value: "database"` frente a `"page"`), verificando que la API no mezcle entidades y que los recursos no compartidos queden estrictamente ocultos.
+3. **Manejo uniforme de identificadores UUID:** Se verificó que tanto el formato canónico con guiones (36 caracteres) como el compacto (32 caracteres) sean procesados transparentemente en todas las operaciones sobre bases de datos.
 
 #### Kevin Uruchi — Módulo Pages
 
@@ -337,12 +435,61 @@ La salida base generada por la IA fue auditada, depurada y contrastada manualmen
 
 ### Clasificación por tipo de prueba
 
+El equipo acordó organizar todas las pruebas de API en cuatro categorías, de modo que cualquier integrante pueda identificar de inmediato la intención de cada caso sin necesidad de leer el detalle completo:
+
+| Categoría | Descripción | Ejemplo representativo |
+|-----------|-------------|------------------------|
+| **Positiva** | Flujo ideal en el que se envían datos válidos y la API responde con éxito. Verifica que la funcionalidad principal opera conforme a la especificación. | Crear una página con título y padre válido → `200 OK` |
+| **Negativa** | Envío deliberado de datos incorrectos, incompletos o no autorizados para confirmar que la API rechaza la solicitud con el código y mensaje de error documentados. | Omitir el header `Authorization` → `401 Unauthorized` |
+| **Límite** | Exploración de valores en las fronteras permitidas por el contrato (mínimos, máximos, cadenas vacías, formatos alternativos de UUID) para detectar comportamientos inesperados en los extremos. | Enviar `page_size=0` o `page_size=101` → `400 validation_error` |
+| **Flujo completo (E2E)** | Secuencia de varios endpoints encadenados que reproduce un escenario de negocio real de principio a fin, validando la coherencia del estado entre cada paso. | Crear una página → actualizar propiedades → mover a otra base de datos → enviar a la papelera → restaurar |
+
 ### Priorización
 
-| ID | Prueba | Prioridad |
-|----|--------|-----------|
-| | | |
+Se definieron tres niveles de prioridad para ordenar la ejecución de las pruebas y concentrar el esfuerzo en lo que más impacta la estabilidad de la aplicación:
+
+| Nivel | Criterio | Ejemplo |
+|-------|----------|---------|
+| **Alta** | Si esta prueba falla, la funcionalidad principal queda inutilizable y bloquea al usuario. | Crear una página, autenticación con token válido, recuperar un recurso existente |
+| **Media** | Validaciones de errores comunes y controles de seguridad que, de fallar, comprometen la confiabilidad pero no impiden el uso básico. | Token inválido rechazado con `401`, header de versión ausente rechazado con `400` |
+| **Baja** | Casos poco frecuentes, funciones secundarias o condiciones de borde que rara vez se presentan en operación normal. | Enviar un payload de 500 KB, UUID nulo `00000000-...`, doble revocación idempotente de un token |
 
 ### Retroalimentación entre integrantes
 
+Se estableció un proceso de revisión cruzada: cada integrante debe intercambiar sus pruebas con al menos un compañero de equipo para que este las lea y evalúe. Si el revisor no comprende el objetivo de una prueba con solo leer su título y descripción, el autor debe reescribirla hasta que resulte clara por sí misma. Este mecanismo garantiza que las pruebas sean comprensibles para todo el equipo y no únicamente para quien las redactó.
+
 ### Convenciones del equipo
+
+Durante la reunión del equipo se acordaron las siguientes convenciones para mantener uniformidad y claridad en toda la suite de pruebas de API:
+
+#### 1. Formato estándar para nombrar pruebas
+
+Todos los títulos de casos de prueba deben seguir la estructura:
+
+> **[Módulo] - [Tipo] - Acción (Código esperado)**
+
+| | Ejemplo |
+|---|---------|
+| **Correcto** | `Pages - Positiva - Crear una página con padre válido (200 OK)` |
+| **Correcto** | `Users - Negativa - Consultar usuario con token revocado (401 Unauthorized)` |
+| **Incorrecto** | `Prueba de creación de usuario que falla` |
+| **Incorrecto** | `Test crear página` |
+
+El objetivo es que cualquier persona pueda entender qué se prueba, en qué módulo y cuál es el resultado esperado sin abrir el detalle del caso.
+
+#### 2. Plantilla base para describir cada prueba
+
+Al redactar el detalle de un caso de prueba se deben incluir como mínimo tres datos clave:
+
+| Campo | Contenido |
+|-------|-----------|
+| **Endpoint** | Método HTTP y ruta (por ejemplo, `POST /v1/pages`) |
+| **Datos enviados** | Descripción concisa del cuerpo, headers especiales o parámetros de consulta que se envían |
+| **Resultado esperado** | Código de estado HTTP, estructura del JSON de respuesta y valores clave que se deben verificar |
+
+#### 3. Reglas para el uso de IA generativa
+
+Cada integrante que utilice herramientas de IA generativa para obtener una lista base de escenarios debe cumplir dos requisitos:
+
+- **Registro del prompt:** documentar en el laboratorio el prompt exacto que se proporcionó a la herramienta, junto con el nombre del modelo utilizado.
+- **Filtrado y justificación:** revisar manualmente cada escenario generado, descartar los que no sean aplicables al contrato real de la API (`2025-09-03`) y anotar brevemente por qué se eliminaron los casos descartados. El estudiante es responsable de validar que solo se conserven pruebas verificables contra el comportamiento documentado del SUT.
