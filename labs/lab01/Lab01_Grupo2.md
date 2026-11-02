@@ -194,7 +194,7 @@ La plataforma **Notion**, a través de su especificación **Notion REST API (`No
 | Gabriel Marcos Guaman Ortuño | Gestión de Identidad y Directorio de Usuarios (`Users`) y Ciclo de Vida de Autenticación/Autorización (`OAuth` 2.0) |
 | Karen Ivonne Cruz Alvarez | |
 | Sebastián Pereyra | |
-| Kevin Uruchi | |
+| Kevin Uruchi | Gestión del Ciclo de Vida de Páginas (`Pages`) |
 
 #### Detalle de Caso de Uso — Gabriel Marcos Guaman Ortuño (Módulos: Users & OAuth)
 
@@ -211,6 +211,20 @@ El alcance asignado comprende dos módulos transversales de identidad y segurida
   - `POST /v1/oauth/revoke` (*Revoke*): Revoca e invalida de forma inmediata e idempotente (RFC 7009) un `access_token` activo, cerrando el ciclo de sesión de la integración y bloqueando cualquier petición posterior hacia recursos protegidos.
 
 - **Valor para las pruebas de API:** La articulación conjunta de `OAuth` y `Users` permite diseñar una suite de pruebas altamente representativa que cubre validación estricta de contratos (`Notion-Version: 2025-09-03` y esquemas tipados), seguridad bajo **esquemas duales de autenticación** (`HTTP Basic Auth` con credenciales de cliente en `/v1/oauth/*` frente a `Bearer Token` en `/v1/users/*` y restricciones `403 restricted_resource` por capacidades), análisis de valores límite (*Boundary*) sobre cursores de paginación (`page_size` en `0`, `1`, `100` y `101`) y formatos `UUIDv4`, así como flujos **End-to-End (E2E)** completos de extremo a extremo (emisión de token en `/v1/oauth/token` → validación de `active: true` en `/v1/oauth/introspect` → verificación de identidad del bot en `/v1/users/me` → revocación en `/v1/oauth/revoke` → comprobación de `active: false` y rechazo determinista `401 Unauthorized` al reintentar el consumo de `/v1/users/me`).
+
+
+#### Detalle de Caso de Uso — Kevin Uruchi (Módulo Pages)
+
+El alcance asignado comprende el módulo de gestión de contenido `Pages` de la colección oficial de Postman **Notion API (`2025-09-03`)**, que cubre el ciclo completo de creación, lectura, actualización y reubicación de páginas dentro de un *workspace*.
+
+- **Módulo `Pages` (Ciclo de Vida de Páginas):**
+   - `POST /v1/pages` (*Create a page*) crea una página bajo una página padre (`parent.page_id`) o como fila de un *data source* (`parent.data_source_id`), con propiedades tipadas, bloques de contenido (`children`, hasta 100 por petición), `icon` y `cover`. Devuelve `object: "page"`, el nuevo `id`, `parent`, marcas temporales y `url`.
+   - `GET /v1/pages/{page_id}` (*Retrieve a page*) recupera las propiedades y los metadatos de una página (`created_by`, `last_edited_time`, `in_trash`, `icon`, `cover`, `properties`). Admite `filter_properties` para reducir la respuesta y no devuelve bloques de contenido. Las propiedades con muchas referencias (`relation`, `rollup`, `people`) se devuelven truncadas.
+   - `GET /v1/pages/{page_id}/properties/{property_id}` (*Retrieve a page property item*) obtiene el valor completo de una sola propiedad. Las propiedades simples devuelven `object: "property_item"` y las paginadas (`title`, `rich_text`, `relation`, `rollup`, `people`) devuelven `object: "list"` con `results[]`, `has_more` y `next_cursor`. Acepta `page_size` entre `1` y `100` y `start_cursor`.
+   - `POST /v1/pages/{page_id}/move` (*Move a page*) reubica una página existente bajo otra página (`type: "page_id"`) o dentro de un *data source* (`type: "data_source_id"`). Conserva el `id`, la `url` y el contenido, y mueve también las subpáginas. Rechaza `database_id`, ciclos jerárquicos y destinos en la papelera.
+   - `PATCH /v1/pages/{page_id}` (*Update page properties*) actualiza propiedades, `icon`, `cover`, el estado de papelera (`in_trash`) y el bloqueo (`is_locked`) de forma atómica y parcial. Rechaza propiedades de solo lectura (`formula`, `rollup`, `created_time`, entre otras) y los campos `parent` y `children`.
+
+- **Valor para las pruebas de API.** El módulo `Pages` permite diseñar una suite que cubre validación estricta de contratos (`Notion-Version: 2025-09-03`, esquemas tipados y el modelo de *data sources*), seguridad con `Bearer Token` y restricciones por capacidades (`403 restricted_resource`), respuestas idénticas `404 object_not_found` para páginas inexistentes o no compartidas, análisis de valores límite (100 y 101 bloques, 2,000 y 2,001 caracteres, `page_size` en `0`, `1`, `100` y `101`, y `UUIDv4` con y sin guiones), control de límite de peticiones (`429 rate_limited`) y flujos **End-to-End (E2E)** completos. El flujo principal crea una fila con `POST /v1/pages`, la lee con `GET /v1/pages/{page_id}` y con el endpoint de propiedades, la actualiza con `PATCH`, la mueve entre padres y *data sources* con `POST /move`, la envía a la papelera con `in_trash: true` y comprueba que desaparece de las consultas. Después la restaura y verifica que conserva todos sus datos.
 
 ---
 
@@ -238,10 +252,23 @@ La especificación completa en inglés de las Historias de Usuario (*User Storie
 - **Flujos End-to-End (`E2E`):**
   - *Ciclo completo de credencial OAuth e identidad del Bot:* Emisión en `/v1/oauth/token` → verificación `active: true` en `/v1/oauth/introspect` → validación de correspondencia `id == bot_id` en `/v1/users/me` → invalidación en `/v1/oauth/revoke` → confirmación `active: false` y bloqueo inmediato `401 Unauthorized` en `/v1/users/me`, complementado con el flujo de rotación continua por `refresh_token` y descubrimiento paginado de usuarios (`/v1/users` → `/v1/users/{user_id}`).
 
+#### Kevin Uruchi — Módulo Pages
+
+La especificación completa en inglés de las Historias de Usuario (*User Stories*), Criterios de Aceptación detallados y tablas de Casos de Prueba para los 5 endpoints asignados se encuentra documentada en el archivo [`pruebas/KevinUruchiTests.md`](./pruebas/KevinUruchiTests.md). A continuación, se sintetizan los criterios de aceptación establecidos bajo el contrato `Notion-Version: 2025-09-03`.
+
+- **Módulo `Pages` (`POST /v1/pages`, `GET /v1/pages/{page_id}`, `GET /v1/pages/{page_id}/properties/{property_id}`, `POST /v1/pages/{page_id}/move`, `PATCH /v1/pages/{page_id}`)**
+  - *Happy Path.* Autenticado con `Authorization: Bearer <token>` válido y `Notion-Version: 2025-09-03`, `POST /v1/pages` crea una página bajo una página padre o como fila de un *data source* (`parent.data_source_id`) y retorna `200 OK` con `object: "page"`, `id`, `parent` y `url`, respetando el orden de los bloques de `children`. `GET /v1/pages/{page_id}` retorna `200 OK` con las propiedades y los metadatos de la página, y admite `filter_properties`. `GET /v1/pages/{page_id}/properties/{property_id}` retorna `object: "property_item"` para propiedades simples y `object: "list"` con `results[]`, `has_more` y `next_cursor` para las paginadas. `POST /v1/pages/{page_id}/move` reubica la página bajo otra página o *data source* conservando `id`, `url` y contenido. `PATCH /v1/pages/{page_id}` actualiza propiedades, `icon`, `cover`, `in_trash` e `is_locked` de forma parcial y atómica.
+  - *Negative Scenarios.* Tokens ausentes, inválidos, revocados o con esquema distinto de `Bearer` responden `401 Unauthorized` (`code: "unauthorized"`). La omisión del header `Notion-Version` retorna `400 Bad Request` (`code: "missing_version"`). Tokens sin la capacidad requerida (lectura, inserción o actualización de contenido) reciben `403 Forbidden` (`code: "restricted_resource"`). Un `UUID`, un cuerpo, una propiedad de solo lectura o un tipo de propiedad inválidos producen `400 Bad Request` (`code: "validation_error"` o `"invalid_json"`). Una página inexistente o no compartida con la integración devuelve la misma respuesta `404 Not Found` (`code: "object_not_found"`). El endpoint de `move` rechaza `database_id`, ciclos jerárquicos y destinos en la papelera con `400`. Una petición rechazada no crea, modifica ni mueve nada, y el exceso de peticiones retorna `429 Too Many Requests` (`code: "rate_limited"`) con `Retry-After`.
+  - *Boundary Cases.* En `POST /v1/pages`, 100 bloques en `children` responden `200 OK` y 101 se rechazan con `400 validation_error`; la misma frontera aplica a 2,000 y 2,001 caracteres de texto enriquecido, y a 100 y 101 elementos en `multi_select`, `people` y `relation`. En el endpoint de propiedades, `page_size=1` (mínimo) y `page_size=100` (máximo) responden `200 OK`, mientras que `page_size=0` y `page_size=101` se rechazan con `400 validation_error`. En todos los endpoints, tanto el `UUIDv4` con guiones como la cadena hexadecimal de 32 caracteres sin guiones son aceptados, mientras que longitudes de 31 y 33 caracteres y las cadenas vacías fallan con `400 validation_error`.
+
+- **Flujos End-to-End (`E2E`)**
+  - *Ciclo de vida completo de una página.* Creación en `POST /v1/pages` → lectura y verificación de valores en `GET /v1/pages/{page_id}` → actualización en `PATCH` y confirmación del nuevo valor mediante `GET /v1/pages/{page_id}/properties/{property_id}` → reubicación entre páginas y *data sources* en `POST /move` con `id`, `url` y contenido intactos → envío a la papelera con `in_trash: true` y ausencia en las consultas del *data source* → restauración con `in_trash: false` sin pérdida de datos. Se complementa con flujos de relaciones duales con paginación por `next_cursor`, propiedades calculadas (`rollup` y `formula`), control de permisos entre integraciones, recuperación ante errores sin efectos secundarios y operaciones masivas de 50 páginas.
+
 ### Escenarios de prueba
 
 *Escenarios correspondientes a **Gabriel Marcos Guaman Ortuño** — Módulos `Users` y `OAuth` (detalle completo de precondiciones, pasos, resultados esperados y prioridades en [`pruebas/GabrielGuamanTests.md`](./pruebas/GabrielGuamanTests.md)):*
 
+*Escenarios correspondientes a **Kevin Uruchi** — Módulo `Pages` (detalle completo de precondiciones, pasos, resultados esperados y prioridades en [`pruebas/KevinUruchiTests.md`](./pruebas/KevinUruchiTests.md)).*
 
 ### Uso de IA generativa
 
@@ -271,6 +298,33 @@ La salida base generada por la IA fue auditada, depurada y contrastada manualmen
 2. **Validación de esquemas de autenticación dual:** Se corrigieron y segmentaron las precondiciones de seguridad para distinguir con exactitud entre los endpoints del módulo `Users` —que exigen autenticación `Authorization: Bearer <token>` y capacidades explícitas de lectura de usuario (*Read user information*)— y los endpoints del módulo `OAuth`, que exigen autenticación de cliente mediante `Authorization: Basic` codificado en Base64 con `client_id:client_secret`.
 3. **Ajuste de valores límite (`Boundary`) reales:** Se verificó en la especificación oficial de Notion (`2025-09-03`) que `GET /v1/users` admite el parámetro `page_size` únicamente entre `1` (mínimo) y `100` (máximo), ajustando los casos fuera de rango (`page_size=0` y `page_size=101`) para esperar `400 Bad Request` (`code: "validation_error"`), además de validar la aceptación dual de identificadores `UUIDv4` con guiones (36 caracteres) y sin guiones (32 caracteres).
 4. **Estandarización de códigos de error propios de Notion:** Se validó que todos los resultados esperados contemplen la estructura real de error de Notion (`object: "error"`, `code: "unauthorized" | "validation_error" | "object_not_found" | "missing_version" | "restricted_resource" | "rate_limited"`), así como las respuestas específicas del estándar OAuth 2.0 (`error: "invalid_client" | "invalid_grant" | "unsupported_grant_type"` y `active: true/false`).
+
+#### Kevin Uruchi — Módulo Pages
+
+**Prompt utilizado**
+
+```text
+Act as a Senior QA Automation Engineer (SQE). Populate the file KevinUruchiTests.md entirely in English, designing the User Stories, Acceptance Criteria and API Test Cases for Activity #4, based on the Notion REST API (Notion-Version: 2025-09-03), following the structure and table columns of the reference files workspaces_crud_ac.md and workspaces_test_cases.md.
+
+Target module and endpoints (Postman collection, Pages):
+- POST /v1/pages
+- GET /v1/pages/{page_id}
+- GET /v1/pages/{page_id}/properties/{property_id}
+- POST /v1/pages/{page_id}/move
+- PATCH /v1/pages/{page_id}
+
+Part 1: for each endpoint write a User Story and Acceptance Criteria grouped into Happy Path, Negative Scenarios and Boundary Cases, plus a final E2E section with complete lifecycle scenarios.
+Part 2: for each endpoint and for the E2E section write a test case table with the columns Test Case ID, Description, Preconditions, Steps, Expected Result, Test Type and Priority. Cover Happy Path, Negative, Boundary and E2E, and state the HTTP status code and the key JSON attributes of every expected result.
+```
+
+**Procedimiento de filtrado y validación**
+
+La salida base generada por la IA fue auditada, depurada y contrastada manualmente contra la documentación oficial de *Notion Developers*, aplicando cuatro criterios técnicos de validación.
+
+1. **Adaptación de escenarios ajenos al módulo `Pages`.** El prompt incluía ejemplos propios de `Users` y `OAuth` (`user_id`, `grant_type`, `code`, `Basic Auth`). Se reemplazaron por sus equivalentes en `Pages`, como `page_size` en el endpoint de propiedades, `UUIDv4` con y sin guiones, cadenas vacías en el cuerpo y esquemas de autenticación distintos de `Bearer`.
+2. **Validación del contrato del modelo de *data sources*.** Se verificó en la documentación oficial que con `Notion-Version: 2025-09-03` las páginas de una base de datos usan `data_source_id` como padre, y que `POST /v1/pages/{page_id}/move` solo admite `page_id` o `data_source_id`. Por ello se añadió un caso negativo que espera `400 validation_error` al enviar `database_id`.
+3. **Contraste de valores límite (`Boundary`).** Se revisaron los límites publicados por Notion (100 bloques por petición, 2,000 caracteres por texto enriquecido, 100 elementos por lista, 25 referencias truncadas en `GET /v1/pages/{page_id}` y `page_size` entre `1` y `100`) y se definieron pares de casos en cada frontera, por ejemplo 100 y 101 bloques o `page_size=0` y `page_size=101`.
+4. **Estandarización de resultados esperados.** Se normalizaron los tipos de prueba a `Happy Path`, `Negative`, `Boundary` y `E2E`, y todos los resultados esperados contemplan la estructura real de error de Notion (`object: "error"`, `code: "unauthorized"`, `"validation_error"`, `"object_not_found"`, `"missing_version"`, `"restricted_resource"` o `"rate_limited"`). Los comportamientos ambiguos de la documentación quedaron marcados como "comportamiento documentado" para fijarlos tras la primera ejecución.
 
 ---
 
