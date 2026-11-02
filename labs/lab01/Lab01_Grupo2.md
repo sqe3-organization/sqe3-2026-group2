@@ -18,7 +18,7 @@ Kevin Uruchi
 
 Jala University  
 Ingeniería en Software Comercial  
-Mgr. Orlando Alarcon
+Ing. Edson Guerra
 
 <br><br>
 
@@ -56,7 +56,7 @@ Octubre 30, 2026
 |------------|-----|
 | Valentina Molina Bustillos | |
 | Gabriel Marcos Guaman Ortuño | |
-| Karen Ivonne Cruz Alvarez | |
+| Karen Ivonne Cruz Alvarez |  |
 | Sebastián Pereyra | |
 | Kevin Uruchi | |
 
@@ -192,7 +192,7 @@ La plataforma **Notion**, a través de su especificación **Notion REST API (`No
 |------------|------------------------------|
 | Valentina Molina Bustillos | Gestión de Fuentes de Datos Tabulares (`Data sources`), Esquemas de Propiedades Dinámicas y Consultas Compuestas (`Query`) |
 | Gabriel Marcos Guaman Ortuño | Gestión de Identidad y Directorio de Usuarios (`Users`) y Ciclo de Vida de Autenticación/Autorización (`OAuth` 2.0) |
-| Karen Ivonne Cruz Alvarez | |
+| Karen Ivonne Cruz Alvarez | Gestión del Contenido de Páginas mediante Árboles de Bloques (`Blocks`): anexado, lectura, actualización y eliminación lógica |
 | Sebastián Pereyra | Contenedores de Bases de Datos (`Databases`) y Búsqueda Indexada Global (`Search`) |
 | Kevin Uruchi | Gestión del Ciclo de Vida de Páginas (`Pages`) |
 
@@ -250,6 +250,19 @@ El alcance asignado comprende el módulo de gestión de contenido `Pages` de la 
    - `PATCH /v1/pages/{page_id}` (*Update page properties*) actualiza propiedades, `icon`, `cover`, el estado de papelera (`in_trash`) y el bloqueo (`is_locked`) de forma atómica y parcial. Rechaza propiedades de solo lectura (`formula`, `rollup`, `created_time`, entre otras) y los campos `parent` y `children`.
 
 - **Valor para las pruebas de API.** El módulo `Pages` permite diseñar una suite que cubre validación estricta de contratos (`Notion-Version: 2025-09-03`, esquemas tipados y el modelo de *data sources*), seguridad con `Bearer Token` y restricciones por capacidades (`403 restricted_resource`), respuestas idénticas `404 object_not_found` para páginas inexistentes o no compartidas, análisis de valores límite (100 y 101 bloques, 2,000 y 2,001 caracteres, `page_size` en `0`, `1`, `100` y `101`, y `UUIDv4` con y sin guiones), control de límite de peticiones (`429 rate_limited`) y flujos **End-to-End (E2E)** completos. El flujo principal crea una fila con `POST /v1/pages`, la lee con `GET /v1/pages/{page_id}` y con el endpoint de propiedades, la actualiza con `PATCH`, la mueve entre padres y *data sources* con `POST /move`, la envía a la papelera con `in_trash: true` y comprueba que desaparece de las consultas. Después la restaura y verifica que conserva todos sus datos.
+
+#### Detalle de Caso de Uso — Karen Ivonne Cruz Alvarez (Módulo: Blocks)
+
+El alcance asignado comprende el módulo de contenido `Blocks` de la colección oficial de Postman **Notion API (`2025-09-03`)**, que cubre el ciclo completo de creación, lectura, edición y eliminación lógica de los bloques que conforman el cuerpo de una página.
+
+- **Módulo `Blocks` (Árboles de Bloques de Contenido):**
+  - `PATCH /v1/blocks/{block_id}/children` (*Append block children*): Anexa hasta `100` bloques hijos (`paragraph`, `heading_2`, `to_do`, `bulleted_list_item`, `toggle`, entre otros) a una página o bloque existente. Admite el parámetro `after` para insertar a continuación de un bloque hermano y hasta dos niveles de anidación por petición. Devuelve `object: "list"` con los bloques creados, conservando el orden enviado.
+  - `GET /v1/blocks/{block_id}` (*Retrieve a block*): Recupera un único bloque con su `type`, el contenido del tipo correspondiente, `parent`, `has_children`, marcas temporales y estado de papelera (`in_trash`). No incluye los hijos anidados; para leerlos se usa el endpoint de hijos.
+  - `GET /v1/blocks/{block_id}/children` (*Retrieve block children*): Retorna de forma paginada (`object: "list"`, `page_size` entre `1` y `100`, `start_cursor`, `has_more` y `next_cursor`) los hijos de primer nivel de un bloque o página, en su orden visual.
+  - `PATCH /v1/blocks/{block_id}` (*Update a block*): Modifica el contenido del bloque conforme a su propio tipo (por ejemplo, `rich_text` de un `paragraph` o `checked` de un `to_do`) y permite enviarlo o restaurarlo de la papelera (`in_trash`). El `type` de un bloque es inmutable.
+  - `DELETE /v1/blocks/{block_id}` (*Delete a block*): Elimina lógicamente un bloque (*Soft Delete*), devolviendo el objeto con `in_trash: true` (`archived: true`) y excluyéndolo del listado de hijos de su padre.
+
+- **Valor para las pruebas de API.** El módulo `Blocks` permite diseñar una suite que cubre validación estricta de contratos (`Notion-Version: 2025-09-03` y esquemas tipados por `type`), seguridad con `Bearer Token` y restricciones por capacidades (`403 restricted_resource` en lectura, inserción y actualización de contenido), respuestas idénticas `404 object_not_found` para bloques inexistentes o no compartidos, análisis de valores límite (`100` y `101` bloques por petición, `2,000` y `2,001` caracteres por fragmento de `rich_text`, dos y tres niveles de anidación, `page_size` en `0`, `1`, `100` y `101`, y `UUIDv4` con y sin guiones) y flujos **End-to-End (E2E)** completos. El flujo principal anexa un bloque a una página con `PATCH /children`, lo lee con `GET /v1/blocks/{block_id}`, lo edita con `PATCH`, lo elimina con `DELETE` y verifica que desaparece del listado de hijos y que conserva `in_trash: true`. Se complementa con la construcción de árboles anidados recorridos por paginación de cursores y con la inserción ordenada mediante `after`, seguida de eliminación y restauración.
 
 ---
 
@@ -316,9 +329,23 @@ La especificación completa en inglés de las Historias de Usuario (*User Storie
 - **Flujos End-to-End (`E2E`)**
   - *Ciclo de vida completo de una página.* Creación en `POST /v1/pages` → lectura y verificación de valores en `GET /v1/pages/{page_id}` → actualización en `PATCH` y confirmación del nuevo valor mediante `GET /v1/pages/{page_id}/properties/{property_id}` → reubicación entre páginas y *data sources* en `POST /move` con `id`, `url` y contenido intactos → envío a la papelera con `in_trash: true` y ausencia en las consultas del *data source* → restauración con `in_trash: false` sin pérdida de datos. Se complementa con flujos de relaciones duales con paginación por `next_cursor`, propiedades calculadas (`rollup` y `formula`), control de permisos entre integraciones, recuperación ante errores sin efectos secundarios y operaciones masivas de 50 páginas.
 
+#### Karen Ivonne Cruz Alvarez — Módulo Blocks
+
+La especificación completa en inglés de las Historias de Usuario (*User Stories*), Criterios de Aceptación detallados y tablas de Casos de Prueba para los 5 endpoints asignados se encuentra documentada en el archivo [`pruebas/KarenCruzTests.md`](./pruebas/KarenCruzTests.md). A continuación, se sintetizan los criterios de aceptación establecidos bajo el contrato `Notion-Version: 2025-09-03`:
+
+- **Módulo `Blocks` (`PATCH /v1/blocks/{block_id}/children`, `GET /v1/blocks/{block_id}`, `GET /v1/blocks/{block_id}/children`, `PATCH /v1/blocks/{block_id}`, `DELETE /v1/blocks/{block_id}`):**
+  - *Happy Path:* Autenticado con `Authorization: Bearer <token>` válido y `Notion-Version: 2025-09-03`, `PATCH /children` anexa uno o varios bloques a una página o bloque compartido y retorna `200 OK` con `object: "list"` y los bloques creados en el orden enviado (con soporte de `after` para insertar tras un hermano). `GET /v1/blocks/{block_id}` retorna `200 OK` con `object: "block"`, `type`, `parent`, `has_children` e `in_trash`. `GET /children` retorna una lista paginada (`object: "list"`, `results[]`, `has_more`, `next_cursor`) con los hijos de primer nivel. `PATCH /v1/blocks/{block_id}` actualiza el contenido del tipo propio del bloque (o su estado `in_trash`) y retorna el bloque actualizado. `DELETE` retorna `200 OK` con `in_trash: true` y excluye el bloque del listado de hijos de su padre.
+  - *Negative Scenarios:* Tokens ausentes, inválidos o revocados responden `401 Unauthorized` (`code: "unauthorized"`); la omisión del header `Notion-Version` retorna `400 Bad Request` (`code: "missing_version"`); tokens sin la capacidad requerida (*Read content*, *Insert content* o *Update content*) reciben `403 Forbidden` (`code: "restricted_resource"`); un `block_id` válido pero inexistente o no compartido devuelve `404 Not Found` (`code: "object_not_found"`); un `UUID`, un cuerpo, un `type` no soportado o un payload que no corresponde al tipo del bloque producen `400 Bad Request` (`code: "validation_error"` o `"invalid_json"`); no se permite anexar ni editar contenido de bloques en la papelera; y el exceso de peticiones retorna `429 Too Many Requests` (`code: "rate_limited"`) con `Retry-After`. Una petición rechazada no crea, modifica ni elimina ningún bloque.
+  - *Boundary Cases:* En `PATCH /children`, `100` bloques responden `200 OK` y `101` se rechazan con `400 validation_error`; la misma frontera aplica a `2,000` y `2,001` caracteres de `rich_text` y a dos y tres niveles de anidación en una sola petición. En `GET /children`, `page_size=1` (mínimo) y `page_size=100` (máximo) responden `200 OK`, mientras que `page_size=0`, `-1` y `101` se rechazan con `400 validation_error`, y un bloque sin hijos retorna `results: []` con `has_more: false`. En todos los endpoints, tanto el `UUIDv4` con guiones como la cadena hexadecimal de 32 caracteres sin guiones son aceptados, mientras que longitudes de 31 y 33 caracteres fallan con `400 validation_error` y el UUID nulo retorna `404 object_not_found`. El comportamiento al eliminar un bloque ya eliminado o enviar cuerpos vacíos se fija tras la primera ejecución, garantizando que nunca se produzca un `500`.
+
+- **Flujos End-to-End (`E2E`):**
+  - *Ciclo de vida completo de un bloque:* Anexado en `PATCH /children` → lectura en `GET /v1/blocks/{block_id}` → edición en `PATCH` y verificación del nuevo contenido → eliminación en `DELETE` con `in_trash: true` → verificación de ausencia en `GET /children` del padre. Se complementa con la construcción de un árbol de `101` bloques con un `toggle` anidado recorrido mediante paginación por `next_cursor`, la inserción ordenada con `after` seguida de eliminación y restauración con `in_trash: false`, y el control de capacidades entre integraciones de solo lectura y de acceso completo.
+
 ### Escenarios de prueba
 
 *Escenarios correspondientes a **Gabriel Marcos Guaman Ortuño** — Módulos `Users` y `OAuth` (detalle completo de precondiciones, pasos, resultados esperados y prioridades en [`pruebas/GabrielGuamanTests.md`](./pruebas/GabrielGuamanTests.md)):*
+
+*Escenarios correspondientes a **Karen Ivonne Cruz Alvarez** — Módulo `Blocks` (detalle completo de precondiciones, pasos, resultados esperados y prioridades en [`pruebas/KarenCruzTests.md`](./pruebas/KarenCruzTests.md)).*
 
 *Escenarios correspondientes a **Valentina Molina Bustillos** — Módulo `Data sources` (detalle completo de precondiciones, pasos, resultados esperados y prioridades en [`pruebas/ValentinaMolinaTests.md`](./pruebas/ValentinaMolinaTests.md)).*
 
@@ -354,6 +381,30 @@ La salida base generada por la IA fue auditada, depurada y contrastada manualmen
 2. **Validación de esquemas de autenticación dual:** Se corrigieron y segmentaron las precondiciones de seguridad para distinguir con exactitud entre los endpoints del módulo `Users` —que exigen autenticación `Authorization: Bearer <token>` y capacidades explícitas de lectura de usuario (*Read user information*)— y los endpoints del módulo `OAuth`, que exigen autenticación de cliente mediante `Authorization: Basic` codificado en Base64 con `client_id:client_secret`.
 3. **Ajuste de valores límite (`Boundary`) reales:** Se verificó en la especificación oficial de Notion (`2025-09-03`) que `GET /v1/users` admite el parámetro `page_size` únicamente entre `1` (mínimo) y `100` (máximo), ajustando los casos fuera de rango (`page_size=0` y `page_size=101`) para esperar `400 Bad Request` (`code: "validation_error"`), además de validar la aceptación dual de identificadores `UUIDv4` con guiones (36 caracteres) y sin guiones (32 caracteres).
 4. **Estandarización de códigos de error propios de Notion:** Se validó que todos los resultados esperados contemplen la estructura real de error de Notion (`object: "error"`, `code: "unauthorized" | "validation_error" | "object_not_found" | "missing_version" | "restricted_resource" | "rate_limited"`), así como las respuestas específicas del estándar OAuth 2.0 (`error: "invalid_client" | "invalid_grant" | "unsupported_grant_type"` y `active: true/false`).
+
+#### Karen Ivonne Cruz Alvarez — Módulo Blocks
+
+**Prompt utilizado**
+
+```text
+Act as a Senior QA Automation Engineer (SQE). Generate a comprehensive base list of API User Stories, Acceptance Criteria, and API Test Scenarios (covering Happy Path, Negative, Boundary, and End-to-End flows) in English for the Notion Public REST API (header Notion-Version: 2025-09-03), specifically targeting the official Postman collection module "Blocks":
+- PATCH /v1/blocks/{block_id}/children (Append block children to a page or block)
+- GET /v1/blocks/{block_id} (Retrieve a block)
+- GET /v1/blocks/{block_id}/children (Retrieve block children with cursor pagination)
+- PATCH /v1/blocks/{block_id} (Update a block's content or in_trash state)
+- DELETE /v1/blocks/{block_id} (Delete a block, soft delete to trash)
+
+For each endpoint, include preconditions, Bearer token authentication requirements and integration capabilities (Read content, Insert content, Update content), boundary values (up to 100 children per request, 2000 characters per rich_text, nesting depth, pagination page_size 0, 1, 100, 101, UUID canonical/compact formats), expected HTTP status codes, and exact Notion JSON response attributes. Use the structure of GabrielGuamanTests.md as template.
+```
+
+**Procedimiento de filtrado y validación**
+
+La salida base generada por la IA fue auditada, depurada y contrastada manualmente contra la documentación oficial de *Notion Developers*, aplicando cuatro criterios técnicos de validación:
+
+1. **Corrección del modelo de eliminación.** La IA propuso escenarios que esperaban la purga física del bloque y un `204 No Content` en `DELETE /v1/blocks/{block_id}`. Se corrigieron para esperar `200 OK` con el objeto `block` y `in_trash: true` (`archived: true`), ya que la eliminación es lógica y el bloque puede restaurarse con `PATCH` y `{"in_trash": false}`.
+2. **Descarte de operaciones no soportadas.** Se eliminaron los escenarios de cambio de `type` de un bloque existente como caso exitoso (el tipo es inmutable y se rechaza con `400 validation_error`), de lectura de hijos anidados embebidos en `GET /v1/blocks/{block_id}` (solo se informa `has_children`) y de paginación por `offset` o `page_number`, dado que la API usa únicamente `start_cursor` y `next_cursor`.
+3. **Contraste de valores límite (`Boundary`).** Se verificaron los límites publicados por Notion: `100` bloques por petición en `PATCH /children`, `2,000` caracteres por fragmento de `rich_text`, dos niveles de anidación por petición y `page_size` entre `1` y `100`. Se definieron pares de casos en cada frontera (`100` y `101`, `2,000` y `2,001`, `0` y `101`) y se añadió la aceptación de `UUIDv4` con y sin guiones.
+4. **Alineación con capacidades y seguridad.** Se segmentaron los escenarios `403 restricted_resource` según la capacidad faltante (*Read content*, *Insert content*, *Update content*) y se unificó la respuesta `404 object_not_found` para bloques inexistentes y no compartidos. Los comportamientos ambiguos de la documentación (cuerpos vacíos, `children: []` y eliminación de un bloque ya eliminado) quedaron marcados como "comportamiento a fijar tras la primera ejecución", exigiendo únicamente la ausencia de errores `500`.
 
 #### Valentina Molina Bustillos — Módulo Data Sources
 
@@ -493,3 +544,15 @@ Cada integrante que utilice herramientas de IA generativa para obtener una lista
 
 - **Registro del prompt:** documentar en el laboratorio el prompt exacto que se proporcionó a la herramienta, junto con el nombre del modelo utilizado.
 - **Filtrado y justificación:** revisar manualmente cada escenario generado, descartar los que no sean aplicables al contrato real de la API (`2025-09-03`) y anotar brevemente por qué se eliminaron los casos descartados. El estudiante es responsable de validar que solo se conserven pruebas verificables contra el comportamiento documentado del SUT.
+
+
+
+## Team Participation
+
+| Team Member | Contribution | Section/Item Worked On | Additional Comments |
+|---|---|---|---|
+| Karen Ivonne Cruz Alvarez | 67 casos de prueba de API (incluye 4 flujos E2E) para el módulo `Blocks`. Redacción de su caso de uso, criterios de aceptación y registro de IA. | Actividad #3 (caso de uso `Blocks`)| Cubre los 5 endpoints de `Blocks`. Los comportamientos ambiguos de la documentación quedan marcados para fijarlos tras la primera ejecución en Postman. |
+| Gabriel Marcos Guaman Ortuño | Especificación de User Stories, criterios de aceptación y casos de prueba para los módulos `Users` y `OAuth`. | Actividad #2 (exploración), Actividad #3 y #4 (`Users` y `OAuth`), archivo `GabrielGuamanTests.md` | Su archivo sirvió de plantilla para el resto del equipo. |
+| Valentina Molina Bustillos | Especificación de pruebas del módulo `Data sources`. | Actividad #3 y #4 (`Data sources`), archivo `ValentinaMolinaTests.md` | |
+| Sebastián Pereyra | Especificación de pruebas de los módulos `Databases` y `Search`. | Actividad #3 y #4 (`Databases` y `Search`), archivo `SebastianPereyraTests.md` | |
+| Kevin Uruchi | Especificación de pruebas del módulo `Pages`. | Actividad #3 y #4 (`Pages`), archivo `KevinUruchiTests.md` | |
