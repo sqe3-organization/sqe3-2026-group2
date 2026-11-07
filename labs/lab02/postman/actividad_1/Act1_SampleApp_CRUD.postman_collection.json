@@ -1,0 +1,207 @@
+{
+  "info": {
+    "_postman_id": "4c8f1a20-5e9b-47d2-b81a-9012f3456001",
+    "name": "Act1_SampleApp_CRUD",
+    "description": "Postman familiarization collection (SQE III - Lab 02 - Group 2 - Activity #1, Item 2). Executes a complete CRUD lifecycle (GET List, GET by ID, POST, PUT, PATCH, and DELETE) on the /posts resource of the public JSONPlaceholder sandbox REST API.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "01 - GET List All Posts",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{sample_base_url}}/posts",
+          "host": [
+            "{{sample_base_url}}"
+          ],
+          "path": [
+            "posts"
+          ]
+        },
+        "description": "Retrieves the full list of post resources (/posts) available in JSONPlaceholder (100 JSON records)."
+      },
+      "response": []
+    },
+    {
+      "name": "02 - GET Single Post by ID",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{sample_base_url}}/posts/1",
+          "host": [
+            "{{sample_base_url}}"
+          ],
+          "path": [
+            "posts",
+            "1"
+          ]
+        },
+        "description": "Retrieves the details of a single post resource identified by its path parameter ID (/posts/1)."
+      },
+      "response": []
+    },
+    {
+      "name": "03 - POST Create New Post",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json; charset=UTF-8",
+            "type": "text"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"SQE III Lab 02 Sample\",\n  \"body\": \"Testing CRUD in Postman\",\n  \"userId\": 1\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{sample_base_url}}/posts",
+          "host": [
+            "{{sample_base_url}}"
+          ],
+          "path": [
+            "posts"
+          ]
+        },
+        "description": "Creates a new post resource by sending a structured JSON payload in the request body. Returns 201 Created with the newly instantiated resource (id: 101)."
+      },
+      "response": []
+    },
+    {
+      "name": "04 - PUT Update Post",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json; charset=UTF-8",
+            "type": "text"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"id\": 1,\n  \"title\": \"SQE III Lab 02 Sample - Updated via PUT\",\n  \"body\": \"Full resource replacement executed in Postman\",\n  \"userId\": 1\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{sample_base_url}}/posts/1",
+          "host": [
+            "{{sample_base_url}}"
+          ],
+          "path": [
+            "posts",
+            "1"
+          ]
+        },
+        "description": "Performs a full, idempotent replacement of all fields on the /posts/1 resource using the HTTP PUT method."
+      },
+      "response": []
+    },
+    {
+      "name": "05 - PATCH Partial Update Post",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json; charset=UTF-8",
+            "type": "text"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"Updated Title via PATCH\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{sample_base_url}}/posts/1",
+          "host": [
+            "{{sample_base_url}}"
+          ],
+          "path": [
+            "posts",
+            "1"
+          ]
+        },
+        "description": "Partially updates the /posts/1 resource by modifying only the title attribute while leaving body and userId unchanged."
+      },
+      "response": []
+    },
+    {
+      "name": "06 - DELETE Post",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{sample_base_url}}/posts/1",
+          "host": [
+            "{{sample_base_url}}"
+          ],
+          "path": [
+            "posts",
+            "1"
+          ]
+        },
+        "description": "Requests deletion of the /posts/1 resource using the HTTP DELETE verb, returning 200 OK and an empty JSON object {}."
+      },
+      "response": []
+    }
+  ],
+  "variable": [
+    {
+      "key": "sample_base_url",
+      "value": "https://jsonplaceholder.typicode.com",
+      "type": "string"
+    }
+  ]
+}

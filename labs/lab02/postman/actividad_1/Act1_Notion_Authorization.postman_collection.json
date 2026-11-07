@@ -1,0 +1,228 @@
+{
+  "info": {
+    "_postman_id": "8e2b5d74-3a19-4f6c-9c04-7182a9045002",
+    "name": "Act1_Notion_Authorization",
+    "description": "Authorization verification collection for Notion REST API v1 (Notion-Version: 2025-09-03) - SQE III, Lab 02, Group 2 (Activity #1, Item 3). Demonstrates Notion's dual authorization architecture: Bearer Token for Internal Integrations and HTTP Basic Auth (RFC 7617) for OAuth 2.0 lifecycle endpoints in Public Integrations.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "01_Bearer_Token_Auth (Internal Integration)",
+      "item": [
+        {
+          "name": "Auth Check - GET Retrieve token's bot user (Valid Token)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Notion-Version",
+                "value": "2025-09-03",
+                "type": "text",
+                "description": "Mandatory Notion API contract version header."
+              },
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{NOTION_BASE_URL}}/v1/users/me",
+              "host": [
+                "{{NOTION_BASE_URL}}"
+              ],
+              "path": [
+                "v1",
+                "users",
+                "me"
+              ]
+            },
+            "description": "Validates successful authorization (200 OK) by inheriting the Bearer Token scheme ({{NOTION_TOKEN}}) from the parent folder. Returns the bot user object linked to the team's internal integration."
+          },
+          "response": []
+        },
+        {
+          "name": "Auth Check - GET Retrieve token's bot user (Invalid Token - 401)",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Notion-Version",
+                "value": "2025-09-03",
+                "type": "text",
+                "description": "Mandatory Notion API contract version header."
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer secret_invalid_token_123",
+                "type": "text",
+                "description": "Overrides inherited authorization with an invalid token to demonstrate 401 Unauthorized rejection."
+              },
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{NOTION_BASE_URL}}/v1/users/me",
+              "host": [
+                "{{NOTION_BASE_URL}}"
+              ],
+              "path": [
+                "v1",
+                "users",
+                "me"
+              ]
+            },
+            "description": "Demonstrates negative access control by overriding the Authorization header with an invalid credential (secret_invalid_token_123). Notion API deterministically rejects the request with HTTP 401 Unauthorized and code: \"unauthorized\"."
+          },
+          "response": []
+        }
+      ],
+      "description": "Bearer Token authorization scheme (Authorization: Bearer {{NOTION_TOKEN}}) used by internal integrations and active access tokens to consume Notion domain resources (/v1/users, /v1/pages, /v1/databases, /v1/data_sources, /v1/blocks, /v1/comments, /v1/search, and /v1/file_uploads).",
+      "auth": {
+        "type": "bearer",
+        "bearer": [
+          {
+            "key": "token",
+            "value": "{{NOTION_TOKEN}}",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "02_OAuth2_Basic_Auth (Public Integration)",
+      "item": [
+        {
+          "name": "OAuth Auth Check - POST Introspect Token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Notion-Version",
+                "value": "2025-09-03",
+                "type": "text",
+                "description": "Mandatory Notion API contract version header."
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"{{NOTION_TOKEN}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{NOTION_BASE_URL}}/v1/oauth/introspect",
+              "host": [
+                "{{NOTION_BASE_URL}}"
+              ],
+              "path": [
+                "v1",
+                "oauth",
+                "introspect"
+              ]
+            },
+            "description": "Inspects the active status (active: true/false) of an access token per RFC 7662 while authenticating the client application via HTTP Basic Auth (base64(OAUTH_CLIENT_ID:OAUTH_CLIENT_SECRET))."
+          },
+          "response": []
+        },
+        {
+          "name": "OAuth Auth Check - POST Exchange Token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Notion-Version",
+                "value": "2025-09-03",
+                "type": "text",
+                "description": "Mandatory Notion API contract version header."
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"grant_type\": \"authorization_code\",\n  \"code\": \"{{OAUTH_AUTH_CODE}}\",\n  \"redirect_uri\": \"{{OAUTH_REDIRECT_URI}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{NOTION_BASE_URL}}/v1/oauth/token",
+              "host": [
+                "{{NOTION_BASE_URL}}"
+              ],
+              "path": [
+                "v1",
+                "oauth",
+                "token"
+              ]
+            },
+            "description": "Exchanges a temporary single-use OAuth 2.0 authorization code (authorization_code) for an active access_token, inheriting HTTP Basic Auth client credentials from the parent folder."
+          },
+          "response": []
+        }
+      ],
+      "description": "HTTP Basic Auth authorization scheme (Authorization: Basic base64(client_id:client_secret)) strictly required by Notion OAuth 2.0 management endpoints (/v1/oauth/token, /v1/oauth/introspect, and /v1/oauth/revoke).",
+      "auth": {
+        "type": "basic",
+        "basic": [
+          {
+            "key": "username",
+            "value": "{{OAUTH_CLIENT_ID}}",
+            "type": "string"
+          },
+          {
+            "key": "password",
+            "value": "{{OAUTH_CLIENT_SECRET}}",
+            "type": "string"
+          }
+        ]
+      }
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Enforces the mandatory Notion-Version: 2025-09-03 contract header across all requests at the collection level",
+          "const notionVersion = pm.environment.get('NOTION_VERSION') || '2025-09-03';",
+          "pm.request.headers.upsert({",
+          "    key: 'Notion-Version',",
+          "    value: notionVersion",
+          "});"
+        ]
+      }
+    }
+  ]
+}
