@@ -259,7 +259,94 @@ Inspecting the **`OAuth`** module of the official `Notion API (2025-09-03)` coll
 1. Review verification concepts in Postman and how tests are implemented on requests.
 2. Implement in Postman the tests written in the previous laboratory, including multiple required assertions on status code, body, headers, etc.  
 
-### 2.1 Implementation of Previous Lab Test Cases with Multi-Layer Assertions in Postman
+### 2.1 Verifications and Assertions in Postman
+
+Before starting to write scripts for Notion, the team reviewed how Postman's testing system works. The main conclusion was that Postman does not "guess" if an API works correctly. We need to tell it what to check after each request. These checks are called **verifications or assertions**.
+
+#### Where do we write the verifications?
+
+In Postman, the code that checks the response is written in **Scripts → Post-response** (previously called *Tests*). This section uses JavaScript and allows us to access the data returned by the server, such as the status code, headers, JSON body, and response time.
+
+The important thing is that this code runs automatically after we send a request. This means we do not need to manually check if the `id` was received correctly or if the status was 200. Postman shows the results in green if the test passes and in red if it fails, inside the *Test Results* tab.
+
+#### The two main tools: `pm.test` and `pm.expect`
+
+Most of our verifications use these two functions:
+
+- **`pm.test(name, function)`** allows us to group one or more verifications under the same name. For example, we can create a test called *"The database was created correctly"* and check the status, the `object`, and the `id` inside it. If one verification fails, the entire test is marked as failed.
+- **`pm.expect(value).to...`** allows us to compare values using Chai syntax, a library included in Postman. With it, we can check if a value is equal to 200, if a property exists, or if it has the expected data type.
+
+#### The four types of verifications we will use in the lab
+
+##### 1. Verify the status code (Status Code)
+
+This is the most basic check because it tells us if the API accepted or rejected the request.
+
+```javascript
+pm.test("The status code is 200 OK", function () {
+    pm.response.to.have.status(200);
+});
+```
+
+If Notion returns a `401` because the token is incorrect, the test fails and we can identify that the problem is related to authentication.
+
+##### 2. Verify the response body (Body)
+
+Here, we check if the data returned by Notion is what we expected. First, we convert the JSON response into a JavaScript object and then check its properties.
+
+```javascript
+pm.test("The response is a valid page", function () {
+    const jsonData = pm.response.json();
+    pm.expect(jsonData.object).to.eql("page");
+    pm.expect(jsonData.id).to.be.a('string');
+});
+```
+
+This is important because an API can return `200 OK` but still have an empty body or incorrect data. With `pm.expect`, we check that the response actually matches what we requested.
+
+##### 3. Verify the headers (Headers)
+
+We can also check if the server returns the response in the expected format, such as JSON.
+
+```javascript
+pm.test("The response is JSON", function () {
+    pm.expect(pm.response.headers.get("Content-Type")).to.include("application/json");
+});
+```
+
+This verification helps us find format problems before trying to process the response body.
+
+##### 4. Verify the response time (optional)
+
+Although this is not a Notion business rule, checking that the API responds within a reasonable time is a good quality practice.
+
+```javascript
+pm.test("The response is fast", function () {
+    pm.expect(pm.response.responseTime).to.be.below(500);
+});
+```
+
+This is not required for the lab, but it helps us evaluate not only if the API works, but also if it responds within an acceptable time.
+
+#### Why is it important to group verifications?
+
+A common mistake when starting is creating a separate `pm.test` for every check. This can make the results difficult to read without adding much value. It is better to group related verifications.
+
+For example, in a single test, we can check that the response has the correct `object`, that the `id` is a string, and that the `parent` matches the value we sent. If something fails, the error message helps us identify which condition was not met.
+
+#### How does this connect with Postman variables?
+
+In the lab, we use environment variables, such as `{{database_id}}`, to avoid writing IDs directly in our requests (*hardcoding*).
+
+Verifications can also use these variables. For example, after creating a page, we can get its ID from the response and save it to use in the next request, such as a `GET`.
+
+We do this with `pm.environment.set("page_id", jsonData.id)` inside the test script.
+
+This allows us to connect several requests and use the results of one request in the next ones. This is the basic idea behind the multi-request tests required in **Activity #3**.
+
+---
+
+### 2.2 Implementation of Previous Lab Test Cases with Multi-Layer Assertions in Postman
 
 #### Gabriel Marcos Guaman Ortuño — Modules: Users & OAuth
 
