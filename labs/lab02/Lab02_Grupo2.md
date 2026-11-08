@@ -632,11 +632,74 @@ The collection [`Lab02_Grupo2_Valentina_CRUD.postman_collection.json`](./postman
 ---
 
 
+#### Karen Ivonne Cruz Alvarez — Module: Blocks
+
+All **72 test cases** designed in Laboratory 01 (`KarenCruzTests.md` — 68 endpoint test cases across the five `Blocks` endpoints plus 4 multi-step E2E scenarios, identified as `TC_BLK_*` and `TC_E2E_BLK_*`) were implemented in Postman inside [`postman/karen_cruz/Notion_Blocks_KarenCruz.postman_collection.json`](./postman/karen_cruz/Notion_Blocks_KarenCruz.postman_collection.json) (paired with [`Notion_Blocks_Env.postman_environment.json`](./postman/karen_cruz/Notion_Blocks_Env.postman_environment.json)), resulting in **81 executable HTTP requests** (one per test case, except `TC_E2E_BLK_001` and `TC_E2E_BLK_003`, which are chained across 6 and 5 sequential requests), each named `TC_ID - <description>`. Every request verifies the response in several layers: status code, `Content-Type` header, response time (SLA), response body / error contract, and data integrity (a follow-up `GET` that confirms the change was really stored or not applied).
+
+| Lab 01 Suite / Endpoint | Implemented Test Case IDs | Req. Count | Multi-Layer `pm.test()` Verifications Implemented |
+|-------------------------|---------------------------|------------|---------------------------------------------------|
+| **`PATCH /v1/blocks/{block_id}/children`**<br>(`01_PATCH_Append_Block_Children`) | `TC_BLK_APP_001` – `TC_BLK_APP_018` | 18 | **Status:** `200`, `400`, `401`, `403`, `404`, `429`.<br>**Headers & SLA:** `Content-Type: application/json`, `responseTime < 5000 ms`, `Retry-After` on `429`.<br>**Body / Schema:** `object === "list"`, `results[]` length equal to blocks sent (`100` accepted, `101` rejected), block `type` and order preserved, `parent.page_id`, `has_children` on nested toggles, `rich_text` content (`2000` vs `2001` chars) stored intact; error codes `"validation_error"`, `"object_not_found"`, `"unauthorized"`, `"restricted_resource"`, `"missing_version"`, `"invalid_json"`, `"rate_limited"`.<br>**Data integrity:** `GET /v1/blocks/{id}/children` shows the new blocks (or no new block after a rejected request). |
+| **`GET /v1/blocks/{block_id}`**<br>(`02_GET_Retrieve_Block`) | `TC_BLK_GET_001` – `TC_BLK_GET_011` | 11 | **Status:** `200`, `400`, `401`, `403`, `404`.<br>**Headers & SLA:** `application/json`, `< 5000 ms`.<br>**Body / Schema:** `object === "block"`, `id` equality, 32-char compact id normalized to 36-char hyphenated, `type`, `parent`, boolean `has_children` (without embedded `children`), ISO-8601 `created_time` / `last_edited_time`, `in_trash`; identical `object_not_found` for non-existent and non-shared blocks (no enumeration leak); nil UUID `404` vs 31/33-char `400`. |
+| **`GET /v1/blocks/{block_id}/children`**<br>(`03_GET_Retrieve_Block_Children`) | `TC_BLK_CHL_001` – `TC_BLK_CHL_014` | 14 | **Status:** `200`, `400`, `401`, `403`, `404`.<br>**Headers & SLA:** `application/json`, `< 5000 ms`.<br>**Body / Schema:** `object === "list"`, `type === "block"`, `results[]` bounds (`=== 1` at `page_size=1`, `=== 100` at `page_size=100`), boolean `has_more`, `next_cursor` (`null` on leaf blocks), no duplicates or gaps across pages, `parent.block_id` of toggle children; out-of-range `page_size` (`0`, `-1`, `101`) and malformed `start_cursor` rejected with `"validation_error"`. |
+| **`PATCH /v1/blocks/{block_id}`**<br>(`04_PATCH_Update_Block`) | `TC_BLK_UPD_001` – `TC_BLK_UPD_014` | 14 | **Status:** `200`, `400`, `401`, `403`, `404`.<br>**Headers & SLA:** `application/json`, `< 5000 ms`.<br>**Body / Schema:** same `id`, updated `rich_text`, `to_do.checked` toggled, `in_trash` true/false round trip, `last_edited_time` updated; mismatched payload type, non-boolean `checked`, trashed block and `2001`-char content rejected; error codes `"validation_error"`, `"invalid_json"`, `"missing_version"`, `"restricted_resource"`.<br>**Data integrity:** a failed update leaves the block unchanged (verified with `GET`). |
+| **`DELETE /v1/blocks/{block_id}`**<br>(`05_DELETE_Block`) | `TC_BLK_DEL_001` – `TC_BLK_DEL_011` | 11 | **Status:** `200`, `400`, `401`, `403`, `404`.<br>**Headers & SLA:** `application/json`, `< 5000 ms`.<br>**Body / Schema:** `object === "block"`, `id` equality, `in_trash === true`, deterministic (never `500`) response on repeated deletion and nil UUID; restore through `PATCH {"in_trash": false}` returns original content.<br>**Data integrity:** the deleted block no longer appears in the parent's `children` list; rejected deletions leave the block active. |
+| **Chained & E2E Flows**<br>(`06_E2E_Flows`) | `TC_E2E_BLK_001` – `TC_E2E_BLK_004` | 13 | Cross-request state parity between append, retrieve, update, delete and restore; `101` first-level blocks collected across 3 pages with no duplicates; nested toggle with exactly `2` children; insertion order `A, B, C` → `A, C` → `A, B, C` using `after`; read-only token allowed on `GET` but `403 restricted_resource` on every write, with content unchanged. |
+
+Every request script starts with a shared helper prelude (`call()` wrapper over `pm.sendRequest` throttled to stay under Notion's `~3 requests/second`, block builders such as `para()` / `toggle()`, `sandbox()` / `cleanup()`, and the assertion helpers `std()`, `isErr()` and `errResp()`). The two scripts below show the case-specific part.
+
+##### Representative Postman Script 1 — Negative & Error Contract Validation (`Blocks` Module: `TC_BLK_GET_008`)
+
+```javascript
+// [Pre-request Script] Intentionally send a syntactically invalid block_id
+// Request: GET {{NOTION_BASE_URL}}/v1/blocks/{{target_id}}
+setTarget("invalid-block-id-123");
+
+// [Post-response / Tests Script] Multi-layer error contract verification
+// errResp(id, status, code) = std() + isErr(), where:
+const std = (id, status) => {
+    pm.test(`${id} - Status code is ${status}`, () => pm.response.to.have.status(status));
+    pm.test(`${id} - Content-Type header is application/json`, () => pm.expect(pm.response.headers.get("Content-Type")).to.include("application/json"));
+    pm.test(`${id} - Response time is within 5000 ms SLA`, () => pm.expect(pm.response.responseTime).to.be.below(5000));
+};
+const isErr = (name, body, status, code) => pm.test(name, () => {
+    pm.expect(body.object).to.eql("error"); pm.expect(body.status).to.eql(status);
+    pm.expect(body.code).to.eql(code); pm.expect(body.message).to.be.a("string").and.not.empty;
+});
+const errResp = (id, status, code) => { std(id, status); isErr(`${id} - Error contract matches Notion error payload (${code})`, J(pm.response), status, code); };
+
+errResp("TC_BLK_GET_008", 400, "validation_error");
+```
+
+##### Representative Postman Script 2 — Preconditions, Data Integrity & Cleanup (`Blocks` Module: `TC_BLK_APP_001`)
+
+```javascript
+// [Pre-request Script] Precondition created by API: an isolated sandbox page under PAGE_ID
+const sb = await sandbox("APP_001"); setTarget(sb); setBody({ children: [para("Hello")] });
+
+// [Post-response / Tests Script]
+std(ID, 200);
+const b = J(pm.response); const first = (b.results || [])[0] || {};
+pm.test(`${ID} - Appended block matches the request (list schema, type, parent, text)`, () => {
+    pm.expect(b.object).to.eql("list"); pm.expect(b.results).to.have.lengthOf(1);
+    pm.expect(first.object).to.eql("block"); pm.expect(first.type).to.eql("paragraph"); pm.expect(first.id).to.match(ID_RE);
+    pm.expect(strip(first.parent.page_id)).to.eql(strip(V("sandbox_id")));
+    pm.expect(first.paragraph.rich_text[0].text.content).to.eql("Hello");
+});
+// Data integrity: a GET must return the stored block
+const stored = await getBlock(first.id);
+pm.test(`${ID} - [Data integrity] GET returns the same block id and text`, () => {
+    pm.expect(stored.id).to.eql(first.id); pm.expect(stored.paragraph.rich_text[0].text.content).to.eql("Hello");
+});
+// CLEANUP: Notion has no permanent delete, so the sandbox page (and its blocks) goes to the trash
+await cleanup();
+```
+
+![Karen Cruz - Test Results of the Blocks module (PASS badges)](./caps/Karen/actividad2-1.png)
+
+![Karen Cruz - Test Results of a negative / boundary contract check](./caps/Karen/actividad2-2.png)
+
 ---
 
-#### Karen Ivonne Cruz Alvarez — Module: [Pending Implementation]
-
-> *[Reserved for Karen Ivonne Cruz Alvarez's multi-layer test implementation summary, code snippets, and execution screenshots.]*
 
 ---
 
@@ -926,6 +989,61 @@ Screamshots:
 2. Identify test requirements, such as necessary preconditions and postconditions.
 3. Review the concept of variables, variable scopes, and environments in Postman.
 4. Implement multi-request tests using shared variables.  
+
+---
+
+#### Karen Ivonne Cruz Alvarez — Module: Blocks
+
+##### 3.1 Feasibility Evaluation of Lab 01 Test Cases in Postman
+
+All **72 test cases** from `KarenCruzTests.md` were evaluated for unattended execution inside Postman Collection Runner and Newman CLI:
+
+| Automation Classification | Covered Test Cases (`KarenCruzTests.md`) | Count | Technical Justification & Execution Strategy |
+|---------------------------|------------------------------------------|-------|----------------------------------------------|
+| **100% Automatable (Unattended Runner)** | All `TC_BLK_*` and `TC_E2E_BLK_*` not listed in the next two rows | **64 TCs** | Deterministic HTTP contracts. Every case creates its own sandbox page under `PAGE_ID` and every block, toggle, trashed block or page with `100` / `101` children by API in the pre-request script (`PATCH /children`, max `100` blocks per call); the sandbox page is moved to the trash at the end. They only need `NOTION_TOKEN` and `PAGE_ID`. Cases whose behavior is "to be pinned after first execution" (`TC_BLK_APP_015`, `TC_BLK_GET_011`, `TC_BLK_UPD_013`, `TC_BLK_DEL_003`, `TC_BLK_DEL_009`) assert a deterministic status (never `500`) with tolerant checks. |
+| **Conditionally Automatable (Extra Credentials or Data)** | `TC_BLK_APP_007`, `TC_BLK_UPD_006`, `TC_BLK_DEL_006` (`READONLY_TOKEN`); `TC_BLK_GET_006`, `TC_BLK_CHL_007` (`RESTRICTED_TOKEN`); `TC_BLK_GET_007` (`UNSHARED_BLOCK_ID`); `TC_E2E_BLK_004` (`READONLY_TOKEN`) | **7 TCs** | Run once the matching variable is filled in the environment. A second integration without the *Insert / Update / Read content* capability must be created in the Notion Developers Portal, and a block that exists but is not connected to the integration must be prepared. When the variable is empty the request is marked as skipped instead of failing. |
+| **Semi-Automated (Burst / Load Traffic)** | `TC_BLK_APP_018` (`429` rate limit) | **1 TC** | Needs more than `15` parallel requests per second, which a sequential Runner iteration does not produce. The script dispatches a burst of `20` parallel calls with `pm.sendRequest()` and asserts `429` + `Retry-After` when throttled, or `200 OK` on every call when Notion does not throttle. |
+
+##### 3.2 Test Requirements — Preconditions & Postconditions
+
+| Suite / Scope | Required Preconditions (Before Execution) | Enforced Postconditions (After Execution) |
+|---------------|-------------------------------------------|-------------------------------------------|
+| **`01_PATCH_Append_Block_Children`**<br>(`TC_BLK_APP_001`–`018`) | 1. Active `NOTION_TOKEN` with *Read*, *Update* and *Insert content* capabilities.<br>2. `PAGE_ID` of a page shared with the integration (`Connections`).<br>3. `READONLY_TOKEN` for `TC_BLK_APP_007`; a page with `>= 2` children and `first_block_id` for `TC_BLK_APP_003`, created by the script. | The case's sandbox page (with every block created in it) is moved to the trash with `PATCH /v1/pages/{id}` `{"in_trash": true}`; rejected requests leave the children count unchanged. |
+| **`02_GET_Retrieve_Block`**<br>(`TC_BLK_GET_001`–`011`) | 1. Same credentials and `PAGE_ID`.<br>2. A paragraph block, a toggle with a child and a trashed block, created by API.<br>3. `RESTRICTED_TOKEN` (`TC_BLK_GET_006`) and `UNSHARED_BLOCK_ID` (`TC_BLK_GET_007`). | Read-only requests leave no changes. The sandbox page and its helper blocks are trashed at the end of each case. |
+| **`03_GET_Retrieve_Block_Children`**<br>(`TC_BLK_CHL_001`–`014`) | 1. Same credentials and `PAGE_ID`.<br>2. Pages with `>= 3`, exactly `100` and `101` children, plus a leaf block and a toggle with children, created by API (`100` + `1` blocks in two requests).<br>3. `RESTRICTED_TOKEN` for `TC_BLK_CHL_007`. | Read-only requests leave no changes. The sandbox pages (`sandbox_id`, and `sandbox2_id` in `TC_BLK_CHL_013`) are trashed; `skip_case` and the sandbox variables are reset at the start of the next case. |
+| **`04_PATCH_Update_Block`**<br>(`TC_BLK_UPD_001`–`014`) | 1. Same credentials and `PAGE_ID`.<br>2. A paragraph with known text, a `to_do` block with `checked: false` and a trashed block, created by API.<br>3. `READONLY_TOKEN` for `TC_BLK_UPD_006`. | The sandbox page is trashed at the end. Failed updates leave the stored content unchanged (verified with `GET`). |
+| **`05_DELETE_Block`**<br>(`TC_BLK_DEL_001`–`011`) | 1. Same credentials and `PAGE_ID`.<br>2. A fresh block (and a toggle with children for `TC_BLK_DEL_003`) created by API for every case, so deletion never consumes shared data.<br>3. `READONLY_TOKEN` for `TC_BLK_DEL_006`. | Deleted blocks stay in the trash inside a sandbox page that is trashed too (Notion has no permanent delete through the API); rejected deletions leave the block active (verified with `GET`). |
+| **`06_E2E_Flows`**<br>(`TC_E2E_BLK_001`–`004`) | Executed strictly as the **final folder** (the chained steps depend on the order of their requests) so the `101`-block and permission scenarios never affect earlier suites. | The sandbox page created by the flow is trashed in the last step (or at the end of the single-request cases), even when an assertion fails, because `cleanup()` runs after the `pm.test()` calls. |
+
+##### 3.3 Multi-Request Chaining & Shared Variables Implementation
+
+Variables were partitioned across three Postman scopes to prevent credential leakage while supporting dynamic request chaining:
+
+| Scope Level | Variable Names | Purpose & Lifecycle |
+|-------------|----------------|---------------------|
+| **Collection Scope** | `NOTION_BASE_URL`, `NOTION_VERSION`, `target_id`, `sandbox_id`, `sandbox2_id`, `skip_case`, `first_block_id`, `next_cursor`, `e2e_block_id`, `e2e_a_id`, `e2e_b_id` | Portable contract defaults (`2025-09-03`) and cross-step runtime state shared via `pm.collectionVariables.set()` / `.get()`; the E2E chains read `{{e2e_block_id}}`, `{{e2e_b_id}}` and `{{sandbox_id}}` directly in the request URL. |
+| **Environment Scope** (`Notion_Blocks_Env`) | `NOTION_TOKEN` (*secret*), `READONLY_TOKEN` (*secret*), `RESTRICTED_TOKEN` (*secret*), `PAGE_ID`, `UNSHARED_BLOCK_ID` | Workspace-specific values and secrets, masked in the UI. Empty optional variables make the dependent cases skip instead of fail. |
+| **Script-local Scope** | `BASE`, `TOKEN`, `ROOT` (`PAGE_ID`), `ID` (test case id), `SKIP`, the compact 32-char id (`strip(id)`), and the generated payloads (`text(2000)`, `many(100)`) | Ephemeral values computed inside each Pre-request / Tests script. |
+
+Two workflows were implemented as **true multi-request chains** inside `06_E2E_Flows`, passing state through collection variables:
+
+1. **Full Block Lifecycle (`TC_E2E_BLK_001` — 6 Sequential Requests):**
+   - `Step 1` (`PATCH /v1/blocks/{{target_id}}/children`) creates a sandbox page, appends one paragraph and stores `results[0].id` -> `e2e_block_id`.
+   - `Step 2` (`GET /v1/blocks/{{e2e_block_id}}`) asserts the original text and `parent.page_id == sandbox_id`.
+   - `Step 3` (`PATCH /v1/blocks/{{e2e_block_id}}`) updates the text, and `Step 4` (`GET`) confirms the new text persisted.
+   - `Step 5` (`DELETE /v1/blocks/{{e2e_block_id}}`) returns `in_trash: true`.
+   - `Step 6` (`GET /v1/blocks/{{sandbox_id}}/children`) asserts the block is absent, calls `GET` on the block (`in_trash: true`), unsets `e2e_block_id` and trashes the sandbox page.
+2. **Ordered Insertion, Delete and Restore (`TC_E2E_BLK_003` — 5 Sequential Requests):**
+   - `Step 1` appends paragraphs `A` and `C` and stores `e2e_a_id`; `Step 2` inserts `B` with `"after": "{{e2e_a_id}}"` and stores `e2e_b_id`; `Step 3` lists children and asserts order `A, B, C`.
+   - `Step 4` (`DELETE /v1/blocks/{{e2e_b_id}}`) asserts order `A, C`; `Step 5` (`PATCH` `{"in_trash": false}`) restores `B` and asserts `A, B, C` with the original content, then cleans up.
+
+The other two scenarios run their steps inside a single request script through `pm.sendRequest()`: pagination (`TC_E2E_BLK_002`: `100` + `1` blocks, traversal at `page_size=50` until `has_more: false`, exactly `101` unique first-level blocks over 3 pages, toggle with `2` children) and capability enforcement (`TC_E2E_BLK_004`: read-only token reads succeed, three writes return `403`, full-access `GET` confirms the content is unchanged).
+
+![Karen Cruz - Collection and environment variables used in the chained flow](./caps/Karen/actividad3-1.png)
+
+![Karen Cruz - Chained execution of TC_E2E_BLK_001 / TC_E2E_BLK_003](./caps/Karen/actividad3-2.png)
+
+---
 
 ### 3.1 Evaluation and Feasibility of Written Tests in Postman
 
@@ -1883,9 +2001,50 @@ Executed against `Act1_Notion_Env`: 13 requests executed, **30 tests passed, 0 f
 
 ---
 
-#### Karen Ivonne Cruz Alvarez — Automated Execution Summary: [Pending Implementation]
+#### Karen Ivonne Cruz Alvarez — Automated Execution Summary (`Blocks`)
 
-> *[Reserved for Karen Ivonne Cruz Alvarez's Postman Collection Runner / Newman CLI metrics and execution screenshots.]*
+Karen's collection follows the team conventions defined in section 4.1:
+
+| Convention Dimension | How it is applied in `Notion_Blocks_KarenCruz` |
+|----------------------|------------------------------------------------|
+| **Folder hierarchy** | One folder per endpoint (`01_PATCH_Append_Block_Children`, `02_GET_Retrieve_Block`, `03_GET_Retrieve_Block_Children`, `04_PATCH_Update_Block`, `05_DELETE_Block`) and `06_E2E_Flows` last. |
+| **Request ordering** | Inside every endpoint folder: `Happy Path` → `Negative` → `Boundary`, following the numeric order of `KarenCruzTests.md`. Destructive and permission flows live in the final `06_E2E_Flows` folder. |
+| **Naming** | Request name `TC_ID - <description>`. Assertions prefixed with `<TC_ID> - <Check>`; data integrity checks start with `[Data integrity]`. Static config and secrets in `UPPER_SNAKE_CASE` (`NOTION_TOKEN`), dynamic chained variables in `lower_snake_case` (`created_block_id`). |
+| **Execution isolation** | Each case creates its own blocks and trashes them at the end, so any case can run alone or in any folder selection. |
+
+```bash
+# Full automated suite execution with CLI and HTML dashboard report
+npx newman run postman/karen_cruz/Notion_Blocks_KarenCruz.postman_collection.json \
+  -e postman/karen_cruz/Notion_Blocks_Env.postman_environment.json \
+  --delay-request 400 \
+  --timeout-script 600000 \
+  --reporters cli,htmlextra \
+  --reporter-htmlextra-export reports/karen_cruz_newman_report.html
+
+# Unattended execution of a single endpoint folder
+npx newman run postman/karen_cruz/Notion_Blocks_KarenCruz.postman_collection.json \
+  -e postman/karen_cruz/Notion_Blocks_Env.postman_environment.json \
+  --folder "03_GET_Retrieve_Block_Children" \
+  --delay-request 400 \
+  --timeout-script 600000
+```
+
+The delay is `400 ms` between requests, and the helper calls made from the scripts add their own `340 ms` pause (`--delay-request` does not apply to `pm.sendRequest`), to stay below Notion's `~3 requests/second` limit, and `--timeout-script 600000` is needed because some cases create `100` and `101` blocks (`TC_BLK_CHL_013`, `TC_E2E_BLK_002`).
+
+| Execution Metric | Value / Specification |
+|------------------|-----------------------|
+| **Collection File** | [`postman/karen_cruz/Notion_Blocks_KarenCruz.postman_collection.json`](./postman/karen_cruz/Notion_Blocks_KarenCruz.postman_collection.json) |
+| **Environment File** | [`postman/karen_cruz/Notion_Blocks_Env.postman_environment.json`](./postman/karen_cruz/Notion_Blocks_Env.postman_environment.json) |
+| **Lab 01 Test Cases Covered** | **72 Test Cases** (`18` append + `11` retrieve + `14` children + `14` update + `11` delete + `4` E2E) |
+| **Total Automated Requests** | **81 HTTP Requests** (`18` + `11` + `14` + `14` + `11` endpoint requests and `13` in `06_E2E_Flows`) |
+| **Total `pm.test()` Assertions** | **[COMPLETAR: numero que muestra el Runner]** |
+| **Passed / Failed / Skipped** | **[COMPLETAR]** (skipped = cases whose optional environment variable is empty) |
+| **Runner Configuration** | Iterations: `1` \| Inter-request Delay: `400 ms` \| Persist Variables: `Enabled` |
+
+![Karen Cruz - Postman Collection Runner summary](./caps/Karen/actividad4-1.png)
+
+![Karen Cruz - Newman CLI terminal output](./caps/Karen/actividad4-2.png)
+
 
 ---
 
