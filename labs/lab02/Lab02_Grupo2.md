@@ -376,9 +376,103 @@ pm.test("TC_OAUTH_REV_004 - Error schema contract matches Notion error payload (
 
 > *[Reserved for Sebastián Pereyra's multi-layer test implementation summary, code snippets, and execution screenshots.]*
 
-#### Kevin Uruchi — Module: [Pending Implementation]
+#### Kevin Uruchi — Module: Pages
 
-> *[Reserved for Kevin Uruchi's multi-layer test implementation summary, code snippets, and execution screenshots.]*
+All **200 test cases** designed in Laboratory 01 (`KevinUruchiTests.md` — 184 endpoint test cases across the five `Pages` endpoints plus 16 multi-step E2E scenarios, identified as `TC_PAGES_*` and `TC_E2E_*`) were implemented in Postman inside [`postman/kevin_uruchi/Notion_Pages.postman_collection.json`](./postman/kevin_uruchi/Notion_Pages.postman_collection.json) (paired with [`Notion_Pages.postman_environment.json`](./postman/kevin_uruchi/Notion_Pages.postman_environment.json)), resulting in **200 executable HTTP requests**, one per test case, each named exactly like its test case (`TC_ID: Verify that ...`). Every request verifies the response in several layers: status code, response body, JSON schema, headers, response time and data integrity (a follow-up `GET` that confirms the change was really stored).
+
+| Lab 01 Suite / Endpoint | Implemented Test Case IDs | Req. Count | Multi-Layer `pm.test()` Verifications Implemented |
+|-------------------------|---------------------------|------------|---------------------------------------------------|
+| **`POST /v1/pages`**<br>(`POST /v1/pages`) | `TC_PAGES_001` – `TC_PAGES_048` | 48 | **Status:** `200`, `400`, `401`, `403`, `404`, `429`.<br>**Headers & SLA:** `Content-Type: application/json`, `responseTime < 2000 ms`.<br>**Body / Schema:** `object === "page"`, `UUID` regex on `id`, `parent.type`, `in_trash === false`, ISO-8601 `created_time` / `last_edited_time`, title and property values equal to the request; error codes `"validation_error"`, `"object_not_found"`, `"unauthorized"`, `"restricted_resource"`, `"missing_version"`, `"invalid_json"`.<br>**Data integrity:** `GET /v1/pages/{id}` returns what was sent. |
+| **`GET /v1/pages/{page_id}`**<br>(`GET /v1/pages/{page_id}`) | `TC_PAGES_GET_001` – `TC_PAGES_GET_025` | 25 | **Status:** `200`, `400`, `401`, `403`, `404`.<br>**Headers & SLA:** `application/json`, `< 2000 ms`.<br>**Body / Schema:** all documented page fields, `filter_properties` returning only the requested properties, 100-property rows, 2,000-character Unicode titles, relation truncation (`has_more` at 26 references); error codes `"validation_error"`, `"object_not_found"`, `"restricted_resource"`. |
+| **`GET /v1/pages/{page_id}/properties/{property_id}`**<br>(`GET /v1/pages/{page_id}/properties/{property_id}`) | `TC_PAGES_PROP_001` – `TC_PAGES_PROP_030` | 30 | **Status:** `200`, `400`, `401`, `403`, `404`.<br>**Headers & SLA:** `application/json`, `< 2000 ms`.<br>**Body / Schema:** `object === "property_item"` or `"list"`, `type` per property kind (number, select, date, formula, rollup, relation, people, rich_text, title), `next_cursor` and `page_size` pagination without duplicates or gaps. |
+| **`POST /v1/pages/{page_id}/move`**<br>(`POST /v1/pages/{page_id}/move`) | `TC_PAGES_MOVE_001` – `TC_PAGES_MOVE_034` | 34 | **Status:** `200`, `400`, `401`, `403`, `404`, `409`.<br>**Headers & SLA:** `application/json`, `< 2000 ms`.<br>**Body / Schema:** new `parent.type` (`page_id` or `data_source_id`), `id`, `url`, `created_by`, `icon`, `cover` and blocks unchanged; destination rejected when it is a `database_id`, a descendant (cycle) or a trashed page.<br>**Data integrity:** the old parent no longer lists the page and the new parent does. |
+| **`PATCH /v1/pages/{page_id}`**<br>(`PATCH /v1/pages/{page_id}`) | `TC_PAGES_PATCH_001` – `TC_PAGES_PATCH_047` | 47 | **Status:** `200`, `400`, `401`, `403`, `404`, `409`.<br>**Headers & SLA:** `application/json`, `< 2000 ms`.<br>**Body / Schema:** updated values per property type, `icon` and `cover`, `in_trash` and `is_locked`, `last_edited_time` updated; read-only properties (formula, rollup, created/edited time) rejected; limits of 2,000 characters, 100 rich-text elements and 100 list items.<br>**Data integrity:** a failed update leaves the page unchanged. |
+| **Chained & E2E Flows**<br>(`E2E`) | `TC_E2E_001` – `TC_E2E_016` | 16 | Cross-endpoint state parity between create, read, property read, query, update, move and trash; dual relation sync, rollup and formula recalculation, pagination of large values, no side effects after failed requests, rate-limit handling without duplicates, permissions across the lifecycle, bulk operations on 50 pages and concurrent updates. |
+
+##### Representative Postman Script 1 — Negative & Error Contract Validation (`Pages` Module: `TC_PAGES_GET_013`)
+
+```javascript
+// [Pre-request Script] A well-formed UUID that does not belong to any page
+const uuid = () =>
+    "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+        const r = (Math.random() * 16) | 0;
+        return (c === "x" ? r : (r & 3) | 8).toString(16);
+    });
+pm.collectionVariables.set("targetId", uuid());
+// Request: GET {{apiBaseURL}}{{pagesEndpoint}}/{{targetId}}
+
+// [Post-response / Tests Script] Multi-layer error contract verification
+pm.test("Status code should be 404", function () {
+    pm.response.to.have.status(404);
+});
+
+pm.test("Response body should be a Notion error with code object_not_found", function () {
+    const errorBody = pm.response.json();
+    pm.expect(errorBody.object).to.eql("error");
+    pm.expect(errorBody.status).to.eql(404);
+    pm.expect(errorBody.code).to.eql("object_not_found");
+    pm.expect(errorBody.message).to.be.a("string").and.not.empty;
+});
+
+pm.test("Content-Type should be application/json", function () {
+    pm.response.to.have.header("Content-Type");
+    pm.expect(pm.response.headers.get("Content-Type")).to.include("application/json");
+});
+
+pm.test("Response time should be less than 2000ms", function () {
+    pm.expect(pm.response.responseTime).to.be.below(2000);
+});
+```
+
+##### Representative Postman Script 2 — Preconditions, Data Integrity & Cleanup (`Pages` Module: `TC_PAGES_MOVE_001`)
+
+```javascript
+// [Pre-request Script] Preconditions created by API (headers and pagesUrl are built as in TC_PAGES_001)
+// 1. Parent page, 2. second parent page (destination), 3. page to move
+const parentResponse = await pm.sendRequest({
+    url: pagesUrl, method: "POST", header: headers,
+    body: { mode: "raw", raw: JSON.stringify({
+        parent: { page_id: pm.environment.get("rootPageId") },
+        properties: { title: { title: [{ text: { content: "QA parent - " + Date.now() } }] } }
+    }) }
+});
+const p = parentResponse.json().id;
+pm.collectionVariables.set("parentPageId", p);
+// ... the second parent (parent2Id) and the child page (pageId) are created the same way ...
+pm.request.body.update({
+    mode: "raw",
+    raw: JSON.stringify({ parent: { type: "page_id", page_id: pm.collectionVariables.get("parent2Id") } })
+});
+
+// [Post-response / Tests Script]
+pm.test("Status code should be 200", function () {
+    pm.response.to.have.status(200);
+});
+pm.test("The new parent should be the destination", function () {
+    const jsonData = pm.response.json();
+    pm.expect(jsonData.parent.type).to.eql("page_id");
+    pm.expect(jsonData.parent.page_id.replace(/-/g, "")).to.eql(pm.collectionVariables.get("parent2Id").replace(/-/g, ""));
+});
+
+// Data integrity: a GET shows the new parent
+const getResponse = await pm.sendRequest({ url: `${pagesUrl}/${pm.collectionVariables.get("pageId")}`, method: "GET", header: headers });
+pm.test("[Data integrity] GET should show the new parent", function () {
+    pm.expect(getResponse.json().parent.page_id.replace(/-/g, "")).to.eql(pm.collectionVariables.get("parent2Id").replace(/-/g, ""));
+});
+
+// CLEANUP. Notion has no permanent delete, so every created page goes to the trash
+for (const pageToTrash of [pm.collectionVariables.get("parentPageId"), pm.collectionVariables.get("parent2Id")]) {
+    await pm.sendRequest({
+        url: `${pagesUrl}/${pageToTrash}`, method: "PATCH", header: headers,
+        body: { mode: "raw", raw: JSON.stringify({ in_trash: true }) }
+    });
+}
+```
+Screamshots:
+
+![alt text](caps/Kevin/actividad2-1.png)
+
+![alt text](caps/Kevin/actividad2-2.png)
 
 ---
 
@@ -454,9 +548,49 @@ Two primary multi-request chained workflows were implemented inside `03_Chained_
 
 > *[Reserved for Sebastián Pereyra's feasibility evaluation (`3.1`), preconditions/postconditions (`3.2`), and chained multi-request implementation (`3.3`).]*
 
-#### Kevin Uruchi — Module: [Pending Implementation]
+#### Kevin Uruchi — Module: Pages
 
-> *[Reserved for Kevin Uruchi's feasibility evaluation (`3.1`), preconditions/postconditions (`3.2`), and chained multi-request implementation (`3.3`).]*
+##### 3.1 Feasibility Evaluation of Lab 01 Test Cases in Postman
+
+All **200 test cases** from `KevinUruchiTests.md` were evaluated for unattended execution inside Postman Collection Runner and Newman CLI:
+
+| Automation Classification | Covered Test Cases (`KevinUruchiTests.md`) | Count | Technical Justification & Execution Strategy |
+|---------------------------|--------------------------------------------|-------|----------------------------------------------|
+| **100% Automatable (Unattended Runner)** | All `TC_PAGES_*` and `TC_E2E_*` not listed in the next two rows | **187 TCs** | Every precondition (parent pages, data sources, rows, relations, page trees) is created by API in the pre-request script, and the cleanup moves the pages to the trash. They only need `notionToken` and `rootPageId`. |
+| **Conditionally Automatable (Extra Credentials or Data)** | `TC_PAGES_009` (public integration token), `TC_PAGES_023`, `TC_PAGES_GET_014`, `TC_PAGES_MOVE_019`, `TC_PAGES_PATCH_021` (page not shared with the integration), `TC_PAGES_024`, `TC_PAGES_MOVE_025`, `TC_PAGES_PATCH_022` (read-only or insert-only token), `TC_PAGES_GET_016`, `TC_PAGES_PROP_016` (token without read capability), `TC_PAGES_GET_025` (integration without access), `TC_PAGES_PATCH_030` (data source with a Status property) | **12 TCs** | They run once the matching variable (`tokenPublic`, `unsharedPageId`, `tokenReadOnly`, `tokenInsertOnly`, `tokenNoRead`, `tokenB`, `statusDataSourceId`) is filled in the environment. When it is empty the request is marked as skipped instead of failing. |
+| **Semi-Automated (Manual Sharing Steps)** | `TC_E2E_013` | **1 TC** | Sharing a page with a second integration and then revoking it is done in the Notion web UI. The script automates the steps that use prepared tokens (no access, read-only, insert-only) and the manual steps are documented in the test case. |
+
+Nine of the automatable cases generate burst or parallel traffic from the script itself (`TC_PAGES_033`, `TC_PAGES_GET_018`, `TC_PAGES_PROP_019`, `TC_PAGES_MOVE_028`, `TC_PAGES_MOVE_034`, `TC_PAGES_PATCH_035`, `TC_PAGES_PATCH_047`, `TC_E2E_012` and `TC_E2E_015`), so no external load tool is needed. Five more cases (`TC_PAGES_013`, `TC_PAGES_GET_010`, `TC_PAGES_PROP_009`, `TC_PAGES_MOVE_010` and `TC_PAGES_PATCH_017`) add an extra check with `revokedToken` when that variable is filled.
+
+##### 3.2 Test Requirements — Preconditions & Postconditions
+
+| Suite / Scope | Required Preconditions (Before Execution) | Enforced Postconditions (After Execution) |
+|---------------|-------------------------------------------|-------------------------------------------|
+| **`POST /v1/pages`**<br>(`TC_PAGES_001`–`048`) | 1. Active `notionToken` with *Read*, *Update* and *Insert content* capabilities.<br>2. `rootPageId` of a page shared with the integration.<br>3. A parent page, data source or row created by the pre-request script, according to the test case. | The created page and the parent page are moved to the trash with `PATCH {"in_trash": true}`. |
+| **`GET /v1/pages/{page_id}`**<br>(`TC_PAGES_GET_001`–`025`) | 1. Same credentials and root page.<br>2. The page, row, relation or 100-property data source that the case reads is created by API. | Read-only requests leave no changes. The helper pages and data sources are trashed with their parent. |
+| **`GET /v1/pages/{page_id}/properties/{property_id}`**<br>(`TC_PAGES_PROP_001`–`030`) | 1. Same credentials and root page.<br>2. A data source with one property of each type and a filled row, created by API.<br>3. A valid user ID (`userId`, or the first user returned by `/v1/users`). | `propId` and the helper data are cleared at the start of the next case, and the pages are trashed. |
+| **`POST /v1/pages/{page_id}/move`**<br>(`TC_PAGES_MOVE_001`–`034`) | 1. Same credentials and root page.<br>2. Two parent pages, the page to move and, for data source cases, one or two data sources, created by API. | All pages, including the moved page, go to the trash with their parents. A rejected move leaves the page under its original parent. |
+| **`PATCH /v1/pages/{page_id}`**<br>(`TC_PAGES_PATCH_001`–`047`) | 1. Same credentials and root page.<br>2. A row with known values, a full-type row or a dual-relation pair, created by API. | Pages go to the trash. Failed updates leave the stored values unchanged (verified by a `GET`). |
+| **`E2E`**<br>(`TC_E2E_001`–`016`) | Executed strictly as the **final folder** so the bulk, concurrent and permission scenarios never affect earlier suites. | Every parent page, data source and page created by the flow is trashed in the `finally` block, even when an assertion fails. |
+
+##### 3.3 Multi-Request Chaining & Shared Variables Implementation
+
+Variables were partitioned across Postman scopes to avoid credential leakage while supporting dynamic request chaining:
+
+| Scope Level | Variable Names | Purpose & Lifecycle |
+|-------------|----------------|---------------------|
+| **Collection Scope** | `pagesEndpoint`, `parentPageId`, `parent2Id`, `pageId`, `targetId`, `propId`, `qs`, `dsId`, `dbId`, `relDsId`, `expected`, `pageTitle`, `tracked` | `pagesEndpoint` (`/v1/pages`) is the base path of every request. The others are runtime state shared between the pre-request script, the request and the test script through `pm.collectionVariables.set()` / `.get()`. Each case resets them at the start. |
+| **Environment Scope** (`Notion Pages`) | `apiBaseURL`, `notionVersion`, `notionToken` (*secret*), `rootPageId`, `userId`, `unsharedPageId`, `tokenReadOnly` / `tokenInsertOnly` / `tokenNoRead` / `tokenB` / `tokenPublic` / `revokedToken` (*secret*), `statusDataSourceId` | Workspace-specific values and secrets, masked in the UI. |
+| **Local / Pre-request Scope** | `headers`, `pagesUrl`, the IDs returned by each precondition request (`p`, `p2`, `c`) | Ephemeral values computed inside each script. |
+
+Four chained workflows were implemented in the `E2E` folder:
+
+1. **Create, read, update and query (`TC_E2E_001` → `TC_E2E_003`):** create a row with every property type, read it with `GET` and compare each value, update three properties and read them back with both `GET` endpoints, then find the row by querying the data source with a filter on those values.
+2. **Trash and restore without data loss (`TC_E2E_004`):** send the row to the trash, confirm it is hidden from the query, restore it and compare all properties and blocks with the snapshot.
+3. **Move through every parent type (`TC_E2E_006`, `TC_E2E_007`):** move a page between two pages and two data sources and back, checking after each step that `id`, `url`, `created_by`, `icon`, `cover` and blocks never change, and move a three-level tree intact while the move into a descendant is rejected.
+4. **Dual relation and computed properties (`TC_E2E_008`, `TC_E2E_009`):** create a project and its tasks, follow `next_cursor` through 31 relation items, change a task to another project, and check that the rollup and formula recalculate (`150`/`300` becomes `250`/`500`) while updating the rollup directly returns `400`.
+
+![alt text](caps/Kevin/actividad3-1.png)
 
 ---
 
@@ -538,9 +672,48 @@ npx newman run postman/gabriel_guaman/Notion_Users_OAuth_GabrielGuaman.postman_c
 
 > *[Reserved for Sebastián Pereyra's Postman Collection Runner / Newman CLI metrics and execution screenshots.]*
 
-#### Kevin Uruchi — Automated Execution Summary: [Pending Implementation]
+#### Kevin Uruchi — Automated Execution Summary (`Pages`)
 
-> *[Reserved for Kevin Uruchi's Postman Collection Runner / Newman CLI metrics and execution screenshots.]*
+Kevin's collection follows the team conventions defined in section 4.1:
+
+| Convention Dimension | How it is applied in `Notion_Pages` |
+|----------------------|-------------------------------------|
+| **Folder hierarchy** | One folder per endpoint (`POST /v1/pages`, `GET /v1/pages/{page_id}`, `GET /v1/pages/{page_id}/properties/{property_id}`, `POST /v1/pages/{page_id}/move`, `PATCH /v1/pages/{page_id}`) and the `E2E` folder last. |
+| **Request ordering** | Requests follow the numeric order of the test case document (`TC_PAGES_001`, `002`, ...), and the destructive, bulk and permission flows are in the final `E2E` folder. |
+| **Naming** | Request name `TC_ID: Verify that ...`, identical to the test case title. Assertions use plain descriptions (`Status code should be 404`) and data integrity checks start with `[Data integrity]`. Static config in lowerCamelCase environment variables (`notionToken`) and runtime state in collection variables (`pageId`). |
+| **Execution isolation** | Each case creates its own data and trashes it at the end, so any case can run alone or in any folder selection. |
+
+```bash
+# Full automated suite execution
+npx newman run postman/kevin_uruchi/Notion_Pages.postman_collection.json \
+  -e postman/kevin_uruchi/Notion_Pages.postman_environment.json \
+  --delay-request 400 \
+  --timeout-script 600000 \
+  --reporters cli,htmlextra \
+  --reporter-htmlextra-export reports/kevin_uruchi_newman_report.html
+
+# Unattended execution of a single endpoint folder
+npx newman run postman/kevin_uruchi/Notion_Pages.postman_collection.json \
+  -e postman/kevin_uruchi/Notion_Pages.postman_environment.json \
+  --folder "POST /v1/pages/{page_id}/move" \
+  --delay-request 400 \
+  --timeout-script 600000
+```
+
+The delay is `400 ms` to stay below Notion's `~3 requests/second` limit, and `--timeout-script 600000` is needed because some E2E cases create dozens of pages (`TC_E2E_014` handles 50).
+
+| Execution Metric | Value / Specification |
+|------------------|-----------------------|
+| **Collection File** | [`postman/kevin_uruchi/Notion_Pages.postman_collection.json`](./postman/kevin_uruchi/Notion_Pages.postman_collection.json) |
+| **Environment File** | [`postman/kevin_uruchi/Notion_Pages.postman_environment.json`](./postman/kevin_uruchi/Notion_Pages.postman_environment.json) |
+| **Lab 01 Test Cases Covered** | **200 Test Cases** (`48` POST + `25` GET + `30` properties + `34` move + `47` PATCH + `16` E2E) |
+| **Total Automated Requests** | **200 HTTP Requests** (one per test case) |
+| **Total `pm.test()` Assertions** | **[Fill with the number shown by the Runner after the run]** |
+| **Passed / Failed / Skipped** | **[Fill after the run]** (skipped = cases whose optional environment variable is empty) |
+| **Runner Configuration** | Iterations: `1` \| Inter-request Delay: `400 ms` \| Persist Variables: `Enabled` |
+
+![alt text](caps/Kevin/actividad4-1.png)
+
 
 ---
 
