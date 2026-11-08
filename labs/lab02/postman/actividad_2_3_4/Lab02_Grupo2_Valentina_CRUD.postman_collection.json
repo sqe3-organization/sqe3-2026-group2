@@ -1,0 +1,626 @@
+{
+	"info": {
+		"_postman_id": "211a1c57-6326-4cfc-86e8-867adb2d1994",
+		"name": "Lab02_Grupo2_Valentina_CRUD (Data Sources, Comments, File Uploads)",
+		"description": "Colección con operaciones CRUD (o equivalentes) para los módulos asignados, basada en los Test Cases del Lab 1.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "58498180"
+	},
+	"item": [
+		{
+			"name": "00 - Setup (Crear Database)",
+			"item": [
+				{
+					"name": "Setup - Crear base de datos para pruebas",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"El código de estado es 200 OK\", function () { pm.response.to.have.status(200); });",
+									"const responseJson = pm.response.json();",
+									"pm.test(\"La base de datos se creó correctamente\", function () {",
+									"    pm.expect(responseJson.object).to.eql(\"database\");",
+									"    pm.expect(responseJson.id).to.be.a('string');",
+									"});",
+									"pm.environment.set(\"database_id\", responseJson.id);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"parent\": {\n        \"type\": \"page_id\",\n        \"page_id\": \"{{NOTION_PAGE_ID}}\"\n    },\n    \"title\": [\n        {\n            \"type\": \"text\",\n            \"text\": {\n                \"content\": \"Base de Prueba Lab 02 - CRUD\"\n            }\n        }\n    ],\n    \"properties\": {\n        \"Name\": {\n            \"title\": {}\n        }\n    }\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{NOTION_BASE_URL}}/v1/databases",
+							"host": [
+								"{{NOTION_BASE_URL}}"
+							],
+							"path": [
+								"v1",
+								"databases"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "01 - Data Sources CRUD",
+			"item": [
+				{
+					"name": "DS - CREATE - Crear Data Source",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"El código de estado es 200 OK\", function () { pm.response.to.have.status(200); });",
+									"const responseJson = pm.response.json();",
+									"pm.test(\"La respuesta es un objeto 'data_source' válido\", function () {",
+									"    pm.expect(responseJson.object).to.eql(\"data_source\");",
+									"    pm.expect(responseJson.id).to.be.a('string');",
+									"    pm.expect(responseJson.properties).to.have.property('Name');",
+									"});",
+									"pm.environment.set(\"data_source_id\", responseJson.id);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"parent\": {\n        \"type\": \"database_id\",\n        \"database_id\": \"{{database_id}}\"\n    },\n    \"properties\": {\n        \"Name\": { \"title\": {} },\n        \"Count\": { \"number\": { \"format\": \"number\" } }\n    }\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{NOTION_BASE_URL}}/v1/data_sources",
+							"host": [
+								"{{NOTION_BASE_URL}}"
+							],
+							"path": [
+								"v1",
+								"data_sources"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "DS - READ - Recuperar Data Source",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"El código de estado es 200 OK\", function () { pm.response.to.have.status(200); });",
+									"const responseJson = pm.response.json();",
+									"pm.test(\"Los datos de la fuente de datos son correctos\", function () {",
+									"    pm.expect(responseJson.object).to.eql(\"data_source\");",
+									"    pm.expect(responseJson.id).to.eql(pm.environment.get(\"data_source_id\"));",
+									"    pm.expect(responseJson.properties).to.have.property('Name');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{NOTION_BASE_URL}}/v1/data_sources/{{data_source_id}}",
+							"host": [
+								"{{NOTION_BASE_URL}}"
+							],
+							"path": [
+								"v1",
+								"data_sources",
+								"{{data_source_id}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "DS - UPDATE - Actualizar Data Source (Añadir columna)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"El código de estado es 200 OK\", function () { pm.response.to.have.status(200); });",
+									"const responseJson = pm.response.json();",
+									"pm.test(\"Se añadió la nueva propiedad 'Status'\", function () {",
+									"    pm.expect(responseJson.properties).to.have.property('Status');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"properties\": {\n        \"Status\": {\n            \"select\": {\n                \"options\": [\n                    { \"name\": \"Active\", \"color\": \"green\" },\n                    { \"name\": \"Inactive\", \"color\": \"red\" }\n                ]\n            }\n        }\n    }\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{NOTION_BASE_URL}}/v1/data_sources/{{data_source_id}}",
+							"host": [
+								"{{NOTION_BASE_URL}}"
+							],
+							"path": [
+								"v1",
+								"data_sources",
+								"{{data_source_id}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "DS - DELETE - Archivar Data Source",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"El código de estado es 200 OK\", function () { pm.response.to.have.status(200); });",
+									"pm.test(\"La fuente de datos fue archivada\", function () {",
+									"    const responseJson = pm.response.json();",
+									"    pm.expect(responseJson.in_trash).to.eql(true);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"in_trash\": true\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{NOTION_BASE_URL}}/v1/data_sources/{{data_source_id}}",
+							"host": [
+								"{{NOTION_BASE_URL}}"
+							],
+							"path": [
+								"v1",
+								"data_sources",
+								"{{data_source_id}}"
+							]
+						},
+						"description": "Notion no tiene un endpoint DELETE para data sources. Se usa PATCH con in_trash: true para archivarlo."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "02 - Comments CRUD",
+			"item": [
+				{
+					"name": "Comments - CREATE - Crear comentario en página",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"El código de estado es 200 OK\", function () { pm.response.to.have.status(200); });",
+									"const responseJson = pm.response.json();",
+									"pm.test(\"El comentario se creó correctamente\", function () {",
+									"    pm.expect(responseJson.object).to.eql(\"comment\");",
+									"    pm.expect(responseJson.id).to.be.a('string');",
+									"    pm.expect(responseJson.parent.type).to.eql(\"page_id\");",
+									"});",
+									"pm.environment.set(\"comment_id\", responseJson.id);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"parent\": {\n        \"page_id\": \"{{NOTION_PAGE_ID}}\"\n    },\n    \"rich_text\": [\n        {\n            \"text\": {\n                \"content\": \"Hello world\"\n            }\n        }\n    ]\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{NOTION_BASE_URL}}/v1/comments",
+							"host": [
+								"{{NOTION_BASE_URL}}"
+							],
+							"path": [
+								"v1",
+								"comments"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Comments - READ - Listar comentarios de página",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"El código de estado es 200 OK\", function () { pm.response.to.have.status(200); });",
+									"const responseJson = pm.response.json();",
+									"pm.test(\"La respuesta es una lista de comentarios\", function () {",
+									"    pm.expect(responseJson.object).to.eql(\"list\");",
+									"    pm.expect(responseJson.results).to.be.an('array');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{NOTION_BASE_URL}}/v1/comments?block_id={{NOTION_PAGE_ID}}",
+							"host": [
+								"{{NOTION_BASE_URL}}"
+							],
+							"path": [
+								"v1",
+								"comments"
+							],
+							"query": [
+								{
+									"key": "block_id",
+									"value": "{{NOTION_PAGE_ID}}"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Comments - UPDATE - (No soportado por la API)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"// Notion no permite actualizar un comentario. Este test es solo para documentar la limitación.",
+									"pm.test(\"La API no soporta actualizar comentarios (400/404)\", function () {",
+									"    pm.response.to.have.status(404);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"rich_text\": [\n        { \"text\": { \"content\": \"Updated comment\" } }\n    ]\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{NOTION_BASE_URL}}/v1/comments/{{comment_id}}",
+							"host": [
+								"{{NOTION_BASE_URL}}"
+							],
+							"path": [
+								"v1",
+								"comments",
+								"{{comment_id}}"
+							]
+						},
+						"description": "Este endpoint no existe en Notion. Se deja como referencia de que la API no permite modificar comentarios."
+					},
+					"response": []
+				},
+				{
+					"name": "Comments - DELETE - (No soportado por la API)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"// Notion no permite borrar un comentario. Este test es solo para documentar la limitación.",
+									"pm.test(\"La API no soporta borrar comentarios (404)\", function () {",
+									"    pm.response.to.have.status(404);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{NOTION_BASE_URL}}/v1/comments/{{comment_id}}",
+							"host": [
+								"{{NOTION_BASE_URL}}"
+							],
+							"path": [
+								"v1",
+								"comments",
+								"{{comment_id}}"
+							]
+						},
+						"description": "Este endpoint no existe en Notion. Se deja como referencia de que la API no permite borrar comentarios."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "03 - File Uploads Lifecycle",
+			"item": [
+				{
+					"name": "FU - CREATE - Iniciar carga de archivo",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"El código de estado es 200 OK\", function () { pm.response.to.have.status(200); });",
+									"const responseJson = pm.response.json();",
+									"pm.test(\"La carga de archivo se inicializó correctamente\", function () {",
+									"    pm.expect(responseJson.object).to.eql(\"file_upload\");",
+									"    pm.expect(responseJson.status).to.eql(\"pending\");",
+									"});",
+									"pm.environment.set(\"file_upload_id\", responseJson.id);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"report.pdf\",\n    \"content_type\": \"application/pdf\",\n    \"mode\": \"single_part\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{NOTION_BASE_URL}}/v1/file_uploads",
+							"host": [
+								"{{NOTION_BASE_URL}}"
+							],
+							"path": [
+								"v1",
+								"file_uploads"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "FU - READ - Recuperar estado de carga",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"El código de estado es 200 OK\", function () { pm.response.to.have.status(200); });",
+									"const responseJson = pm.response.json();",
+									"pm.test(\"Los datos de la carga son correctos\", function () {",
+									"    pm.expect(responseJson.object).to.eql(\"file_upload\");",
+									"    pm.expect(responseJson.id).to.eql(pm.environment.get(\"file_upload_id\"));",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{NOTION_BASE_URL}}/v1/file_uploads/{{file_upload_id}}",
+							"host": [
+								"{{NOTION_BASE_URL}}"
+							],
+							"path": [
+								"v1",
+								"file_uploads",
+								"{{file_upload_id}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "FU - UPDATE (Send) - Enviar contenido",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"El código de estado es 200 OK\", function () { pm.response.to.have.status(200); });",
+									"// En este paso, el estado del archivo debería cambiar a 'uploaded' o similar",
+									"pm.test(\"El archivo se envió correctamente\", function () {",
+									"    pm.expect(pm.response.code).to.eql(200);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"data\": \"base64_encoded_file_chunk\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{NOTION_BASE_URL}}/v1/file_uploads/{{file_upload_id}}/send",
+							"host": [
+								"{{NOTION_BASE_URL}}"
+							],
+							"path": [
+								"v1",
+								"file_uploads",
+								"{{file_upload_id}}",
+								"send"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "FU - DELETE (Complete) - Finalizar carga",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"El código de estado es 200 OK\", function () { pm.response.to.have.status(200); });",
+									"pm.test(\"La carga se completó\", function () {",
+									"    const responseJson = pm.response.json();",
+									"    pm.expect(responseJson.status).to.be.oneOf([\"uploaded\", \"completed\"]);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{NOTION_BASE_URL}}/v1/file_uploads/{{file_upload_id}}/complete",
+							"host": [
+								"{{NOTION_BASE_URL}}"
+							],
+							"path": [
+								"v1",
+								"file_uploads",
+								"{{file_upload_id}}",
+								"complete"
+							]
+						},
+						"description": "Notion no tiene DELETE para file uploads; el ciclo termina con 'complete'."
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"pm.request.headers.upsert({ key: 'Notion-Version', value: pm.environment.get('NOTION_VERSION') });",
+					"pm.request.headers.upsert({ key: 'Authorization', value: 'Bearer ' + pm.environment.get('NOTION_TOKEN') });"
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "NOTION_BASE_URL",
+			"value": "https://api.notion.com"
+		},
+		{
+			"key": "NOTION_PAGE_ID",
+			"value": "41220beb9f8180d18597d589ec4e5adc"
+		}
+	]
+}

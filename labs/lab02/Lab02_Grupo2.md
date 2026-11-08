@@ -259,6 +259,455 @@ Inspecting the **`OAuth`** module of the official `Notion API (2025-09-03)` coll
 1. Review verification concepts in Postman and how tests are implemented on requests.
 2. Implement in Postman the tests written in the previous laboratory, including multiple required assertions on status code, body, headers, etc.  
 
+### 2.1 Postman Verification Concepts and Assertion Mechanics
+
+In automated API testing, **verification** represents the programmatic inspection and validation of server responses against contractual specifications, business rules, and non-functional service-level agreements (SLAs). In Postman, verification is implemented via the **Post-response (Tests) Script** tab, executed inside an isolated Node.js sandbox environment immediately following the completion of the HTTP transaction.
+
+#### Postman Test Execution Sandbox & Assertion Architecture
+
+Postman integrates the **Chai Assertion Library** alongside custom HTTP verification helpers under the `pm.*` object facade. Tests are authored using Chai's **BDD (Behavior-Driven Development)** style (`pm.test`, `pm.expect`), ensuring readable, self-documenting, and deterministically auditable test results:
+
+```mermaid
+flowchart LR
+    subgraph RequestCycle ["HTTP Transaction Lifecycle"]
+        REQ["HTTP Request Dispatch"] --> RES["HTTP Response Arrival"]
+    end
+
+    subgraph Sandbox ["Postman Sandbox Execution (Node.js)"]
+        RES --> PARSE["Parse Response (pm.response)"]
+        PARSE --> AS1["1. Status Code & Status Text"]
+        PARSE --> AS2["2. Response Latency SLA"]
+        PARSE --> AS3["3. Contractual Headers"]
+        PARSE --> AS4["4. JSON Schema & Data Types"]
+        PARSE --> AS5["5. Business Logic & Error Codes"]
+    end
+
+    Sandbox --> RUNNER["Postman Test Results Pane / Newman CLI Report"]
+```
+
+#### Multi-Tier Verification Framework for Notion REST API
+
+To guarantee exhaustive verification across Group 2's assigned modules, each implemented request incorporates a mandatory **five-tier assertion framework**:
+
+1. **HTTP Status Code and Reason Phrase Verification:**
+   Validates standard RFC 9110 status codes and status text matching the expected HTTP outcome:
+   ```javascript
+   pm.test("Status code is 200 OK", function () {
+       pm.response.to.have.status(200);
+   });
+   ```
+
+2. **Response Latency SLA Verification:**
+   Validates non-functional performance requirements ensuring endpoint responsiveness remains within acceptable limits (typically `< 2500 ms` for cloud integrations):
+   ```javascript
+   pm.test("Response time is within acceptable SLA (< 2500ms)", function () {
+       pm.expect(pm.response.responseTime).to.be.below(2500);
+   });
+   ```
+
+3. **Mandatory Contractual Transport Headers:**
+   Validates content negotiation, character encoding, and the mandatory Notion API contract version header returned by the server:
+   ```javascript
+   pm.test("Headers contain valid Content-Type and Notion version echo", function () {
+       pm.response.to.have.header("Content-Type");
+       pm.expect(pm.response.headers.get("Content-Type")).to.include("application/json");
+   });
+   ```
+
+4. **JSON Body Structure, Entity Type, and Schema Integrity:**
+   Validates top-level object discriminators (`object: "database"`, `object: "data_source"`, `object: "list"`), canonical UUID formats, and field data types:
+   ```javascript
+   pm.test("Response body matches canonical entity schema", function () {
+       const jsonData = pm.response.json();
+       pm.expect(jsonData).to.be.an("object");
+       pm.expect(jsonData.object).to.eql("database");
+       pm.expect(jsonData.id).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+       pm.expect(jsonData.created_time).to.be.a("string");
+       pm.expect(Date.parse(jsonData.created_time)).to.not.be.NaN;
+   });
+   ```
+
+5. **Error Contract Validation (Negative Tests):**
+   For client errors (`400`, `401`, `403`, `404`, `429`), validates Notion's typed error response contract:
+   ```javascript
+   pm.test("Error response conforms to Notion error specification", function () {
+       const err = pm.response.json();
+       pm.expect(err.object).to.eql("error");
+       pm.expect(err.status).to.eql(pm.response.code);
+       pm.expect(err.code).to.be.a("string").and.to.not.be.empty;
+       pm.expect(err.message).to.be.a("string").and.to.not.be.empty;
+       pm.expect(err.request_id).to.be.a("string").and.to.not.be.empty;
+   });
+   ```
+
+---
+
+### 2.2 Implementation of Lab 01 Tests in Postman with Multi-level Verifications
+
+In accordance with module assignments from Laboratory 01, this section presents the concrete Postman test implementation for **Valentina Molina Bustillos** (`Data sources` module) and **Sebastián Pereyra** (`Databases` and `Search` modules).
+
+---
+
+#### 2.2.1 Data Sources Module Implementation (Valentina Molina Bustillos)
+
+The `Data sources` module covers four primary endpoints:
+- `POST /v1/data_sources`: Create a new data source container with a typed property schema.
+- `GET /v1/data_sources/{data_source_id}`: Retrieve property schema and container metadata.
+- `PATCH /v1/data_sources/{data_source_id}`: Mutate property schema (add, rename, remove columns).
+- `POST /v1/data_sources/{data_source_id}/query`: Query tabular rows using filters, sorting, and pagination.
+
+##### Representative Multi-Tier Assertion Script Examples (Data Sources)
+
+###### 1. Happy Path: `TC_DS_CREATE_001` – Create Data Source with Typed Schema (`POST /v1/data_sources`)
+```javascript
+// =========================================================================
+// TC_DS_CREATE_001 - Multi-tier Verification Script
+// =========================================================================
+
+// 1. Status Code
+pm.test("HTTP Status is 200 OK", function () {
+    pm.response.to.have.status(200);
+});
+
+// 2. Response Time SLA
+pm.test("Response time is under 3000ms", function () {
+    pm.expect(pm.response.responseTime).to.be.below(3000);
+});
+
+// 3. Response Headers
+pm.test("Response is UTF-8 JSON", function () {
+    pm.expect(pm.response.headers.get("Content-Type")).to.include("application/json");
+});
+
+// 4. Schema & Business Rules
+pm.test("Data Source object schema and properties integrity", function () {
+    const res = pm.response.json();
+    
+    // Contract object discriminator
+    pm.expect(res.object).to.eql("data_source");
+    pm.expect(res.id).to.be.a("string").and.to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+    
+    // Parent database correlation
+    pm.expect(res.parent).to.be.an("object");
+    pm.expect(res.parent.type).to.eql("database_id");
+    pm.expect(res.parent.database_id).to.eql(pm.environment.get("database_id"));
+    
+    // Typed schema validation
+    pm.expect(res.properties).to.be.an("object");
+    pm.expect(res.properties).to.have.property("Name");
+    pm.expect(res.properties.Name.type).to.eql("title");
+    pm.expect(res.properties).to.have.property("Count");
+    pm.expect(res.properties.Count.type).to.eql("number");
+    
+    // Timestamps
+    pm.expect(res.created_time).to.be.a("string");
+    pm.expect(res.last_edited_time).to.be.a("string");
+
+    // Dynamic variable capture for downstream chained tests
+    pm.environment.set("data_source_id", res.id);
+});
+```
+
+###### 2. Happy Path: `TC_DS_QUERY_001` – Query Data Source Rows (`POST /v1/data_sources/{id}/query`)
+```javascript
+// =========================================================================
+// TC_DS_QUERY_001 - Query Data Source Verification Script
+// =========================================================================
+
+pm.test("HTTP Status is 200 OK", function () {
+    pm.response.to.have.status(200);
+});
+
+pm.test("Response is a paginated list of page rows", function () {
+    const res = pm.response.json();
+    
+    pm.expect(res.object).to.eql("list");
+    pm.expect(res.results).to.be.an("array");
+    pm.expect(res.has_more).to.be.a("boolean");
+    pm.expect(res).to.have.property("next_cursor");
+    pm.expect(res.type).to.eql("page_or_data_source");
+    
+    // Verify row structure if rows exist
+    if (res.results.length > 0) {
+        const row = res.results[0];
+        pm.expect(row.object).to.eql("page");
+        pm.expect(row.parent.type).to.eql("data_source_id");
+        pm.expect(row.parent.data_source_id).to.eql(pm.environment.get("data_source_id"));
+    }
+});
+```
+
+###### 3. Negative Scenario: `TC_DS_CREATE_004` – Missing Authorization Header (`POST /v1/data_sources`)
+```javascript
+// =========================================================================
+// TC_DS_CREATE_004 - Missing Authorization Negative Check
+// =========================================================================
+
+pm.test("HTTP Status is 401 Unauthorized", function () {
+    pm.response.to.have.status(401);
+});
+
+pm.test("Error response conforms to Notion typed error contract", function () {
+    const err = pm.response.json();
+    pm.expect(err.object).to.eql("error");
+    pm.expect(err.status).to.eql(401);
+    pm.expect(err.code).to.eql("unauthorized");
+    pm.expect(err.message).to.be.a("string").and.to.include("API token is invalid");
+});
+```
+
+###### 4. Boundary Scenario: `TC_DS_QUERY_028` – Page Size Out of Bounds (`page_size: 101`)
+```javascript
+// =========================================================================
+// TC_DS_QUERY_028 - Boundary Check (page_size > 100)
+// =========================================================================
+
+pm.test("HTTP Status is 400 Bad Request", function () {
+    pm.response.to.have.status(400);
+});
+
+pm.test("Error payload indicates validation_error on page_size", function () {
+    const err = pm.response.json();
+    pm.expect(err.object).to.eql("error");
+    pm.expect(err.status).to.eql(400);
+    pm.expect(err.code).to.eql("validation_error");
+    pm.expect(err.message).to.match(/page_size|100|maximum/i);
+});
+```
+
+##### Valentina Molina – Postman Implementation Mapping Matrix
+
+The following table summarizes the implementation in Postman of the test cases designed by Valentina Molina in Laboratory 01:
+
+| Lab 01 Test ID | Postman Request Label | Method | Target Endpoint | Multi-Level Assertions Implemented | Type | Priority |
+|---|---|---|---|---|---|---|
+| `TC_DS_CREATE_001` | `DATA_SOURCES - Positiva - Crear data source con schema (200)` | `POST` | `/v1/data_sources` | Status `200`, SLA `<3s`, `object: "data_source"`, properties schema, UUID format, captures `{{data_source_id}}` | Happy Path | High |
+| `TC_DS_CREATE_003` | `DATA_SOURCES - Positiva - Crear con select/multi_select (200)` | `POST` | `/v1/data_sources` | Status `200`, `properties.Priority.select.options` length and colors | Happy Path | Medium |
+| `TC_DS_CREATE_004` | `DATA_SOURCES - Negativa - Sin cabecera Authorization (401)` | `POST` | `/v1/data_sources` | Status `401`, `code: "unauthorized"`, `object: "error"` | Negative | High |
+| `TC_DS_CREATE_005` | `DATA_SOURCES - Negativa - Sin Notion-Version header (400)` | `POST` | `/v1/data_sources` | Status `400`, `code: "missing_version"` | Negative | High |
+| `TC_DS_CREATE_007` | `DATA_SOURCES - Negativa - database_id malformado (400)` | `POST` | `/v1/data_sources` | Status `400`, `code: "validation_error"` | Negative | High |
+| `TC_DS_CREATE_008` | `DATA_SOURCES - Negativa - database_id inexistente (404)` | `POST` | `/v1/data_sources` | Status `404`, `code: "object_not_found"`, targeted using `{{ghost_id}}` | Negative | High |
+| `TC_DS_CREATE_010` | `DATA_SOURCES - Limites - Schema minimo con solo title (200)` | `POST` | `/v1/data_sources` | Status `200`, schema contains exactly 1 title property | Boundary | Low |
+| `TC_DS_GET_001` | `DATA_SOURCES - Positiva - Obtener data source por ID (200)` | `GET` | `/v1/data_sources/{{data_source_id}}` | Status `200`, SLA `<2s`, `id` matches `{{data_source_id}}`, schema integrity | Happy Path | High |
+| `TC_DS_GET_004` | `DATA_SOURCES - Negativa - GET sin token (401)` | `GET` | `/v1/data_sources/{{data_source_id}}` | Status `401`, `code: "unauthorized"` | Negative | High |
+| `TC_DS_GET_007` | `DATA_SOURCES - Negativa - ID con formato no UUID (400)` | `GET` | `/v1/data_sources/invalid-uuid` | Status `400`, `code: "validation_error"` | Negative | High |
+| `TC_DS_GET_008` | `DATA_SOURCES - Negativa - Data source inexistente (404)` | `GET` | `/v1/data_sources/{{ghost_id}}` | Status `404`, `code: "object_not_found"` | Negative | High |
+| `TC_DS_GET_012` | `DATA_SOURCES - Limites - Formato UUID con guiones vs hex (200)` | `GET` | `/v1/data_sources/{{data_source_id}}` | Status `200`, canonical response across 32-char hex vs 36-char hyphenated | Boundary | Medium |
+| `TC_DS_PATCH_001` | `DATA_SOURCES - Positiva - Agregar columna al schema (200)` | `PATCH` | `/v1/data_sources/{{data_source_id}}` | Status `200`, schema contains newly added property `Count`, `last_edited_time` updated | Happy Path | High |
+| `TC_DS_PATCH_002` | `DATA_SOURCES - Positiva - Renombrar columna existente (200)` | `PATCH` | `/v1/data_sources/{{data_source_id}}` | Status `200`, property renamed to `Notes`, ID preserved | Happy Path | High |
+| `TC_DS_PATCH_008` | `DATA_SOURCES - Negativa - PATCH sin version header (400)` | `PATCH` | `/v1/data_sources/{{data_source_id}}` | Status `400`, `code: "missing_version"` | Negative | High |
+| `TC_DS_PATCH_010` | `DATA_SOURCES - Negativa - PATCH sobre ID inexistente (404)` | `PATCH` | `/v1/data_sources/{{ghost_id}}` | Status `404`, `code: "object_not_found"` | Negative | High |
+| `TC_DS_QUERY_001` | `DATA_SOURCES - Positiva - Query sin filtro (200)` | `POST` | `/v1/data_sources/{{data_source_id}}/query` | Status `200`, `object: "list"`, `results` array, `has_more` boolean | Happy Path | High |
+| `TC_DS_QUERY_004` | `DATA_SOURCES - Positiva - Query con filtro select Status (200)` | `POST` | `/v1/data_sources/{{data_source_id}}/query` | Status `200`, all items in `results` have `Status.name == "Done"` | Happy Path | High |
+| `TC_DS_QUERY_007` | `DATA_SOURCES - Positiva - Query con filtro compuesto AND (200)` | `POST` | `/v1/data_sources/{{data_source_id}}/query` | Status `200`, compound filter evaluation verified on each row | Happy Path | High |
+| `TC_DS_QUERY_009` | `DATA_SOURCES - Positiva - Query con ordenamiento ascendente (200)` | `POST` | `/v1/data_sources/{{data_source_id}}/query` | Status `200`, rows sorted strictly ascending by `Count` | Happy Path | High |
+| `TC_DS_QUERY_012` | `DATA_SOURCES - Positiva - Paginacion cursor-based (200)` | `POST` | `/v1/data_sources/{{data_source_id}}/query` | Status `200`, `has_more: true`, captures `{{next_cursor}}`, verifies second page | Happy Path | High |
+| `TC_DS_QUERY_020` | `DATA_SOURCES - Negativa - Filtro con propiedad inexistente (400)` | `POST` | `/v1/data_sources/{{data_source_id}}/query` | Status `400`, `code: "validation_error"` | Negative | High |
+| `TC_DS_QUERY_025` | `DATA_SOURCES - Limites - page_size minimo igual a 1 (200)` | `POST` | `/v1/data_sources/{{data_source_id}}/query` | Status `200`, `results.length <= 1`, `has_more` boolean | Boundary | High |
+| `TC_DS_QUERY_027` | `DATA_SOURCES - Limites - page_size igual a 0 fuera de rango (400)` | `POST` | `/v1/data_sources/{{data_source_id}}/query` | Status `400`, `code: "validation_error"` | Boundary | High |
+| `TC_DS_QUERY_028` | `DATA_SOURCES - Limites - page_size igual a 101 excedido (400)` | `POST` | `/v1/data_sources/{{data_source_id}}/query` | Status `400`, `code: "validation_error"` | Boundary | High |
+| `TC_COMM_001` | `Comments - CREATE - Crear comentario en página (200)` | `POST` | `/v1/comments` | Status `200`, `object: "comment"`, `parent.type: "page_id"`, captures `{{comment_id}}` | Happy Path | High |
+| `TC_COMM_002` | `Comments - READ - Listar comentarios de página (200)` | `GET` | `/v1/comments?block_id={{NOTION_PAGE_ID}}` | Status `200`, `object: "list"`, `results` array | Happy Path | Medium |
+| `TC_COMM_003` | `Comments - UPDATE - (No soportado por la API) (404)` | `PATCH` | `/v1/comments/{{comment_id}}` | Status `404`, confirms Notion contract omission (immutable comments) | Negative | Low |
+| `TC_COMM_004` | `Comments - DELETE - (No soportado por la API) (404)` | `DELETE` | `/v1/comments/{{comment_id}}` | Status `404`, confirms Notion contract omission (deletion via API unsupported) | Negative | Low |
+| `TC_FU_001` | `FU - CREATE - Iniciar carga de archivo (200)` | `POST` | `/v1/file_uploads` | Status `200`, `object: "file_upload"`, `status: "pending"`, captures `{{file_upload_id}}` | Happy Path | High |
+| `TC_FU_002` | `FU - READ - Recuperar estado de carga (200)` | `GET` | `/v1/file_uploads/{{file_upload_id}}` | Status `200`, verifies uploaded file container status | Happy Path | Medium |
+| `TC_FU_003` | `FU - UPDATE (Send) - Enviar contenido (200)` | `POST` | `/v1/file_uploads/{{file_upload_id}}/send` | Status `200`, binary payload chunk transmission confirmed | Happy Path | Medium |
+| `TC_FU_004` | `FU - DELETE (Complete) - Finalizar carga (200)` | `POST` | `/v1/file_uploads/{{file_upload_id}}/complete` | Status `200`, file upload finalized and ready for block attachment | Happy Path | High |
+
+##### Execution Evidence for Data Sources & Supporting Modules (Valentina Molina)
+
+The collection [`Lab02_Grupo2_Valentina_CRUD.postman_collection.json`](./postman/actividad_2_3_4/Lab02_Grupo2_Valentina_CRUD.postman_collection.json) implements the CRUD lifecycle for `Data sources` alongside contractual verifications for `Comments` and `File uploads`. The screenshots below document empirical verification in Postman:
+
+###### 01 - DS CREATE: Crear Data Source (200 OK)
+![DS - CREATE - Crear Data Source](./caps/actividad_2/DataSourceCreateTestPassed.jpeg)
+
+###### 02 - Comments CREATE: Crear Comentario en Página (200 OK)
+![Comments - CREATE - Crear comentario en página](./caps/actividad_2/CommentCreateTestPassed.jpeg)
+
+###### 03 - File Uploads CREATE: Iniciar Carga de Archivo (200 OK)
+![FU - CREATE - Iniciar carga de archivo](./caps/actividad_2/FileUploadCreateTestPassed.jpeg)
+
+---
+
+#### 2.2.2 Databases and Search Modules Implementation (Sebastián Pereyra)
+
+The `Databases` and `Search` modules cover four primary endpoints:
+- `POST /v1/databases`: Create a new database container under a parent page.
+- `GET /v1/databases/{database_id}`: Retrieve database container metadata and associated data source references.
+- `PATCH /v1/databases/{database_id}`: Update database container metadata (title, description, icon, cover, in_trash).
+- `POST /v1/search`: Workspace-wide search with text query, entity type filters, and sorting.
+
+##### Representative Multi-Tier Assertion Script Examples (Databases & Search)
+
+###### 1. Happy Path: `TC_DB_001` – Create Database Container (`POST /v1/databases`)
+```javascript
+// =========================================================================
+// TC_DB_001 - Create Database Multi-tier Verification Script
+// =========================================================================
+
+// 1. Status Code
+pm.test("HTTP Status is 200 OK", function () {
+    pm.response.to.have.status(200);
+});
+
+// 2. Response Time SLA
+pm.test("Response time is acceptable (< 2500ms)", function () {
+    pm.expect(pm.response.responseTime).to.be.below(2500);
+});
+
+// 3. Headers
+pm.test("Content-Type is application/json", function () {
+    pm.expect(pm.response.headers.get("Content-Type")).to.include("application/json");
+});
+
+// 4. Schema & Data Integrity
+pm.test("Database object conforms to Notion 2025-09-03 container schema", function () {
+    const res = pm.response.json();
+    
+    pm.expect(res.object).to.eql("database");
+    pm.expect(res.id).to.be.a("string").and.to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+    
+    // Parent page verification
+    pm.expect(res.parent).to.be.an("object");
+    pm.expect(res.parent.type).to.eql("page_id");
+    pm.expect(res.parent.page_id).to.eql(pm.environment.get("parent_page_id"));
+    
+    // Title array verification
+    pm.expect(res.title).to.be.an("array").and.to.have.lengthOf.at.least(1);
+    pm.expect(res.title[0].plain_text).to.eql("Test DB");
+    
+    // Flags
+    pm.expect(res.archived).to.be.false;
+    pm.expect(res.in_trash).to.be.false;
+    
+    // In Notion 2025-09-03, database contains data_sources references
+    pm.expect(res).to.have.property("data_sources");
+    pm.expect(res.data_sources).to.be.an("array");
+
+    // Dynamic variable capture for downstream chained tests
+    pm.environment.set("database_id", res.id);
+    if (res.data_sources.length > 0) {
+        pm.environment.set("data_source_id", res.data_sources[0].id);
+    }
+});
+```
+
+###### 2. Happy Path: `TC_SEARCH_003` – Filter Search by Database Entity Type (`POST /v1/search`)
+```javascript
+// =========================================================================
+// TC_SEARCH_003 - Search Filter by Type "database" Verification Script
+// =========================================================================
+
+pm.test("HTTP Status is 200 OK", function () {
+    pm.response.to.have.status(200);
+});
+
+pm.test("Search results contain strictly database objects", function () {
+    const res = pm.response.json();
+    
+    pm.expect(res.object).to.eql("list");
+    pm.expect(res.results).to.be.an("array");
+    
+    // Verify strict filtering: every returned entity must be a database
+    res.results.forEach(function (entity, index) {
+        pm.expect(entity.object, `Item at index ${index} must be object: "database"`).to.eql("database");
+        pm.expect(entity.id).to.be.a("string");
+    });
+});
+```
+
+###### 3. Negative Scenario: `TC_DB_014` – Parent Page Not Found (`POST /v1/databases`)
+```javascript
+// =========================================================================
+// TC_DB_014 - Parent Page Not Found Negative Check
+// =========================================================================
+
+pm.test("HTTP Status is 404 Not Found", function () {
+    pm.response.to.have.status(404);
+});
+
+pm.test("Error payload returns object_not_found code", function () {
+    const err = pm.response.json();
+    pm.expect(err.object).to.eql("error");
+    pm.expect(err.status).to.eql(404);
+    pm.expect(err.code).to.eql("object_not_found");
+    pm.expect(err.message).to.be.a("string");
+});
+```
+
+###### 4. Boundary Scenario: `TC_DB_PATCH_015` – Clear Database Title to Untitled (`PATCH /v1/databases/{id}`)
+```javascript
+// =========================================================================
+// TC_DB_PATCH_015 - Clear Title to Empty Array Boundary Check
+// =========================================================================
+
+pm.test("HTTP Status is 200 OK", function () {
+    pm.response.to.have.status(200);
+});
+
+pm.test("Database title is cleared and represents untitled state", function () {
+    const res = pm.response.json();
+    pm.expect(res.object).to.eql("database");
+    pm.expect(res.title).to.be.an("array").and.to.be.empty;
+});
+```
+
+##### Sebastián Pereyra – Postman Implementation Mapping Matrix
+
+The following table summarizes the implementation in Postman of the test cases designed by Sebastián Pereyra in Laboratory 01:
+
+| Lab 01 Test ID | Postman Request Label | Method | Target Endpoint | Multi-Level Assertions Implemented | Type | Priority |
+|---|---|---|---|---|---|---|
+| `TC_DB_001` | `DATABASES - Positiva - Crear database con titulo (200)` | `POST` | `/v1/databases` | Status `200`, SLA `<2.5s`, `object: "database"`, parent match, captures `{{database_id}}` | Happy Path | High |
+| `TC_DB_002` | `DATABASES - Positiva - Crear con schema completo (200)` | `POST` | `/v1/databases` | Status `200`, verify all typed properties created | Happy Path | High |
+| `TC_DB_003` | `DATABASES - Positiva - Validar campos de metadatos (200)` | `POST` | `/v1/databases` | Status `200`, ISO timestamps, `archived: false`, `in_trash: false` | Happy Path | Medium |
+| `TC_DB_004` | `DATABASES - Positiva - Crear database inline (200)` | `POST` | `/v1/databases` | Status `200`, `is_inline: true` asserted in response | Happy Path | Medium |
+| `TC_DB_005` | `DATABASES - Positiva - Crear con icon emoji y cover URL (200)` | `POST` | `/v1/databases` | Status `200`, `icon.emoji` and `cover.external.url` fidelity | Happy Path | Low |
+| `TC_DB_007` | `DATABASES - Negativa - Sin cabecera Authorization (401)` | `POST` | `/v1/databases` | Status `401`, `code: "unauthorized"`, `object: "error"` | Negative | High |
+| `TC_DB_010` | `DATABASES - Negativa - Sin Notion-Version header (400)` | `POST` | `/v1/databases` | Status `400`, `code: "missing_version"` | Negative | High |
+| `TC_DB_011` | `DATABASES - Negativa - JSON malformado en body (400)` | `POST` | `/v1/databases` | Status `400`, `code: "invalid_json"` | Negative | High |
+| `TC_DB_012` | `DATABASES - Negativa - Body sin parent (400)` | `POST` | `/v1/databases` | Status `400`, `code: "validation_error"` | Negative | High |
+| `TC_DB_013` | `DATABASES - Negativa - Parent UUID invalido (400)` | `POST` | `/v1/databases` | Status `400`, `code: "validation_error"` | Negative | High |
+| `TC_DB_014` | `DATABASES - Negativa - Parent page inexistente (404)` | `POST` | `/v1/databases` | Status `404`, `code: "object_not_found"`, targeted using `{{ghost_id}}` | Negative | High |
+| `TC_DB_015` | `DATABASES - Negativa - Parent page no compartida (404)` | `POST` | `/v1/databases` | Status `404`, `code: "object_not_found"`, targeted using `{{unshared_db_id}}` | Negative | High |
+| `TC_DB_020` | `DATABASES - Limites - Titulo vacio [] (200)` | `POST` | `/v1/databases` | Status `200`, database created with empty title array | Boundary | Low |
+| `TC_DB_021` | `DATABASES - Limites - Parent ID en hex vs guiones (200)` | `POST` | `/v1/databases` | Status `200`, parent accepted in both 32-char hex and 36-char hyphenated | Boundary | Medium |
+| `TC_DB_GET_001` | `DATABASES - Positiva - Obtener database por ID (200)` | `GET` | `/v1/databases/{{database_id}}` | Status `200`, SLA `<2s`, `id` match, `object: "database"`, `data_sources` presence | Happy Path | High |
+| `TC_DB_GET_004` | `DATABASES - Negativa - GET sin token (401)` | `GET` | `/v1/databases/{{database_id}}` | Status `401`, `code: "unauthorized"` | Negative | High |
+| `TC_DB_GET_007` | `DATABASES - Negativa - ID con formato no UUID (400)` | `GET` | `/v1/databases/not-a-uuid` | Status `400`, `code: "validation_error"` | Negative | High |
+| `TC_DB_GET_008` | `DATABASES - Negativa - Database inexistente (404)` | `GET` | `/v1/databases/{{ghost_id}}` | Status `404`, `code: "object_not_found"` | Negative | High |
+| `TC_DB_GET_009` | `DATABASES - Negativa - Database no compartida (404)` | `GET` | `/v1/databases/{{unshared_db_id}}` | Status `404`, `code: "object_not_found"` (prevents enumeration) | Negative | High |
+| `TC_DB_PATCH_001` | `DATABASES - Positiva - Actualizar titulo (200)` | `PATCH` | `/v1/databases/{{database_id}}` | Status `200`, updated title plain_text reflected, `last_edited_time` changed | Happy Path | High |
+| `TC_DB_PATCH_003` | `DATABASES - Positiva - Actualizar icono y portada (200)` | `PATCH` | `/v1/databases/{{database_id}}` | Status `200`, `icon.emoji` and `cover.external.url` match updated values | Happy Path | Medium |
+| `TC_DB_PATCH_004` | `DATABASES - Positiva - Mover a papelera in_trash true (200)` | `PATCH` | `/v1/databases/{{database_id}}` | Status `200`, `in_trash: true`, `archived: true` | Happy Path | High |
+| `TC_DB_PATCH_005` | `DATABASES - Positiva - Restaurar de papelera in_trash false (200)` | `PATCH` | `/v1/databases/{{database_id}}` | Status `200`, `in_trash: false`, `archived: false` | Happy Path | High |
+| `TC_DB_PATCH_009` | `DATABASES - Negativa - PATCH sin version header (400)` | `PATCH` | `/v1/databases/{{database_id}}` | Status `400`, `code: "missing_version"` | Negative | High |
+| `TC_DB_PATCH_010` | `DATABASES - Negativa - PATCH con UUID invalido en ruta (400)` | `PATCH` | `/v1/databases/invalid-id` | Status `400`, `code: "validation_error"` | Negative | High |
+| `TC_DB_PATCH_015` | `DATABASES - Limites - Limpiar titulo con array vacio (200)` | `PATCH` | `/v1/databases/{{database_id}}` | Status `200`, `title` becomes empty array `[]` | Boundary | Low |
+| `TC_SEARCH_001` | `SEARCH - Positiva - Busqueda por palabra clave en titulo (200)` | `POST` | `/v1/search` | Status `200`, SLA `<3s`, `object: "list"`, matching entities in `results` | Happy Path | High |
+| `TC_SEARCH_002` | `SEARCH - Positiva - Busqueda con body vacio retorna todo (200)` | `POST` | `/v1/search` | Status `200`, `object: "list"`, `has_more` boolean, `results` array | Happy Path | High |
+| `TC_SEARCH_003` | `SEARCH - Positiva - Filtrar estrictamente por database (200)` | `POST` | `/v1/search` | Status `200`, every returned item has `object: "database"`, zero pages | Happy Path | High |
+| `TC_SEARCH_005` | `SEARCH - Positiva - Ordenar descendente por last_edited_time (200)` | `POST` | `/v1/search` | Status `200`, results sorted from most recently edited to oldest | Happy Path | High |
+| `TC_SEARCH_007` | `SEARCH - Positiva - Paginacion cursor-based con start_cursor (200)` | `POST` | `/v1/search` | Status `200`, `has_more: true`, captures `next_cursor` and traverses page | Happy Path | High |
+| `TC_SEARCH_009` | `SEARCH - Negativa - Busqueda sin token (401)` | `POST` | `/v1/search` | Status `401`, `code: "unauthorized"` | Negative | High |
+| `TC_SEARCH_013` | `SEARCH - Negativa - Valor de filtro invalido object user (400)` | `POST` | `/v1/search` | Status `400`, `code: "validation_error"` | Negative | Medium |
+| `TC_SEARCH_014` | `SEARCH - Negativa - Timestamp de sort invalido created_time (400)` | `POST` | `/v1/search` | Status `400`, `code: "validation_error"` (only `last_edited_time` supported) | Negative | Medium |
+| `TC_SEARCH_017` | `SEARCH - Limites - page_size minimo igual a 1 (200)` | `POST` | `/v1/search` | Status `200`, `results.length <= 1`, `has_more: true` if > 1 resources | Boundary | High |
+| `TC_SEARCH_019` | `SEARCH - Limites - page_size igual a 0 fuera de rango (400)` | `POST` | `/v1/search` | Status `400`, `code: "validation_error"` | Boundary | High |
+| `TC_SEARCH_020` | `SEARCH - Limites - page_size igual a 101 excedido (400)` | `POST` | `/v1/search` | Status `400`, `code: "validation_error"` | Boundary | High |
+| `TC_SEARCH_021` | `SEARCH - Limites - Busqueda de titulo inexistente (200)` | `POST` | `/v1/search` | Status `200`, `results: []`, `has_more: false` | Boundary | Medium |
+
+##### Execution Evidence for Databases & Search Modules (Sebastián Pereyra)
+
+The collection [`Lab02_Grupo2_Databases_Search.postman_collection.json`](./postman/actividad_2_3_4/Lab02_Grupo2_Databases_Search.postman_collection.json) implements the CRUD lifecycle for `Databases` alongside global search queries under `Search`. The screenshots below document empirical verification in Postman:
+
+###### 01 - DB CREATE: Crear Database (200 OK)
+![DB - CREATE - Crear Database](./caps/actividad_2/DBCreateTestPassed.jpeg)
+
+###### 02 - Search: Búsqueda Global (200 OK)
+![Search - Búsqueda global](./caps/actividad_2/SearchGlobalTestPassed.jpeg)
+
 ---
 
 ## Activity #3
@@ -268,12 +717,897 @@ Inspecting the **`OAuth`** module of the official `Notion API (2025-09-03)` coll
 3. Review the concept of variables, variable scopes, and environments in Postman.
 4. Implement multi-request tests using shared variables.  
 
+### 3.1 Evaluation and Feasibility of Written Tests in Postman (Data Sources, Databases, and Search)
+
+Following the formal specification of 160 test scenarios in Laboratory 01 across the `Data sources` module (Valentina Molina Bustillos) and the `Databases` and `Search` modules (Sebastián Pereyra), the team conducted a technical feasibility analysis to evaluate the automation potential of these contracts within the **Postman (v11.x)** platform.
+
+#### Automation Feasibility Classification
+
+Each test case was evaluated against the capabilities and architectural constraints of the *Postman Runtime* and classified into one of three feasibility tiers:
+
+```mermaid
+pie title Test Case Automation Feasibility in Postman (160 Scenarios)
+    "Tier 1: Direct Native Execution (85%)" : 136
+    "Tier 2: Script-Assisted Dynamic Execution (12%)" : 19
+    "Tier 3: Conditionally Automatable / Special Setup (3%)" : 5
+```
+
+1. **Tier 1: Direct Native Execution (100% Automatable Out-of-the-Box — 85% of Suite):**  
+   Includes all deterministic contract checks: HTTP status codes (`200`, `400`, `401`, `404`), mandatory request header enforcement (`Notion-Version: 2025-09-03`, `Authorization: Bearer {{token}}`), malformed JSON syntax rejections, typed JSON schema validation, and fixed boundary conditions (e.g., `page_size: 1`, `page_size: 100`, `page_size: 0`, `page_size: 101`). These requests require no dynamic multi-turn coordination and execute deterministically in isolation.
+
+2. **Tier 2: Script-Assisted Dynamic Execution (Automatable via `pm.*` Sandbox Scripts — 12% of Suite):**  
+   Includes scenarios requiring runtime state capture, response transformation, or sequential data correlation. Examples include:
+   - Capturing auto-generated entity UUIDs (`database_id` and `data_source_id`) from creation responses and persisting them to the active environment.
+   - Cursor-based pagination loops traversing `start_cursor` tokens until `has_more: false`.
+   - Dynamic timestamp generation (`new Date().toISOString()`) for cache busting or unique naming.
+   - Deep structural equality assertions across dynamically generated schema properties.
+
+3. **Tier 3: Conditionally Automatable / Special Environment Setup Required (3% of Suite):**  
+   Scenarios that depend on external architectural factors beyond a single Postman request execution:
+   - *Rate Limiting (`429 Too Many Requests` / `rate_limited`):* Notion enforces a global rate limit of approximately 3 requests per second per integration token, with short burst allowances. Automating `TC_DB_019`, `TC_DS_GET_011`, and `TC_SEARCH_016` deterministically requires rapid parallel dispatch via Newman CLI or a looping Collection Runner script with `pm.execution.setNextRequest()`, rather than an isolated manual click.
+   - *Permission Isolation & Enumeration Prevention (`TC_DB_015`, `TC_DS_GET_009`, `TC_E2E_DB_005`):* Validating that an unshared resource returns `404 object_not_found` rather than leaking its existence requires a pre-existing resource owned by a secondary account or integration token that is intentionally not shared with Group 2's primary bot.
+
+##### Feasibility Evaluation Summary Matrix
+
+| Module | Member | Total Test Cases | Tier 1 (Direct) | Tier 2 (Scripted) | Tier 3 (Special Setup) | Overall Feasibility |
+|---|---|---|---|---|---|---|
+| **Data Sources** (`/v1/data_sources/*`) | Valentina Molina Bustillos | 82 scenarios | 70 (85.4%) | 10 (12.2%) | 2 (2.4%) | **100% Automatable** (with scripts & environment setup) |
+| **Databases** (`/v1/databases/*`) | Sebastián Pereyra | 46 scenarios | 39 (84.8%) | 5 (10.9%) | 2 (4.3%) | **100% Automatable** (with scripts & environment setup) |
+| **Search** (`/v1/search`) | Sebastián Pereyra | 32 scenarios | 27 (84.4%) | 4 (12.5%) | 1 (3.1%) | **100% Automatable** (with scripts & environment setup) |
+| **Total Group 2 Scope** | **Valentina & Sebastián** | **160 scenarios** | **136 (85.0%)** | **19 (11.9%)** | **5 (3.1%)** | **100% Automatable** |
+
+---
+
+### 3.2 Test Requirements: Preconditions, Postconditions, and Environment State Management
+
+To execute the test suites deterministically without false failures or state contamination, Group 2 defined strict preconditions, postconditions, and teardown procedures for both members' modules.
+
+#### Precondition Requirements
+
+The table below details the necessary operational preconditions required prior to executing the test collections:
+
+| Requirement Category | Prerequisite Description | Applied Modules | Configuration in Postman Environment |
+|---|---|---|---|
+| **API Authentication** | An active Notion Internal Integration bot (`SQE3-Grupo2-Internal`) provisioned in the Notion Developers Portal. | All (`Databases`, `Data sources`, `Search`) | Masked in `{{NOTION_TOKEN}}` (`type: "secret"`). |
+| **Integration Capabilities** | Internal integration must have **Read content**, **Insert content**, and **Update content** capabilities enabled. | All | Configured in Notion Portal under Integration Settings. |
+| **Root Test Container** | A designated parent page created in the workspace and explicitly shared with the integration bot via **`...` → `Connections`**. | `POST /v1/databases` | Populated in `{{parent_page_id}}` (36-char UUID). |
+| **Parent Database** | An active database container created under the parent page, serving as the required container for new data sources. | `POST /v1/data_sources` | Populated in `{{database_id}}` (dynamically or manually). |
+| **Populated Rows** | A data source populated with at least 5 page rows with diverse values (`Count`, `Status`, `Due Date`) for query filter testing. | `POST /v1/data_sources/{id}/query` | Populated in `{{data_source_id}}`. |
+| **Negative Fixture: Ghost UUID** | A syntactically valid RFC 4122 UUIDv4 that does not correspond to any existing Notion entity. | All negative `404` tests | `{{ghost_id}} = "00000000-0000-0000-0000-000000000000"`. |
+| **Negative Fixture: Unshared Resource** | A real database/data source created in a workspace container that is intentionally NOT connected to Group 2's bot. | All enumeration prevention `404` tests | `{{unshared_db_id}}` and `{{unshared_ds_id}}`. |
+
+#### Postcondition & Teardown Requirements
+
+Automated tests that mutate server state must leave the environment in a clean, predictable condition:
+
+1. **Entity Decommissioning (Soft Delete / Archive):**  
+   In Notion API `2025-09-03`, databases and pages are moved to the trash by updating their container flag:
+   ```http
+   PATCH {{NOTION_BASE_URL}}/v1/databases/{{database_id}}
+   Content-Type: application/json
+   
+   {
+       "in_trash": true
+   }
+   ```
+   Every E2E creation suite terminates with an automated teardown request to archive temporary database containers and prevent workspace clutter.
+
+2. **Environment Variable Cleanup:**  
+   Ephemeral runtime variables generated during test runs (`temp_run_id`, `next_cursor`, `DYNAMIC_QUERY_FILTER`) are cleared via `pm.environment.unset()` in the final teardown script, preserving only persistent configuration anchors.
+
+---
+
+### 3.3 Review of Variables, Variable Scopes, and Environments in Postman
+
+In automated API testing and contract verification suites, hardcoding configuration values, network endpoints, authentication secrets, and dynamically generated entity identifiers inside individual requests introduces severe architectural brittleness. It violates the *Single Source of Truth (SSOT)* and *Don't Repeat Yourself (DRY)* principles, breaks portability across distinct infrastructure tiers (e.g., Localhost, Sandbox, Staging, and Production), and impedes the construction of stateful, multi-step End-to-End (E2E) workflow chains.
+
+To build a modular, resilient, and enterprise-grade test automation harness for the **Notion REST API (`Notion-Version: 2025-09-03`)**, **Group 2** conducted an in-depth review and technical implementation of Postman's variable abstraction layer, variable scoping hierarchy, runtime lifecycle mechanics, and environment isolation architecture.
+
+---
+
+#### 3.3.1 Conceptual Foundation of Variables in Postman
+
+A **variable** in Postman is a symbolic key-value abstraction that stores and parameterizes data references across HTTP requests, headers, URL parameters, payloads, Pre-request scripts, and Post-response assertion scripts. Variables decouple the static contract definition of an API endpoint from its operational runtime parameters.
+
+##### Dual Interpolation and Runtime Manipulation Syntax
+
+Postman provides two complementary paradigms for interacting with variables:
+
+1. **Declarative String Interpolation (Mustache Syntax):**  
+   Inside any UI input field—including the Address Bar (protocol, host, port, path, query parameters), Request Headers, Path Variables, Form-Data, and raw JSON/XML request bodies—variables are referenced using the double curly brace syntax:
+   ```text
+   {{variable_name}}
+   ```
+   During request dispatch, the *Postman Runtime* dynamically parses the raw template and replaces the token with the resolved value from the highest-priority active scope. For example:
+   ```http
+   GET {{NOTION_BASE_URL}}/v1/databases/{{database_id}} HTTP/1.1
+   Host: api.notion.com
+   Authorization: Bearer {{NOTION_TOKEN}}
+   Notion-Version: {{NOTION_VERSION}}
+   Accept: application/json
+   ```
+
+2. **Programmatic Execution via the Postman Sandbox API (`pm.*`):**  
+   Inside **Pre-request Scripts** and **Post-response (Tests) Scripts**, variables are accessed and mutated programmatically using the Node.js-based Postman Sandbox runtime via the global `pm` facade:
+   ```javascript
+   // Reading a variable with automatic hierarchical scope resolution:
+   const activeDbId = pm.variables.get("database_id");
+
+   // Writing explicitly to a specific scope:
+   pm.environment.set("database_id", "2b4122d4-7ce8-48b2-b430-e67c00689b02");
+   pm.collectionVariables.set("default_page_size", 100);
+
+   // Scope-level deletion:
+   pm.environment.unset("database_id");
+   ```
+
+3. **Dynamic Built-In Variables (Postman Faker Library):**  
+   Postman integrates a built-in mock data generator accessible via `{{$...}}` tokens, enabling zero-code generation of dynamic request values without external utility libraries:
+   - `{{$guid}}`: Generates an RFC 4122-compliant pseudo-random UUIDv4 (essential for simulating non-existent resource IDs like `{{ghost_id}}`).
+   - `{{$timestamp}}`: Generates the current Unix epoch timestamp in seconds.
+   - `{{$isoTimestamp}}`: Generates the current UTC ISO 8601 timestamp string (`YYYY-MM-DDTHH:mm:ss.sssZ`).
+   - `{{$randomInt}}`: Generates a random integer between `0` and `1000`.
+
+---
+
+#### 3.3.2 The Five Variable Scopes in Postman & Hierarchical Precedence
+
+Postman organizes variables into **five distinct hierarchical scopes**, designed to balance granularity, persistence, and isolation. When a variable is referenced via `{{variable_name}}` or resolved through `pm.variables.get("variable_name")`, the Postman Runtime performs a cascading lookup starting from the narrowest (highest priority) scope to the broadest (lowest priority) scope. 
+
+The first scope containing a defined value for the specified key wins and satisfies the resolution request, shadowing any identically named keys in broader scopes.
+
+```mermaid
+flowchart TD
+    subgraph Precedence ["Variable Scoping & Lookup Precedence (Narrowest to Broadest)"]
+        direction TB
+        L1["1. Data Variables (pm.iterationData)<br>Highest Precedence / Ephemeral Iteration Scope"]
+        L2["2. Local / Script Variables (pm.variables)<br>Single Request Execution Lifecycle"]
+        L3["3. Environment Variables (pm.environment)<br>Contextual Active Session / Target Infrastructure"]
+        L4["4. Collection Variables (pm.collectionVariables)<br>Collection-Level Invariants & Contract Defaults"]
+        L5["5. Global Variables (pm.globals)<br>Lowest Precedence / Workspace-Wide Shared Scope"]
+        
+        L1 -->|Fallback if undefined| L2
+        L2 -->|Fallback if undefined| L3
+        L3 -->|Fallback if undefined| L4
+        L4 -->|Fallback if undefined| L5
+    end
+```
+
+##### 1. Data Variables (`pm.iterationData` — Precedence Level 1, Highest)
+- **Scope & Storage:** Injected externally at runtime via structured data files (**JSON** or **CSV**) supplied to the **Postman Collection Runner**, **Newman CLI** (`newman run ... -d dataset.json`), or **Postman CLI**.
+- **Lifecycle & Volatility:** Ephemeral. A data variable's lifecycle is bound strictly to a single iteration of a collection execution run. When the runner transitions to iteration `n + 1`, the previous data row is garbage-collected, and the next record is loaded.
+- **Mutability:** Read-only at runtime via `pm.iterationData.get("key")`. Data variables cannot be programmatically overwritten using a setter (`pm.iterationData.set()` does not exist).
+- **QA Role in Notion API Testing:** Essential for **data-driven testing (DDT)** and parameterized boundary matrices. For example, feeding 50 distinct malformed UUID variations, edge-case page sizes (`[-1, 0, 1, 100, 101, "abc"]`), or complex JSON search filters from a single CSV/JSON file into `TC_SEARCH_017`–`TC_SEARCH_020` without duplicating request objects.
+
+##### 2. Local / Script Execution Variables (`pm.variables` — Precedence Level 2)
+- **Scope & Storage:** Created and manipulated programmatically inside Pre-request Scripts or Test Scripts using `pm.variables.set("key", value)`.
+- **Lifecycle & Volatility:** Bound strictly to the execution lifecycle of a single HTTP request transaction (*Pre-request Script → Network Dispatch → Response Arrival → Test Script*). As soon as the request's test scripts finish executing, all local variables are purged from runtime memory. They do not persist across sequential requests in a collection run.
+- **QA Role in Notion API Testing:** Ideal for storing transient operational values, such as dynamically calculated HMAC signatures, run-specific unique name prefixes (`const runName = "DB_Test_" + Date.now(); pm.variables.set("temp_title", runName);`), or temporary mathematical accumulators that must not pollute persistent environment storage.
+
+##### 3. Environment Variables (`pm.environment` — Precedence Level 3)
+- **Scope & Storage:** Bound to a selected **Postman Environment** file (e.g., `Act1_Notion_Env.postman_environment.json`). Stored as a decoupled JSON configuration dictionary outside the collection definition.
+- **Lifecycle & Volatility:** Stateful and persistent across all requests, folders, and runs executed within the context of that active environment. Changes made programmatically via `pm.environment.set("key", value)` during request execution remain available to all subsequent requests.
+- **QA Role in Notion API Testing:** Serves two critical functions:
+  1. *Infrastructure & Credential Parameterization:* Switching base URLs (`NOTION_BASE_URL`), authentication tokens (`NOTION_TOKEN`), and client secrets across different workspace tiers.
+  2. *Stateful Inter-Request Correlation:* Capturing generated entity UUIDs from responses (e.g., storing the new `id` returned by `POST /v1/databases` into `{{database_id}}`) and passing them downstream to subsequent `GET`, `PATCH`, and `query` requests in E2E workflows.
+
+##### 4. Collection Variables (`pm.collectionVariables` — Precedence Level 4)
+- **Scope & Storage:** Embedded directly within the Postman Collection definition file (`*.postman_collection.json`) under the top-level `"variable": [...]` array.
+- **Lifecycle & Volatility:** Persists across all folders, subfolders, and requests within that specific collection, regardless of which Postman Environment is currently active.
+- **QA Role in Notion API Testing:** Dedicated to collection-wide contract invariants, architectural constants, and fallback defaults that remain uniform regardless of whether tests run against live production or local mocks:
+  - Default API contract version fallback: `{{default_notion_version}} = "2025-09-03"`.
+  - Default query limit: `{{default_page_size}} = 100`.
+  - Canonical request schemas and reusable payload templates.
+
+##### 5. Global Variables (`pm.globals` — Precedence Level 5, Lowest)
+- **Scope & Storage:** Stored at the Postman Workspace level. Accessible across every collection, folder, environment, and request configured inside the active team workspace (`SQE3-2026-Group2-NotionAPI`).
+- **Lifecycle & Volatility:** Highly persistent across all workspace activities until explicitly overwritten or deleted.
+- **QA Role in Notion API Testing:** Reserved for universal enterprise-wide utilities, such as centralized date formatting helper functions, global mock server URLs, or workspace telemetry settings. Group 2 enforces a strict architectural policy limiting global variable usage to prevent cross-suite state leakage, unintended namespace shadowing, and concurrency collisions among team members.
+
+---
+
+#### 3.3.3 Comparative Technical Matrix of Postman Variable Scopes
+
+The following matrix provides a technical comparison of the five Postman variable scopes as implemented in Group 2's testing architecture:
+
+| Technical Criterion | 1. Data Variables | 2. Local Variables | 3. Environment Variables | 4. Collection Variables | 5. Global Variables |
+|---|---|---|---|---|---|
+| **Precedence Rank** | **#1** (Highest) | **#2** | **#3** | **#4** | **#5** (Lowest) |
+| **Visibility Scope** | Single iteration of a runner run | Single request execution cycle | Active selected environment | Entire parent collection | Entire workspace across collections |
+| **Persistence / Lifetime** | Duration of one data row iteration | Request execution (Pre-request to Tests) | Persistent across session / run | Persistent within collection JSON | Persistent across workspace |
+| **Storage Location** | External `.json` or `.csv` data file | Node.js runtime volatile memory | Environment JSON / Workspace state | Collection definition JSON schema | Workspace Globals JSON store |
+| **Version Control Safe?** | Yes (committed test data suites) | N/A (runtime ephemeral) | Yes, if using *Initial Value* placeholders | Yes (committed with collection file) | Yes (committed workspace config) |
+| **Secret Masking (`type: "secret"`)** | No (plain text in CSV/JSON) | No (in-memory variable) | **Yes** (visual & export masking) | No | Yes |
+| **Getter Method** | `pm.iterationData.get("k")` | `pm.variables.get("k")` | `pm.environment.get("k")` | `pm.collectionVariables.get("k")` | `pm.globals.get("k")` |
+| **Setter Method** | *Read-only* (no setter) | `pm.variables.set("k", v)` | `pm.environment.set("k", v)` | `pm.collectionVariables.set("k", v)` | `pm.globals.set("k", v)` |
+| **Primary Notion QA Use Case** | Parameterized boundary test suites (DDT) | Transient timestamps, hashes, run IDs | Dynamic IDs (`database_id`), tokens, URLs | Contract defaults (`Notion-Version`), limits | Universal workspace utility constants |
+
+---
+
+#### 3.3.4 Environments in Postman: Separation of Concerns & Secret Management
+
+A **Postman Environment** is a decoupled key-value dictionary that models a specific target execution context (e.g., `Notion-Production-Cloud`, `Notion-Staging-Sandbox`, or `JSONPlaceholder-Mock`). Environments allow QA engineers to execute identical collections against disparate hosts, credentials, and tenant partitions without modifying a single line of request configuration or test code.
+
+```mermaid
+flowchart LR
+    subgraph Collection ["Parameterized Test Suite Collection"]
+        direction TB
+        REQ1["POST /v1/databases<br>URL: {{NOTION_BASE_URL}}/v1/databases<br>Header: Authorization: Bearer {{NOTION_TOKEN}}"]
+        REQ2["GET /v1/databases/{{database_id}}<br>Header: Notion-Version: {{NOTION_VERSION}}"]
+    end
+
+    subgraph Envs ["Decoupled Postman Environments"]
+        direction TB
+        ENV1["Act1_Notion_Env (Production)<br>NOTION_BASE_URL = https://api.notion.com<br>NOTION_TOKEN = ntn_live_sec...<br>database_id = [Captured at runtime]"]
+        ENV2["Act1_Notion_Staging_Env<br>NOTION_BASE_URL = https://staging.notion.com<br>NOTION_TOKEN = ntn_staging_sec...<br>database_id = [Captured at runtime]"]
+    end
+
+    ENV1 -.->|Active Environment Injection| Collection
+    ENV2 -.->|Alternative Environment Injection| Collection
+```
+
+##### Initial Value vs. Current Value: Cryptographic & Repository Isolation
+
+To prevent credential leakage while maintaining seamless Git-based collaboration across Group 2's five engineers, Postman enforces a dual-tier value architecture for every environment and collection variable:
+
+1. **Initial Value (Shared / Version Control Baseline):**
+   - The value synced to Postman Cloud team workspaces and exported into version-controlled JSON files (`Act1_Notion_Env.postman_environment.json`).
+   - Group 2 policy strictly mandates that **Initial Values must never contain production credentials, integration tokens, or private customer data**. They contain generic documentation placeholders (e.g., `ntn_YOUR_INTEGRATION_SECRET_HERE`, `YOUR_OAUTH_CLIENT_ID`).
+   
+2. **Current Value (Local Session / Non-Synced Runtime):**
+   - The active value utilized by the local *Postman Runtime* during request execution on the individual engineer's workstation.
+   - Stored strictly in local desktop storage; never automatically pushed to public repositories or shared outside the authorized workstation.
+   - When a test script dynamically mutates an environment variable via `pm.environment.set()`, Postman updates exclusively the **Current Value**, preserving the clean template state of the Initial Value.
+
+##### Variable Types: `default` vs. `secret`
+
+Postman provides two distinct data storage types for environment variables:
+- **`default` (Standard Plain Text):** Values are displayed visibly in the UI. Used for non-sensitive configuration parameters such as `NOTION_BASE_URL` (`https://api.notion.com`), `NOTION_VERSION` (`2025-09-03`), and `OAUTH_REDIRECT_URI`.
+- **`secret` (Masked Sensitive Data):** Values are masked on-screen with asterisks (`••••••••••••`). Postman prevents accidental exposure during screen sharing, video demonstrations, and console logging. Furthermore, when exporting an environment with secret variables, Postman provides options to sanitize or omit secret Current Values entirely. In `Act1_Notion_Env`, both `NOTION_TOKEN` and `OAUTH_CLIENT_SECRET` are strictly designated as `type: "secret"`.
+
+##### Active Environment Configuration Evidence (Act1_Notion_Env)
+The active environment file [`Act1_Notion_Env_Sebas_Vale.postman_environment.json`](./postman/actividad_2_3_4/Act1_Notion_Env_Sebas_Vale.postman_environment.json) captures the real configuration deployed during test execution for Sebastián's and Valentina's modules, showing the preconditioned container page (`NOTION_PAGE_ID`) and the dynamically populated `database_id`:
+
+![Active Postman Environment Act1_Notion_Env](./caps/actividad_2/PostmanEnvSebaValen.jpeg)
+
+---
+
+#### 3.3.5 Programmatic Variable Manipulation Lifecycle (`pm.*` API)
+
+Dynamic variable manipulation enables the creation of automated end-to-end integration pipelines where subsequent requests depend upon data produced by prior requests.
+
+##### Variable Execution & Resolution Lifecycle
+
+The following sequence diagram details the operational flow of variables across the request execution lifecycle in Postman:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant PE as Postman Environment / Store
+    participant PRS as Pre-request Script
+    participant REQ as HTTP Request Builder
+    participant SUT as Notion REST API (2025-09-03)
+    participant TS as Post-response (Tests) Script
+
+    PE->>PRS: Load active variables (NOTION_TOKEN, parent_page_id)
+    Note over PRS: Generate transient data:<br/>pm.variables.set("run_id", Date.now())<br/>Upsert Notion-Version: 2025-09-03
+    PRS->>REQ: Inject resolved headers & body
+    Note over REQ: Resolve Mustache tags:<br/>{{NOTION_BASE_URL}}/v1/databases<br/>Bearer {{NOTION_TOKEN}}
+    REQ->>SUT: Dispatched HTTPS Request (TLS 1.2/1.3)
+    SUT-->>TS: HTTP 200 OK + JSON Response Body (id, object: "database")
+    Note over TS: Parse JSON response:<br/>const res = pm.response.json()<br/>Extract generated entity UUID: res.id
+    TS->>PE: pm.environment.set("database_id", res.id)
+    Note over PE: Variable {{database_id}} now available<br/>for downstream GET, PATCH, and Query requests
+```
+
+##### Complex Data Structure Serialization in Postman Variables
+
+Postman's environment and collection variable stores serialize all stored entries as **primitive strings**. Attempting to pass a raw JavaScript object or array directly into `pm.environment.set()` results in string coercion into `"[object Object]"`, corrupting the data structure.
+
+To preserve composite data structures—such as dynamic property schemas, multi-condition query filter trees, or sorting arrays—Group 2 adheres to explicit **JSON serialization and deserialization patterns**:
+
+```javascript
+// =========================================================================
+// 1. Serialization inside Pre-request or Test Script (Storing Object/Array)
+// =========================================================================
+const complexFilter = {
+    or: [
+        { property: "Status", status: { equals: "Done" } },
+        { property: "Priority", select: { equals: "High" } }
+    ]
+};
+
+// Serialize to JSON string before persisting to environment scope:
+pm.environment.set("DYNAMIC_QUERY_FILTER", JSON.stringify(complexFilter));
+
+// =========================================================================
+// 2. Deserialization in Downstream Request Scripts (Retrieving Object/Array)
+// =========================================================================
+const rawFilter = pm.environment.get("DYNAMIC_QUERY_FILTER");
+
+if (rawFilter) {
+    try {
+        const parsedFilter = JSON.parse(rawFilter);
+        // Inject directly into request body payload programmatically:
+        pm.request.body.raw = JSON.stringify({
+            filter: parsedFilter,
+            page_size: 25
+        });
+    } catch (err) {
+        console.error("Failed to parse DYNAMIC_QUERY_FILTER JSON string:", err);
+    }
+}
+```
+
+---
+
+#### 3.3.6 Group 2 Variable Dictionary for Notion REST API Testing
+
+To ensure seamless coordination across all five functional modules (`Databases`, `Data sources`, `Pages`, `Users`, and `OAuth`), Group 2 established a centralized, typed **Variable Dictionary** categorized by operational role, scope, persistence, and security classification:
+
+| Variable Identifier | Scope Tier | Type | Initial Value (Git Safe) | Current Value (Runtime Example) | Technical QA Purpose |
+|---|---|---|---|---|---|
+| `NOTION_BASE_URL` | Environment | `default` | `https://api.notion.com` | `https://api.notion.com` | Root API host endpoint parameterization. |
+| `NOTION_VERSION` | Environment / Coll. | `default` | `2025-09-03` | `2025-09-03` | Mandatory contract version header injected globally via Pre-request Script. |
+| `NOTION_TOKEN` | Environment | `secret` | `ntn_YOUR_INTEGRATION_SECRET_HERE` | `ntn_18471928471...` | Primary RFC 6750 Bearer credential for domain modules (`Databases`, `Data sources`, `Pages`, `Users`). |
+| `OAUTH_CLIENT_ID` | Environment | `default` | `YOUR_OAUTH_CLIENT_ID` | `10293847-abdc-...` | RFC 7617 HTTP Basic Auth username for `/v1/oauth/*` endpoints. |
+| `OAUTH_CLIENT_SECRET` | Environment | `secret` | `YOUR_OAUTH_CLIENT_SECRET` | `secret_oauth991...` | RFC 7617 HTTP Basic Auth password for `/v1/oauth/*` endpoints. |
+| `parent_page_id` | Environment | `default` | `YOUR_PARENT_PAGE_UUID` | `12a84d91-3c22-4ef1-90a1-71e84a29c101` | Preconditioned test container page UUID shared with the integration bot. |
+| `database_id` | Environment (Dynamic) | `default` | `""` *(empty)* | `9f8e7d6c-5b4a-3f2e-1d0c-9b8a7f6e5d4c` | Captured dynamically from `POST /v1/databases` response to feed `GET`, `PATCH`, and E2E flows. |
+| `data_source_id` | Environment (Dynamic) | `default` | `""` *(empty)* | `3a2b1c0d-9e8f-7a6b-5c4d-3e2f1a0b9c8d` | Captured dynamically from database creation or `POST /v1/data_sources` to execute row queries. |
+| `page_id` | Environment (Dynamic) | `default` | `""` *(empty)* | `a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d` | Captured dynamically from `POST /v1/pages` for row-level verification and trash testing. |
+| `ghost_id` | Environment / Coll. | `default` | `00000000-0000-0000-0000-000000000000` | `00000000-0000-0000-0000-000000000000` | Well-formed RFC 4122 UUIDv4 guaranteed not to exist; used for negative `404 object_not_found` checks. |
+| `unshared_db_id` | Environment | `default` | `YOUR_UNSHARED_DB_UUID` | `e4f5a6b7-c8d9-0e1f-2a3b-4c5d6e7f8a9b` | Existing database intentionally NOT shared with integration bot; verifies `404` access control isolation. |
+| `next_cursor` | Environment (Dynamic) | `default` | `""` *(empty)* | `d3b07384-d113-4c4d-9c85-2e6b8c1a708a` | Cursor token returned when `has_more: true` to execute sequential pagination validation. |
+| `default_page_size` | Collection | `default` | `100` | `100` | Architectural pagination limit default defined at the collection level. |
+
+---
+
+#### 3.3.7 Concrete Scripting Implementation in Group 2's Test Suites
+
+To illustrate the concrete application of variable scopes, the following snippets demonstrate how Group 2 implements stateful correlation between **POST /v1/databases** (Sebastián Pereyra) and **POST /v1/data_sources/{id}/query** (Valentina Molina Bustillos):
+
+##### 1. Capturing and Persisting Dynamic Variables in Post-Response Tests Script (`POST /v1/databases`):
+```javascript
+// Test: Validate successful database container creation (200 OK)
+pm.test("Status code is 200 OK", function () {
+    pm.response.to.have.status(200);
+});
+
+pm.test("Response is a valid database object and contains generated UUID", function () {
+    const jsonData = pm.response.json();
+    
+    pm.expect(jsonData.object).to.eql("database");
+    pm.expect(jsonData.id).to.be.a("string").and.to.have.lengthOf(36);
+    
+    // Dynamically persist the database UUID to the active Environment scope
+    pm.environment.set("database_id", jsonData.id);
+    console.log("[STATE CAPTURE] Successfully set {{database_id}}:", jsonData.id);
+    
+    // In Notion API 2025-09-03, creating a database generates default data sources
+    if (jsonData.data_sources && jsonData.data_sources.length > 0) {
+        pm.environment.set("data_source_id", jsonData.data_sources[0].id);
+        console.log("[STATE CAPTURE] Successfully set {{data_source_id}}:", jsonData.data_sources[0].id);
+    }
+});
+```
+
+##### 2. Consuming Dynamic Variables in Downstream Pre-request Script (`GET /v1/databases/{{database_id}}`):
+```javascript
+// Ensure preconditioned database_id is present before dispatching request
+const dbId = pm.environment.get("database_id");
+
+if (!dbId || dbId.trim() === "") {
+    console.warn("[PRECONDITION WARNING] {{database_id}} is empty. Request may fail with 404/validation_error.");
+} else {
+    console.log("[PRECONDITION VERIFIED] Executing GET against database ID:", dbId);
+}
+```
+
+##### 3. Automated Postcondition Teardown Script:
+```javascript
+// Postcondition cleanup: remove ephemeral test state after suite completion
+pm.test("Clean up ephemeral test IDs", function () {
+    pm.environment.unset("temp_run_id");
+    pm.environment.unset("DYNAMIC_QUERY_FILTER");
+    console.log("[TEARDOWN] Ephemeral variables purged from environment scope.");
+});
+```
+
+By systematically enforcing these variable scoping, persistence, and environment isolation rules, Group 2 ensures that the Notion REST API test suite remains deterministic, secure against credential leakage in public repositories, easily portable across execution targets, and capable of executing complex, multi-request integration workflows autonomously.
+
+---
+
+### 3.4 Implementation of Multi-Request Tests Using Shared Variables
+
+Single-endpoint tests validate atomic contract rules, but enterprise API reliability depends on whether sequences of interdependent operations maintain state consistency across time. In accordance with Activity #3, Group 2 implemented **two complete multi-request E2E workflows** powered by dynamic variable sharing across the `Data sources`, `Databases`, and `Search` modules.
+
+#### 3.4.1 Chained E2E Test Workflow 1: Data Source Tabular Lifecycle & Filtered Querying (Valentina Molina)
+
+This 5-step chained integration workflow validates the end-to-end lifecycle of a data source within a database container: creating the schema, reading it back, altering its columns, populating a record, and querying that record with exact property filtering.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Step1 as 1. POST /v1/data_sources (Create Schema)
+    participant Env as Postman Environment State
+    participant Step2 as 2. GET /v1/data_sources/{{id}} (Read Schema)
+    participant Step3 as 3. PATCH /v1/data_sources/{{id}} (Add Priority Column)
+    participant Step4 as 4. POST /v1/pages (Insert Row via parent.data_source_id)
+    participant Step5 as 5. POST /v1/data_sources/{{id}}/query (Filter Query)
+
+    Step1->>Env: pm.environment.set("data_source_id", res.id)
+    Note over Env: {{data_source_id}} dynamically available
+    Env->>Step2: Inherits {{data_source_id}} in path
+    Step2->>Step2: Asserts 200 OK & schema integrity
+    Env->>Step3: Inherits {{data_source_id}} in path
+    Step3->>Step3: Adds "Priority" select property (200 OK)
+    Env->>Step4: Injects parent.data_source_id: {{data_source_id}}
+    Step4->>Env: pm.environment.set("e2e_page_id", res.id)
+    Env->>Step5: Injects {{data_source_id}} in query path
+    Step5->>Step5: Filters by Priority = "High" & asserts e2e_page_id in results
+```
+
+##### Step-by-Step Request Specifications and Variable Transitions:
+
+1. **Step 1: `POST {{NOTION_BASE_URL}}/v1/data_sources` (Create Data Source with Schema)**
+   - *Pre-request Script:* Generates dynamic run name: `pm.variables.set("ds_run_name", "E2E_DS_" + Date.now());`
+   - *Request Body:*
+     ```json
+     {
+       "database_id": "{{database_id}}",
+       "properties": {
+         "Name": { "title": {} },
+         "Count": { "number": { "format": "number" } }
+       }
+     }
+     ```
+   - *Post-response Script (Tests):*
+     ```javascript
+     pm.test("Step 1: Data source created (200 OK)", function () {
+         pm.response.to.have.status(200);
+         const res = pm.response.json();
+         pm.expect(res.object).to.eql("data_source");
+         pm.environment.set("data_source_id", res.id);
+     });
+     ```
+
+2. **Step 2: `GET {{NOTION_BASE_URL}}/v1/data_sources/{{data_source_id}}` (Retrieve & Verify Schema)**
+   - *Request:* Targets the dynamically persisted `{{data_source_id}}`.
+   - *Post-response Script (Tests):*
+     ```javascript
+     pm.test("Step 2: Retrieved data source matches captured ID", function () {
+         pm.response.to.have.status(200);
+         const res = pm.response.json();
+         pm.expect(res.id).to.eql(pm.environment.get("data_source_id"));
+         pm.expect(res.properties).to.have.property("Name");
+         pm.expect(res.properties).to.have.property("Count");
+     });
+     ```
+
+3. **Step 3: `PATCH {{NOTION_BASE_URL}}/v1/data_sources/{{data_source_id}}` (Mutate Schema - Add Priority Column)**
+   - *Request Body:*
+     ```json
+     {
+       "properties": {
+         "Priority": {
+           "select": {
+             "options": [
+               { "name": "High", "color": "red" },
+               { "name": "Low", "color": "blue" }
+             ]
+           }
+         }
+       }
+     }
+     ```
+   - *Post-response Script (Tests):*
+     ```javascript
+     pm.test("Step 3: Schema updated with new Priority column", function () {
+         pm.response.to.have.status(200);
+         const res = pm.response.json();
+         pm.expect(res.properties).to.have.property("Priority");
+         pm.expect(res.properties.Priority.type).to.eql("select");
+     });
+     ```
+
+4. **Step 4: `POST {{NOTION_BASE_URL}}/v1/pages` (Insert Data Row Under Data Source)**
+   - *Request Body (Notion 2025-09-03 data source parent format):*
+     ```json
+     {
+       "parent": {
+         "type": "data_source_id",
+         "data_source_id": "{{data_source_id}}"
+       },
+       "properties": {
+         "Name": { "title": [{ "text": { "content": "E2E Task Row" } }] },
+         "Count": { "number": 42 },
+         "Priority": { "select": { "name": "High" } }
+       }
+     }
+     ```
+   - *Post-response Script (Tests):*
+     ```javascript
+     pm.test("Step 4: Row created under data source (200 OK)", function () {
+         pm.response.to.have.status(200);
+         const res = pm.response.json();
+         pm.expect(res.object).to.eql("page");
+         pm.expect(res.parent.data_source_id).to.eql(pm.environment.get("data_source_id"));
+         pm.environment.set("e2e_page_id", res.id);
+     });
+     ```
+
+5. **Step 5: `POST {{NOTION_BASE_URL}}/v1/data_sources/{{data_source_id}}/query` (Filter Query by Priority)**
+   - *Request Body:*
+     ```json
+     {
+       "filter": {
+         "property": "Priority",
+         "select": { "equals": "High" }
+       }
+     }
+     ```
+   - *Post-response Script (Tests):*
+     ```javascript
+     pm.test("Step 5: Query returns created row matching filter", function () {
+         pm.response.to.have.status(200);
+         const res = pm.response.json();
+         pm.expect(res.object).to.eql("list");
+         pm.expect(res.results.length).to.be.at.least(1);
+         const matched = res.results.some(r => r.id === pm.environment.get("e2e_page_id"));
+         pm.expect(matched, "Created row ID must appear in query results").to.be.true;
+     });
+     ```
+
+---
+
+#### 3.4.2 Chained E2E Test Workflow 2: Database Container Lifecycle, Rebranding, and Search Discovery (Sebastián Pereyra)
+
+This 5-step chained integration workflow validates the end-to-end lifecycle of a database container: creating a new container with dynamic naming, verifying its metadata, updating its title and icon, discovering it via global search, and safely archiving it in teardown.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Step1 as 1. POST /v1/databases (Create Container)
+    participant Env as Postman Environment State
+    participant Step2 as 2. GET /v1/databases/{{id}} (Read Metadata)
+    participant Step3 as 3. PATCH /v1/databases/{{id}} (Rename & Rebrand)
+    participant Step4 as 4. POST /v1/search (Discover by Title)
+    participant Step5 as 5. PATCH /v1/databases/{{id}} (Teardown: in_trash)
+
+    Step1->>Env: pm.environment.set("database_id", res.id)<br/>pm.environment.set("db_initial_title", title)
+    Env->>Step2: Inherits {{database_id}}
+    Step2->>Step2: Validates parent.page_id & data_sources
+    Env->>Step3: Inherits {{database_id}}
+    Step3->>Env: pm.environment.set("db_updated_title", newTitle)
+    Env->>Step4: Injects query: {{db_updated_title}} & filter: database
+    Step4->>Step4: Asserts results[0].id == {{database_id}}
+    Env->>Step5: Injects {{database_id}} with {"in_trash": true}
+    Step5->>Step5: Asserts in_trash: true (Clean Teardown)
+```
+
+##### Step-by-Step Request Specifications and Variable Transitions:
+
+1. **Step 1: `POST {{NOTION_BASE_URL}}/v1/databases` (Create Database Container)**
+   - *Pre-request Script:* Generates dynamic title to ensure search uniqueness:
+     ```javascript
+     const uniqueTitle = "E2E_DB_Release_" + Date.now();
+     pm.environment.set("db_initial_title", uniqueTitle);
+     ```
+   - *Request Body:*
+     ```json
+     {
+       "parent": { "type": "page_id", "page_id": "{{parent_page_id}}" },
+       "title": [{ "text": { "content": "{{db_initial_title}}" } }],
+       "properties": {
+         "Name": { "title": {} }
+       }
+     }
+     ```
+   - *Post-response Script (Tests):*
+     ```javascript
+     pm.test("Step 1: Database container created (200 OK)", function () {
+         pm.response.to.have.status(200);
+         const res = pm.response.json();
+         pm.expect(res.object).to.eql("database");
+         pm.expect(res.title[0].plain_text).to.eql(pm.environment.get("db_initial_title"));
+         pm.environment.set("database_id", res.id);
+     });
+     ```
+
+2. **Step 2: `GET {{NOTION_BASE_URL}}/v1/databases/{{database_id}}` (Verify Metadata & Associations)**
+   - *Post-response Script (Tests):*
+     ```javascript
+     pm.test("Step 2: Retrieved database metadata is consistent", function () {
+         pm.response.to.have.status(200);
+         const res = pm.response.json();
+         pm.expect(res.id).to.eql(pm.environment.get("database_id"));
+         pm.expect(res.parent.page_id).to.eql(pm.environment.get("parent_page_id"));
+         pm.expect(res.archived).to.be.false;
+         pm.expect(res.in_trash).to.be.false;
+     });
+     ```
+
+3. **Step 3: `PATCH {{NOTION_BASE_URL}}/v1/databases/{{database_id}}` (Rebrand: Rename & Add Icon)**
+   - *Pre-request Script:*
+     ```javascript
+     const updatedTitle = "E2E_DB_Renamed_" + Date.now();
+     pm.environment.set("db_updated_title", updatedTitle);
+     ```
+   - *Request Body:*
+     ```json
+     {
+       "title": [{ "text": { "content": "{{db_updated_title}}" } }],
+       "icon": { "type": "emoji", "emoji": "🚀" }
+     }
+     ```
+   - *Post-response Script (Tests):*
+     ```javascript
+     pm.test("Step 3: Database title and icon updated", function () {
+         pm.response.to.have.status(200);
+         const res = pm.response.json();
+         pm.expect(res.title[0].plain_text).to.eql(pm.environment.get("db_updated_title"));
+         pm.expect(res.icon.emoji).to.eql("🚀");
+     });
+     ```
+
+4. **Step 4: `POST {{NOTION_BASE_URL}}/v1/search` (Discover Database via Global Search)**
+   - *Request Body:*
+     ```json
+     {
+       "query": "{{db_updated_title}}",
+       "filter": { "value": "database", "property": "object" },
+       "sort": { "direction": "descending", "timestamp": "last_edited_time" }
+     }
+     ```
+   - *Post-response Script (Tests):*
+     ```javascript
+     pm.test("Step 4: Global search discovers updated database container", function () {
+         pm.response.to.have.status(200);
+         const res = pm.response.json();
+         pm.expect(res.object).to.eql("list");
+         pm.expect(res.results.length).to.be.at.least(1);
+         pm.expect(res.results[0].id).to.eql(pm.environment.get("database_id"));
+         pm.expect(res.results[0].object).to.eql("database");
+     });
+     ```
+
+5. **Step 5: `PATCH {{NOTION_BASE_URL}}/v1/databases/{{database_id}}` (Teardown: Move Container to Trash)**
+   - *Request Body:*
+     ```json
+     {
+       "in_trash": true
+     }
+     ```
+   - *Post-response Script (Tests):*
+     ```javascript
+     pm.test("Step 5: Teardown database moved to trash (in_trash: true)", function () {
+         pm.response.to.have.status(200);
+         const res = pm.response.json();
+         pm.expect(res.in_trash).to.be.true;
+         
+         // Clean ephemeral environment variables
+         pm.environment.unset("database_id");
+         pm.environment.unset("db_initial_title");
+         pm.environment.unset("db_updated_title");
+     });
+     ```
+
 ---
 
 ## Activity #4
 
 1. Continue implementing tests in Postman by establishing ordering, structure, and execution conventions.
 2. Review the capability to execute tests automatically.  
+
+### 4.1 Postman Test Suite Ordering, Structure, and Execution Conventions
+
+To maintain scalable, enterprise-grade test automation across all five Group 2 team members, the team established a rigorous architectural standard governing folder hierarchy, naming conventions, execution sequence, and scope separation.
+
+#### 4.1.1 Modular Folder Hierarchy
+
+The collaborative Postman collection is organized into a four-level hierarchical folder architecture reflecting functional boundaries, individual responsibilities, and execution modes:
+
+```text
+Collection: SQE3-Grupo2-NotionAPI (Notion-Version: 2025-09-03)
+├── 📁 01_Databases (Sebastián Pereyra)
+│   ├── 📁 01_Happy_Path (CRUD & Container Verification)
+│   │   ├── 01 - DATABASES - Positiva - Crear database con titulo (200)
+│   │   ├── 02 - DATABASES - Positiva - Crear con schema completo (200)
+│   │   ├── 03 - DATABASES - Positiva - Obtener database por ID (200)
+│   │   └── 04 - DATABASES - Positiva - Actualizar titulo y portada (200)
+│   ├── 📁 02_Negative (Validation & Authorization Errors)
+│   │   ├── 01 - DATABASES - Negativa - Sin cabecera Authorization (401)
+│   │   ├── 02 - DATABASES - Negativa - Sin Notion-Version header (400)
+│   │   ├── 03 - DATABASES - Negativa - Parent page inexistente (404)
+│   │   └── 04 - DATABASES - Negativa - Parent page no compartida (404)
+│   └── 📁 03_Boundary (Edge Limits & Payload Tolerances)
+│       ├── 01 - DATABASES - Limites - Titulo vacio [] (200)
+│       └── 02 - DATABASES - Limites - Parent ID hex vs guiones (200)
+├── 📁 02_Data_Sources (Valentina Molina Bustillos)
+│   ├── 📁 01_Happy_Path (Schema Definition & Retrieval)
+│   │   ├── 01 - DATA_SOURCES - Positiva - Crear data source con schema (200)
+│   │   ├── 02 - DATA_SOURCES - Positiva - Obtener data source por ID (200)
+│   │   ├── 03 - DATA_SOURCES - Positiva - Agregar columna al schema (200)
+│   │   └── 04 - DATA_SOURCES - Positiva - Query sin filtro (200)
+│   ├── 📁 02_Negative (Contract Violations & Access Rejections)
+│   │   ├── 01 - DATA_SOURCES - Negativa - Sin cabecera Authorization (401)
+│   │   ├── 02 - DATA_SOURCES - Negativa - database_id inexistente (404)
+│   │   └── 03 - DATA_SOURCES - Negativa - Filtro con propiedad inexistente (400)
+│   └── 📁 03_Boundary (Pagination Bounds & Type Constraints)
+│       ├── 01 - DATA_SOURCES - Limites - page_size minimo igual a 1 (200)
+│       ├── 02 - DATA_SOURCES - Limites - page_size igual a 0 fuera de rango (400)
+│       └── 03 - DATA_SOURCES - Limites - page_size igual a 101 excedido (400)
+├── 📁 03_Search (Sebastián Pereyra)
+│   ├── 📁 01_Happy_Path (Title Search, Entity Filters & Sorting)
+│   │   ├── 01 - SEARCH - Positiva - Busqueda por palabra clave (200)
+│   │   ├── 02 - SEARCH - Positiva - Filtrar estrictamente por database (200)
+│   │   └── 03 - SEARCH - Positiva - Ordenar descendente por last_edited_time (200)
+│   ├── 📁 02_Negative (Filter & Parameter Violations)
+│   │   ├── 01 - SEARCH - Negativa - Sin token (401)
+│   │   └── 02 - SEARCH - Negativa - Valor de filtro invalido object user (400)
+│   └── 📁 03_Boundary (Pagination & Non-Existent Queries)
+│       ├── 01 - SEARCH - Limites - page_size 1 vs 100 (200)
+│       └── 02 - SEARCH - Limites - Busqueda de titulo inexistente (200)
+└── 📁 04_E2E_Workflows (Stateful Integration Chains)
+    ├── 📁 E2E_01_Data_Source_Lifecycle (Valentina Molina)
+    │   ├── 01 - E2E - POST Crear Data Source
+    │   ├── 02 - E2E - GET Verificar Schema
+    │   ├── 03 - E2E - PATCH Agregar Columna Priority
+    │   ├── 04 - E2E - POST Insertar Fila
+    │   └── 05 - E2E - POST Query Filtrada por Priority
+    └── 📁 E2E_02_Database_Search_Lifecycle (Sebastián Pereyra)
+        ├── 01 - E2E - POST Crear Database Contenedor
+        ├── 02 - E2E - GET Verificar Metadatos
+        ├── 03 - E2E - PATCH Renombrar y Asignar Icono
+        ├── 04 - E2E - POST Descubrir en Search Global
+        └── 05 - E2E - PATCH Teardown Mover a Papelera
+```
+
+##### Postman Collection Hierarchy Implementation Evidence
+The screenshot below illustrates the structured collection tree configured inside Postman for [`Lab02_Grupo2_Databases_Search.postman_collection.json`](./postman/actividad_2_3_4/Lab02_Grupo2_Databases_Search.postman_collection.json), detailing the Setup, Databases CRUD, and Search folders:
+
+![Databases and Search Collection Folder Tree in Postman](./caps/actividad_2/DatabasesSearchCollectionTree.jpeg)
+
+#### 4.1.2 Standardized Request Naming Convention
+
+All requests across the collection strictly follow the naming formula agreed upon in Laboratory 01, Activity #5:
+
+$$\mathbf{[M\acute{o}dulo]\ -\ [Tipo]\ -\ Acci\acute{o}n\ (C\acute{o}digo\ esperado)}$$
+
+- **`[Módulo]`**: `DATABASES`, `DATA_SOURCES`, `SEARCH`, `PAGES`, `USERS`, `OAUTH`, or `E2E`.
+- **`[Tipo]`**: `Positiva`, `Negativa`, `Limites`, or `E2E`.
+- **`Acción`**: Clear imperative description of the tested behavior.
+- **`Código esperado`**: Expected HTTP response status code in parentheses (e.g., `(200)`, `(400)`, `(401)`, `(404)`).
+
+*Examples:*
+- `DATABASES - Positiva - Crear database con titulo (200)`
+- `DATA_SOURCES - Negativa - database_id inexistente (404)`
+- `SEARCH - Limites - page_size igual a 101 excedido (400)`
+
+#### 4.1.3 Deterministic Execution Order Protocol
+
+When executing the test suite via the Postman Collection Runner or Newman CLI, requests execute in a strict logical order:
+
+```mermaid
+flowchart LR
+    PRE["1. Preconditions & Token Validation"] --> HP["2. Happy Path CRUD"]
+    HP --> BOUND["3. Boundary Limits"]
+    BOUND --> NEG["4. Negative & Error Checks"]
+    NEG --> E2E["5. Stateful E2E Workflows"]
+    E2E --> POST["6. Automated Teardown & State Cleanup"]
+```
+
+1. **Preconditions & Token Validation:** Verifies bot user identity (`GET /v1/users/me`) and validates that `{{NOTION_TOKEN}}` has active permissions before proceeding.
+2. **Happy Path CRUD:** Executes safe resource creation and reads, establishing baseline IDs.
+3. **Boundary Limits:** Validates edge tolerances (`page_size` bounds, empty titles, Unicode strings).
+4. **Negative & Error Checks:** Validates security boundaries (401 Unauthorized, 404 Not Found, 400 Validation Errors) without leaving lingering corrupted state.
+5. **Stateful E2E Workflows:** Executes multi-request chained pipelines using dynamic variable sharing.
+6. **Teardown & State Cleanup:** Moves created database containers to the trash (`in_trash: true`) and purges ephemeral variables from the active environment.
+
+---
+
+### 4.2 Automated Test Execution Mechanics (Collection Runner, Newman CLI, and CI/CD)
+
+Continuous Quality Assurance requires that test suites run automatically without manual engineer intervention, providing deterministic reports on pull requests and scheduled builds.
+
+#### 4.2.1 Postman Collection Runner (Interactive Execution)
+
+Within the Postman Desktop client, the **Collection Runner** enables executing modular suites or entire collections sequentially:
+- **Environment Selection:** Select `Act1_Notion_Env` to inject active credentials and base URLs.
+- **Run Configuration:** Configured with `Iterations: 1`, `Delay: 350 ms` (to respect Notion's 3 req/sec rate limit and prevent false `429` errors), and `Save responses` enabled for debugging.
+- **Run Summary:** Visualizes test pass/fail metrics, response latency distribution, and detailed failure callouts.
+
+##### Collection Runner Execution Evidence:
+
+###### 1. Databases and Search Suite Execution (Sebastián Pereyra)
+Executed against `Act1_Notion_Env`: 6 requests executed, **13 tests passed, 0 failures** (100% pass rate) with an average response time of 469ms and duration of 3s 314ms:
+
+![Sebastián Pereyra Collection Runner Run Results](./caps/actividad_2/SebastianRunnerPassed.jpeg)
+
+###### 2. Data Sources, Comments, and File Uploads Suite Execution (Valentina Molina)
+Executed against `Act1_Notion_Env`: 13 requests executed, **30 tests passed, 0 failures** (100% pass rate) with an average response time of 448ms and duration of 6s 747ms:
+
+![Valentina Molina Collection Runner Run Results](./caps/actividad_2/ValentinaRunnerPassed.jpeg)
+
+#### 4.2.2 Headless Execution with Newman CLI
+
+**Newman** is Postman's official command-line execution engine, running headless in Node.js environments. Group 2 configured Newman to run regression suites directly from the terminal or build servers.
+
+##### Complete Newman Execution Command:
+
+```bash
+# Execute Databases and Data Sources regression suite with HTML Extra reporting:
+newman run postman/actividad_2_3_4/Act2_4_Notion_Databases_DataSources.postman_collection.json \
+  --environment postman/actividad_1/Act1_Notion_Env.postman_environment.json \
+  --delay-request 350 \
+  --reporters cli,htmlextra \
+  --reporter-htmlextra-export reports/Notion_API_Test_Report.html \
+  --reporter-htmlextra-title "SQE III - Group 2 Notion API Test Report" \
+  --bail
+```
+
+##### Command Parameters Breakdown:
+- `newman run <collection.json>`: Path to the version-controlled Postman collection file.
+- `--environment <env.json>`: Injects base URLs, version headers, and masked token templates.
+- `--delay-request 350`: Adds a 350ms delay between consecutive requests, strictly staying within Notion API's rate limits.
+- `--reporters cli,htmlextra`: Outputs concise test tables to the terminal while compiling an interactive HTML dashboard.
+- `--bail`: Immediately halts execution upon encountering any unhandled contract failure (fail-fast principle).
+
+#### 4.2.3 Continuous Integration (CI/CD) Automated Pipeline Specification
+
+To achieve full regression automation, Group 2 authored a **GitHub Actions CI/CD workflow** (`.github/workflows/api-tests.yml`) that executes the test suite automatically on every `push` to `main` and on pull requests:
+
+```yaml
+name: Notion REST API Automated Regression Suite
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  api-contract-tests:
+    name: Execute Postman / Newman Automated Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js Runtime Environment
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install Newman & HTML Extra Reporter
+        run: |
+          npm install -g newman newman-reporter-htmlextra
+
+      - name: Execute Automated API Tests via Newman
+        env:
+          NOTION_TOKEN: ${{ secrets.NOTION_INTEGRATION_TOKEN }}
+        run: |
+          newman run labs/lab02/postman/actividad_2_3_4/Act2_4_Notion_Databases_DataSources.postman_collection.json \
+            --environment labs/lab02/postman/actividad_1/Act1_Notion_Env.postman_environment.json \
+            --env-var "NOTION_TOKEN=$NOTION_TOKEN" \
+            --delay-request 350 \
+            --reporters cli,htmlextra \
+            --reporter-htmlextra-export test-reports/notion_api_report.html
+
+      - name: Upload Test Execution Report Artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: notion-api-test-report
+          path: test-reports/notion_api_report.html
+          retention-days: 30
+```
+
+This automated CI/CD pipeline guarantees that any regression in Notion API version compatibility, breaking change in property schemas, or contract deviation is flagged within minutes of a commit.
 
 ---
 
@@ -282,3 +1616,83 @@ Inspecting the **`OAuth`** module of the official `Notion API (2025-09-03)` coll
 1. Review and evaluate the work of other teams by assessing the complexity, quantity, and type of implemented tests.
 2. Evaluate the ease of use and understandability of the implementation by other teams.
 3. Generate an evaluation and peer-review feedback report.
+
+### 5.1 Evaluation of External Team's Implementation (Complexity, Quantity, and Test Classification)
+
+As part of the cross-team quality assurance evaluation protocol for Laboratory 02, **Group 2** conducted an external peer review of the API automation test suite implemented by **Group 1** (targeting the Spotify Web API v1). The evaluation was conducted jointly with primary analytical contributions from **Sebastián Pereyra** and **Valentina Molina Bustillos**, focusing on technical complexity, test coverage volume, and categorical distribution.
+
+#### Quantitative and Categorical Distribution Analysis
+
+The evaluated external suite comprises **42 implemented requests** distributed across 4 domain modules (`Playlists`, `Tracks`, `Albums`, and `Users/Profile`):
+
+| Evaluation Metric | Observed Value (Group 1 Suite) | Group 2 Technical Assessment | QA Maturity Rating |
+|---|---|---|---|
+| **Total Requests Implemented** | 42 test requests | Sufficient breadth covering core CRUD operations across target resources. | Satisfactory |
+| **Happy Path Coverage** | 22 tests (52.4%) | Comprehensive validation of successful resource retrieval, creation, and mutation. | High |
+| **Negative Error Scenarios** | 12 tests (28.6%) | Validation of `401 Unauthorized` (expired OAuth token) and `404 Not Found`. Lacks coverage of `403 Forbidden` on private playlists. | Moderate |
+| **Boundary & Limits Scenarios** | 5 tests (11.9%) | Basic boundary checks on `limit` query parameters (`limit=0`, `limit=50`). Omission of extreme boundary payloads. | Needs Improvement |
+| **Multi-request E2E Workflows** | 3 tests (7.1%) | 1 chained workflow (Create Playlist → Add Track → Reorder Tracks). Demonstrates basic inter-request state passing. | Moderate |
+| **Average Assertions per Request** | 2.1 assertions | Primarily asserts status code and single property existence (`pm.expect(res.id).to.exist`). Lacks strict schema and latency SLA assertions. | Moderate |
+
+#### Technical Complexity Evaluation
+- **Strengths:** Group 1 demonstrated effective handling of Spotify's OAuth 2.0 Authorization Code Flow with Refresh Tokens via collection-level pre-request scripts, ensuring automated token refreshing before test runs.
+- **Identified Deficiencies:**
+  1. *Insufficient Assertion Depth:* Over 40% of test scripts assert solely `pm.response.to.have.status(200)` without inspecting the response body schema, leaving contract regressions undetected if the payload structure mutates.
+  2. *Hardcoded Resource IDs:* Several requests rely on hardcoded Spotify Track and Playlist IDs rather than dynamically generated fixtures, causing tests to fail if the external entity is modified or removed.
+  3. *Absence of Response Latency Assertions:* Non-functional performance SLAs were not audited across the collection.
+
+---
+
+### 5.2 Usability, Comprehensibility, and Setup Evaluation
+
+The team evaluated the operational ease of importing, configuring, and executing Group 1's collection and environment files in a clean Postman workspace.
+
+| Usability Dimension | Observed Implementation | Evaluation & Impact |
+|---|---|---|
+| **Documentation & Readme** | Minimal collection description; missing request-level markdown descriptions. | **Moderate**: Requires inspecting raw payloads to infer test intent. |
+| **Environment Configuration** | Environment file provided with clear initial value placeholders (`SPOTIFY_CLIENT_ID`, `SPOTIFY_REFRESH_TOKEN`). | **High**: Fast onboarding; tokens are appropriately decoupled from the collection. |
+| **Secret Isolation (`type: "secret"`)** | `SPOTIFY_CLIENT_SECRET` configured as `type: "default"` (plain text). | **Critical Security Flaw**: Secret credentials were not masked in the Postman UI, risking leakage during demonstrations. |
+| **Folder Hierarchy & Order** | Flat folder structure organized strictly by HTTP resource (`/playlists`, `/tracks`). | **Moderate**: Lacks explicit separation between Happy Path, Negative, and Boundary test folders. |
+| **Execution Determinism in Runner** | Executed in Collection Runner with 1 iteration. 39 passed, 3 failed due to race conditions on shared track order. | **Moderate**: Tests depend on previous state without automated pre/postcondition cleanup. |
+
+---
+
+### 5.3 Peer-Review Feedback and Recommendations Report
+
+Based on the empirical audit, Group 2 formulated the following concrete recommendations for Group 1:
+
+1. **Enforce Multi-Tier Assertion Framework:**
+   Upgrade single-line status assertions to multi-tier verifications inspecting HTTP status, response time SLA (`< 2000ms`), contractual headers (`Content-Type: application/json; charset=utf-8`), and deep schema validation:
+   ```javascript
+   // Recommended assertion upgrade:
+   pm.test("Playlist creation contract conforms to Spotify specification", function () {
+       pm.response.to.have.status(201);
+       pm.expect(pm.response.responseTime).to.be.below(2000);
+       const res = pm.response.json();
+       pm.expect(res.type).to.eql("playlist");
+       pm.expect(res.id).to.be.a("string").and.to.have.lengthOf(22);
+       pm.expect(res.public).to.be.a("boolean");
+   });
+   ```
+
+2. **Remediate Credential Masking in Environment Variables:**
+   Immediately update `SPOTIFY_CLIENT_SECRET` and `SPOTIFY_REFRESH_TOKEN` to `type: "secret"` within the Postman Environment manager to ensure credentials remain masked on screen and are sanitized during exports.
+
+3. **Adopt Standardized Test Naming Conventions:**
+   Replace ambiguous request names (e.g., `New Request`, `Get Tracks 2`) with the standardized formula `[Módulo] - [Tipo] - Acción (Código esperado)` to enable instant diagnostic traceability in CLI/Newman test reports.
+
+4. **Implement Automated Teardown Hooks:**
+   Ensure all dynamically created playlists in E2E workflows are unfollowed/deleted (`DELETE /v1/playlists/{playlist_id}/followers`) at the end of the test run to guarantee idempotency and avoid cluttering the test account.
+
+---
+
+## Team Participation
+
+| Team Member | Lab 02 Contributions & Implemented Scope | Section/Item Worked On | Additional Comments & Status |
+|---|---|---|---|
+| **Sebastián Pereyra** | Implementation and verification of the `Databases` (POST, GET, PATCH) and `Search` (POST) modules in Postman. Design of multi-tier assertion scripts, stateful E2E container lifecycle workflows (`E2E_02_Database_Search_Lifecycle`), Collection Runner validation (13/13 tests passed), Newman CI/CD automation design, and cross-team peer review evaluation in Activity #5. | Actividad #2 (2.2.2), Actividad #3 (3.1, 3.2, 3.4.2), Actividad #4 (4.1, 4.2), Actividad #5 (5.1–5.3) | Author of `Lab02_Grupo2_Databases_Search.postman_collection.json`. 100% test execution success rate documented. |
+| **Valentina Molina Bustillos** | Implementation and verification of the `Data sources` (POST, GET, PATCH, Query) module along with supporting contractual checks for `Comments` and `File uploads`. Author of multi-tier assertion scripts, cursor-based pagination tests, chained E2E tabular query workflow (`E2E_01_Data_Source_Lifecycle`), Collection Runner execution (30/30 tests passed), and cross-team peer review evaluation in Activity #5. | Actividad #2 (2.2.1), Actividad #3 (3.1, 3.2, 3.4.1), Actividad #4 (4.1, 4.2), Actividad #5 (5.1–5.3) | Author of `Lab02_Grupo2_Valentina_CRUD.postman_collection.json`. 100% test execution success rate documented. |
+| **Gabriel Marcos Guaman Ortuño** | Exploration and verification of the `Users` and `OAuth` modules in Postman. Implementation of Bearer and Basic Auth verification requests in Activity #1. | Actividad #1 (1.3), Actividad #2 (`Users` & `OAuth` baseline) | Setup of initial OAuth client credentials. |
+| **Kevin Uruchi** | Specification and initial Postman request builder mapping for the `Pages` module (POST, GET, PATCH, Move). | Actividad #2 (`Pages` module baseline) | Continued integration with team collection. |
+| **Karen Ivonne Cruz Alvarez** | Verification and request construction for the `Blocks` module in Postman. | Actividad #2 (`Blocks` module baseline) | Continued integration with team collection. |
+

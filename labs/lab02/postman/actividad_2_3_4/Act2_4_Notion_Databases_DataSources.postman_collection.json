@@ -1,0 +1,982 @@
+{
+  "info": {
+    "_postman_id": "c71a39f0-2f19-4824-a241-9988bba12002",
+    "name": "Act2_4_Notion_Databases_DataSources",
+    "description": "SQE III Lab 02 - Group 2 (Activities #2, #3, #4). Automated test suite for Notion REST API (Notion-Version: 2025-09-03) covering Databases and Search (Sebastián Pereyra) and Data Sources (Valentina Molina Bustillos). Includes multi-tier assertions (status, latency, headers, schema, error codes), shared variable propagation, and stateful E2E workflows.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "01_Databases (Sebastián Pereyra)",
+      "item": [
+        {
+          "name": "01_Happy_Path",
+          "item": [
+            {
+              "name": "DATABASES - Positiva - Crear database con titulo (200)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test(\"Status code is 200 OK\", function () {",
+                      "    pm.response.to.have.status(200);",
+                      "});",
+                      "pm.test(\"Response time is under 2500ms\", function () {",
+                      "    pm.expect(pm.response.responseTime).to.be.below(2500);",
+                      "});",
+                      "pm.test(\"Response is a valid database container object\", function () {",
+                      "    const res = pm.response.json();",
+                      "    pm.expect(res.object).to.eql(\"database\");",
+                      "    pm.expect(res.id).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);",
+                      "    pm.expect(res.parent.type).to.eql(\"page_id\");",
+                      "    pm.expect(res.title[0].plain_text).to.eql(\"Test DB\");",
+                      "    pm.expect(res.archived).to.be.false;",
+                      "    pm.expect(res.in_trash).to.be.false;",
+                      "    pm.environment.set(\"database_id\", res.id);",
+                      "    if (res.data_sources && res.data_sources.length > 0) {",
+                      "        pm.environment.set(\"data_source_id\", res.data_sources[0].id);",
+                      "    }",
+                      "});"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" },
+                  { "key": "Accept", "value": "application/json" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"parent\": { \"type\": \"page_id\", \"page_id\": \"{{parent_page_id}}\" },\n  \"title\": [{ \"text\": { \"content\": \"Test DB\" } }],\n  \"properties\": {\n    \"Name\": { \"title\": {} }\n  }\n}"
+                },
+                "url": {
+                  "raw": "{{NOTION_BASE_URL}}/v1/databases",
+                  "host": ["{{NOTION_BASE_URL}}"],
+                  "path": ["v1", "databases"]
+                }
+              }
+            },
+            {
+              "name": "DATABASES - Positiva - Obtener database por ID (200)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test(\"Status code is 200 OK\", function () {",
+                      "    pm.response.to.have.status(200);",
+                      "});",
+                      "pm.test(\"Retrieved database matches active database_id\", function () {",
+                      "    const res = pm.response.json();",
+                      "    pm.expect(res.object).to.eql(\"database\");",
+                      "    pm.expect(res.id).to.eql(pm.environment.get(\"database_id\"));",
+                      "    pm.expect(res.parent.page_id).to.eql(pm.environment.get(\"parent_page_id\"));",
+                      "});"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "header": [
+                  { "key": "Accept", "value": "application/json" }
+                ],
+                "url": {
+                  "raw": "{{NOTION_BASE_URL}}/v1/databases/{{database_id}}",
+                  "host": ["{{NOTION_BASE_URL}}"],
+                  "path": ["v1", "databases", "{{database_id}}"]
+                }
+              }
+            },
+            {
+              "name": "DATABASES - Positiva - Actualizar titulo (200)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test(\"Status code is 200 OK\", function () {",
+                      "    pm.response.to.have.status(200);",
+                      "});",
+                      "pm.test(\"Title updated successfully\", function () {",
+                      "    const res = pm.response.json();",
+                      "    pm.expect(res.title[0].plain_text).to.eql(\"Updated DB Title\");",
+                      "});"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" },
+                  { "key": "Accept", "value": "application/json" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"title\": [{ \"text\": { \"content\": \"Updated DB Title\" } }]\n}"
+                },
+                "url": {
+                  "raw": "{{NOTION_BASE_URL}}/v1/databases/{{database_id}}",
+                  "host": ["{{NOTION_BASE_URL}}"],
+                  "path": ["v1", "databases", "{{database_id}}"]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "02_Negative",
+          "item": [
+            {
+              "name": "DATABASES - Negativa - Sin cabecera Authorization (401)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test(\"Status code is 401 Unauthorized\", function () {",
+                      "    pm.response.to.have.status(401);",
+                      "});",
+                      "pm.test(\"Error code is unauthorized\", function () {",
+                      "    const err = pm.response.json();",
+                      "    pm.expect(err.code).to.eql(\"unauthorized\");",
+                      "});"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "auth": { "type": "noauth" },
+                "method": "POST",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"parent\": { \"type\": \"page_id\", \"page_id\": \"{{parent_page_id}}\" }\n}"
+                },
+                "url": {
+                  "raw": "{{NOTION_BASE_URL}}/v1/databases",
+                  "host": ["{{NOTION_BASE_URL}}"],
+                  "path": ["v1", "databases"]
+                }
+              }
+            },
+            {
+              "name": "DATABASES - Negativa - Parent page inexistente (404)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test(\"Status code is 404 Not Found\", function () {",
+                      "    pm.response.to.have.status(404);",
+                      "});",
+                      "pm.test(\"Error code is object_not_found\", function () {",
+                      "    const err = pm.response.json();",
+                      "    pm.expect(err.code).to.eql(\"object_not_found\");",
+                      "});"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"parent\": { \"type\": \"page_id\", \"page_id\": \"{{ghost_id}}\" }\n}"
+                },
+                "url": {
+                  "raw": "{{NOTION_BASE_URL}}/v1/databases",
+                  "host": ["{{NOTION_BASE_URL}}"],
+                  "path": ["v1", "databases"]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "03_Boundary",
+          "item": [
+            {
+              "name": "DATABASES - Limites - Titulo vacio [] (200)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test(\"Status code is 200 OK\", function () {",
+                      "    pm.response.to.have.status(200);",
+                      "});",
+                      "pm.test(\"Database created as untitled\", function () {",
+                      "    const res = pm.response.json();",
+                      "    pm.expect(res.title).to.be.an(\"array\").and.to.be.empty;",
+                      "});"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"parent\": { \"type\": \"page_id\", \"page_id\": \"{{parent_page_id}}\" },\n  \"title\": [],\n  \"properties\": { \"Name\": { \"title\": {} } }\n}"
+                },
+                "url": {
+                  "raw": "{{NOTION_BASE_URL}}/v1/databases",
+                  "host": ["{{NOTION_BASE_URL}}"],
+                  "path": ["v1", "databases"]
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02_Data_Sources (Valentina Molina)",
+      "item": [
+        {
+          "name": "01_Happy_Path",
+          "item": [
+            {
+              "name": "DATA_SOURCES - Positiva - Crear data source con schema (200)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test(\"Status code is 200 OK\", function () {",
+                      "    pm.response.to.have.status(200);",
+                      "});",
+                      "pm.test(\"Response object is data_source\", function () {",
+                      "    const res = pm.response.json();",
+                      "    pm.expect(res.object).to.eql(\"data_source\");",
+                      "    pm.expect(res.id).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);",
+                      "    pm.expect(res.properties).to.have.property(\"Name\");",
+                      "    pm.expect(res.properties).to.have.property(\"Count\");",
+                      "    pm.environment.set(\"data_source_id\", res.id);",
+                      "});"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"database_id\": \"{{database_id}}\",\n  \"properties\": {\n    \"Name\": { \"title\": {} },\n    \"Count\": { \"number\": { \"format\": \"number\" } }\n  }\n}"
+                },
+                "url": {
+                  "raw": "{{NOTION_BASE_URL}}/v1/data_sources",
+                  "host": ["{{NOTION_BASE_URL}}"],
+                  "path": ["v1", "data_sources"]
+                }
+              }
+            },
+            {
+              "name": "DATA_SOURCES - Positiva - Obtener data source por ID (200)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test(\"Status code is 200 OK\", function () {",
+                      "    pm.response.to.have.status(200);",
+                      "});",
+                      "pm.test(\"Retrieved data source matches id\", function () {",
+                      "    const res = pm.response.json();",
+                      "    pm.expect(res.id).to.eql(pm.environment.get(\"data_source_id\"));",
+                      "});"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{NOTION_BASE_URL}}/v1/data_sources/{{data_source_id}}",
+                  "host": ["{{NOTION_BASE_URL}}"],
+                  "path": ["v1", "data_sources", "{{data_source_id}}"]
+                }
+              }
+            },
+            {
+              "name": "DATA_SOURCES - Positiva - Query sin filtro (200)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test(\"Status code is 200 OK\", function () {",
+                      "    pm.response.to.have.status(200);",
+                      "});",
+                      "pm.test(\"Response is list of rows\", function () {",
+                      "    const res = pm.response.json();",
+                      "    pm.expect(res.object).to.eql(\"list\");",
+                      "    pm.expect(res.results).to.be.an(\"array\");",
+                      "});"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{}"
+                },
+                "url": {
+                  "raw": "{{NOTION_BASE_URL}}/v1/data_sources/{{data_source_id}}/query",
+                  "host": ["{{NOTION_BASE_URL}}"],
+                  "path": ["v1", "data_sources", "{{data_source_id}}", "query"]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "02_Negative",
+          "item": [
+            {
+              "name": "DATA_SOURCES - Negativa - database_id inexistente (404)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test(\"Status code is 404 Not Found\", function () {",
+                      "    pm.response.to.have.status(404);",
+                      "});",
+                      "pm.test(\"Error code is object_not_found\", function () {",
+                      "    const err = pm.response.json();",
+                      "    pm.expect(err.code).to.eql(\"object_not_found\");",
+                      "});"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"database_id\": \"{{ghost_id}}\",\n  \"properties\": { \"Name\": { \"title\": {} } }\n}"
+                },
+                "url": {
+                  "raw": "{{NOTION_BASE_URL}}/v1/data_sources",
+                  "host": ["{{NOTION_BASE_URL}}"],
+                  "path": ["v1", "data_sources"]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "03_Boundary",
+          "item": [
+            {
+              "name": "DATA_SOURCES - Limites - page_size minimo igual a 1 (200)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test(\"Status code is 200 OK\", function () {",
+                      "    pm.response.to.have.status(200);",
+                      "});",
+                      "pm.test(\"Results contain at most 1 item\", function () {",
+                      "    const res = pm.response.json();",
+                      "    pm.expect(res.results.length).to.be.at.most(1);",
+                      "});"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"page_size\": 1\n}"
+                },
+                "url": {
+                  "raw": "{{NOTION_BASE_URL}}/v1/data_sources/{{data_source_id}}/query",
+                  "host": ["{{NOTION_BASE_URL}}"],
+                  "path": ["v1", "data_sources", "{{data_source_id}}", "query"]
+                }
+              }
+            },
+            {
+              "name": "DATA_SOURCES - Limites - page_size igual a 101 excedido (400)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test(\"Status code is 400 Bad Request\", function () {",
+                      "    pm.response.to.have.status(400);",
+                      "});",
+                      "pm.test(\"Error code is validation_error\", function () {",
+                      "    const err = pm.response.json();",
+                      "    pm.expect(err.code).to.eql(\"validation_error\");",
+                      "});"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"page_size\": 101\n}"
+                },
+                "url": {
+                  "raw": "{{NOTION_BASE_URL}}/v1/data_sources/{{data_source_id}}/query",
+                  "host": ["{{NOTION_BASE_URL}}"],
+                  "path": ["v1", "data_sources", "{{data_source_id}}", "query"]
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03_Search (Sebastián Pereyra)",
+      "item": [
+        {
+          "name": "01_Happy_Path",
+          "item": [
+            {
+              "name": "SEARCH - Positiva - Filtrar estrictamente por database (200)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test(\"Status code is 200 OK\", function () {",
+                      "    pm.response.to.have.status(200);",
+                      "});",
+                      "pm.test(\"All search results are database containers\", function () {",
+                      "    const res = pm.response.json();",
+                      "    pm.expect(res.object).to.eql(\"list\");",
+                      "    res.results.forEach(item => {",
+                      "        pm.expect(item.object).to.eql(\"database\");",
+                      "    });",
+                      "});"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"filter\": { \"value\": \"database\", \"property\": \"object\" }\n}"
+                },
+                "url": {
+                  "raw": "{{NOTION_BASE_URL}}/v1/search",
+                  "host": ["{{NOTION_BASE_URL}}"],
+                  "path": ["v1", "search"]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "02_Negative",
+          "item": [
+            {
+              "name": "SEARCH - Negativa - Valor de filtro invalido object user (400)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test(\"Status code is 400 Bad Request\", function () {",
+                      "    pm.response.to.have.status(400);",
+                      "});",
+                      "pm.test(\"Error code is validation_error\", function () {",
+                      "    const err = pm.response.json();",
+                      "    pm.expect(err.code).to.eql(\"validation_error\");",
+                      "});"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"filter\": { \"value\": \"user\", \"property\": \"object\" }\n}"
+                },
+                "url": {
+                  "raw": "{{NOTION_BASE_URL}}/v1/search",
+                  "host": ["{{NOTION_BASE_URL}}"],
+                  "path": ["v1", "search"]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "03_Boundary",
+          "item": [
+            {
+              "name": "SEARCH - Limites - page_size igual a 101 excedido (400)",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test(\"Status code is 400 Bad Request\", function () {",
+                      "    pm.response.to.have.status(400);",
+                      "});",
+                      "pm.test(\"Error code is validation_error\", function () {",
+                      "    const err = pm.response.json();",
+                      "    pm.expect(err.code).to.eql(\"validation_error\");",
+                      "});"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"page_size\": 101\n}"
+                },
+                "url": {
+                  "raw": "{{NOTION_BASE_URL}}/v1/search",
+                  "host": ["{{NOTION_BASE_URL}}"],
+                  "path": ["v1", "search"]
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "04_E2E_Workflows",
+      "item": [
+        {
+          "name": "E2E_01_Data_Source_Lifecycle (Valentina Molina)",
+          "item": [
+            {
+              "name": "01 - E2E - POST Crear Data Source",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test(\"Step 1: Data source created\", function () {",
+                      "    pm.response.to.have.status(200);",
+                      "    const res = pm.response.json();",
+                      "    pm.expect(res.object).to.eql(\"data_source\");",
+                      "    pm.environment.set(\"data_source_id\", res.id);",
+                      "});"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"database_id\": \"{{database_id}}\",\n  \"properties\": {\n    \"Name\": { \"title\": {} },\n    \"Count\": { \"number\": { \"format\": \"number\" } }\n  }\n}"
+                },
+                "url": {
+                  "raw": "{{NOTION_BASE_URL}}/v1/data_sources",
+                  "host": ["{{NOTION_BASE_URL}}"],
+                  "path": ["v1", "data_sources"]
+                }
+              }
+            },
+            {
+              "name": "02 - E2E - GET Verificar Schema",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test(\"Step 2: Schema retrieved matches data_source_id\", function () {",
+                      "    pm.response.to.have.status(200);",
+                      "    const res = pm.response.json();",
+                      "    pm.expect(res.id).to.eql(pm.environment.get(\"data_source_id\"));",
+                      "    pm.expect(res.properties).to.have.property(\"Name\");",
+                      "    pm.expect(res.properties).to.have.property(\"Count\");",
+                      "});"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{NOTION_BASE_URL}}/v1/data_sources/{{data_source_id}}",
+                  "host": ["{{NOTION_BASE_URL}}"],
+                  "path": ["v1", "data_sources", "{{data_source_id}}"]
+                }
+              }
+            },
+            {
+              "name": "03 - E2E - PATCH Agregar Columna Priority",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test(\"Step 3: Schema altered with Priority column\", function () {",
+                      "    pm.response.to.have.status(200);",
+                      "    const res = pm.response.json();",
+                      "    pm.expect(res.properties).to.have.property(\"Priority\");",
+                      "    pm.expect(res.properties.Priority.type).to.eql(\"select\");",
+                      "});"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "PATCH",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"properties\": {\n    \"Priority\": {\n      \"select\": {\n        \"options\": [\n          { \"name\": \"High\", \"color\": \"red\" },\n          { \"name\": \"Low\", \"color\": \"blue\" }\n        ]\n      }\n    }\n  }\n}"
+                },
+                "url": {
+                  "raw": "{{NOTION_BASE_URL}}/v1/data_sources/{{data_source_id}}",
+                  "host": ["{{NOTION_BASE_URL}}"],
+                  "path": ["v1", "data_sources", "{{data_source_id}}"]
+                }
+              }
+            },
+            {
+              "name": "04 - E2E - POST Insertar Fila",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test(\"Step 4: Page row created under data source\", function () {",
+                      "    pm.response.to.have.status(200);",
+                      "    const res = pm.response.json();",
+                      "    pm.expect(res.object).to.eql(\"page\");",
+                      "    pm.environment.set(\"e2e_page_id\", res.id);",
+                      "});"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"parent\": { \"type\": \"data_source_id\", \"data_source_id\": \"{{data_source_id}}\" },\n  \"properties\": {\n    \"Name\": { \"title\": [{ \"text\": { \"content\": \"E2E Task Row\" } }] },\n    \"Count\": { \"number\": 42 },\n    \"Priority\": { \"select\": { \"name\": \"High\" } }\n  }\n}"
+                },
+                "url": {
+                  "raw": "{{NOTION_BASE_URL}}/v1/pages",
+                  "host": ["{{NOTION_BASE_URL}}"],
+                  "path": ["v1", "pages"]
+                }
+              }
+            },
+            {
+              "name": "05 - E2E - POST Query Filtrada por Priority",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test(\"Step 5: Query returns inserted row matching Priority High\", function () {",
+                      "    pm.response.to.have.status(200);",
+                      "    const res = pm.response.json();",
+                      "    pm.expect(res.results.length).to.be.at.least(1);",
+                      "    const found = res.results.some(r => r.id === pm.environment.get(\"e2e_page_id\"));",
+                      "    pm.expect(found).to.be.true;",
+                      "});"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"filter\": {\n    \"property\": \"Priority\",\n    \"select\": { \"equals\": \"High\" }\n  }\n}"
+                },
+                "url": {
+                  "raw": "{{NOTION_BASE_URL}}/v1/data_sources/{{data_source_id}}/query",
+                  "host": ["{{NOTION_BASE_URL}}"],
+                  "path": ["v1", "data_sources", "{{data_source_id}}", "query"]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "E2E_02_Database_Search_Lifecycle (Sebastián Pereyra)",
+          "item": [
+            {
+              "name": "01 - E2E - POST Crear Database Contenedor",
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "exec": [
+                      "const runTitle = \"E2E_DB_Release_\" + Date.now();",
+                      "pm.environment.set(\"db_initial_title\", runTitle);"
+                    ],
+                    "type": "text/javascript"
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test(\"Step 1: Database container created\", function () {",
+                      "    pm.response.to.have.status(200);",
+                      "    const res = pm.response.json();",
+                      "    pm.expect(res.object).to.eql(\"database\");",
+                      "    pm.environment.set(\"database_id\", res.id);",
+                      "});"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"parent\": { \"type\": \"page_id\", \"page_id\": \"{{parent_page_id}}\" },\n  \"title\": [{ \"text\": { \"content\": \"{{db_initial_title}}\" } }],\n  \"properties\": { \"Name\": { \"title\": {} } }\n}"
+                },
+                "url": {
+                  "raw": "{{NOTION_BASE_URL}}/v1/databases",
+                  "host": ["{{NOTION_BASE_URL}}"],
+                  "path": ["v1", "databases"]
+                }
+              }
+            },
+            {
+              "name": "02 - E2E - GET Verificar Metadatos",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test(\"Step 2: Database metadata verified\", function () {",
+                      "    pm.response.to.have.status(200);",
+                      "    const res = pm.response.json();",
+                      "    pm.expect(res.id).to.eql(pm.environment.get(\"database_id\"));",
+                      "    pm.expect(res.in_trash).to.be.false;",
+                      "});"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{NOTION_BASE_URL}}/v1/databases/{{database_id}}",
+                  "host": ["{{NOTION_BASE_URL}}"],
+                  "path": ["v1", "databases", "{{database_id}}"]
+                }
+              }
+            },
+            {
+              "name": "03 - E2E - PATCH Renombrar y Asignar Icono",
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "exec": [
+                      "const updatedTitle = \"E2E_DB_Renamed_\" + Date.now();",
+                      "pm.environment.set(\"db_updated_title\", updatedTitle);"
+                    ],
+                    "type": "text/javascript"
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test(\"Step 3: Database title and icon updated\", function () {",
+                      "    pm.response.to.have.status(200);",
+                      "    const res = pm.response.json();",
+                      "    pm.expect(res.title[0].plain_text).to.eql(pm.environment.get(\"db_updated_title\"));",
+                      "    pm.expect(res.icon.emoji).to.eql(\"🚀\");",
+                      "});"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "PATCH",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"title\": [{ \"text\": { \"content\": \"{{db_updated_title}}\" } }],\n  \"icon\": { \"type\": \"emoji\", \"emoji\": \"🚀\" }\n}"
+                },
+                "url": {
+                  "raw": "{{NOTION_BASE_URL}}/v1/databases/{{database_id}}",
+                  "host": ["{{NOTION_BASE_URL}}"],
+                  "path": ["v1", "databases", "{{database_id}}"]
+                }
+              }
+            },
+            {
+              "name": "04 - E2E - POST Descubrir en Search Global",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test(\"Step 4: Global search discovers renamed database\", function () {",
+                      "    pm.response.to.have.status(200);",
+                      "    const res = pm.response.json();",
+                      "    pm.expect(res.results.length).to.be.at.least(1);",
+                      "    pm.expect(res.results[0].id).to.eql(pm.environment.get(\"database_id\"));",
+                      "});"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"query\": \"{{db_updated_title}}\",\n  \"filter\": { \"value\": \"database\", \"property\": \"object\" },\n  \"sort\": { \"direction\": \"descending\", \"timestamp\": \"last_edited_time\" }\n}"
+                },
+                "url": {
+                  "raw": "{{NOTION_BASE_URL}}/v1/search",
+                  "host": ["{{NOTION_BASE_URL}}"],
+                  "path": ["v1", "search"]
+                }
+              }
+            },
+            {
+              "name": "05 - E2E - PATCH Teardown Mover a Papelera",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test(\"Step 5: Database moved to trash (in_trash: true)\", function () {",
+                      "    pm.response.to.have.status(200);",
+                      "    const res = pm.response.json();",
+                      "    pm.expect(res.in_trash).to.be.true;",
+                      "    pm.environment.unset(\"database_id\");",
+                      "    pm.environment.unset(\"db_initial_title\");",
+                      "    pm.environment.unset(\"db_updated_title\");",
+                      "});"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "PATCH",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"in_trash\": true\n}"
+                },
+                "url": {
+                  "raw": "{{NOTION_BASE_URL}}/v1/databases/{{database_id}}",
+                  "host": ["{{NOTION_BASE_URL}}"],
+                  "path": ["v1", "databases", "{{database_id}}"]
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "exec": [
+          "const version = pm.environment.get(\"NOTION_VERSION\") || \"2025-09-03\";",
+          "pm.request.headers.upsert({ key: \"Notion-Version\", value: version });",
+          "pm.request.headers.upsert({ key: \"Accept\", value: \"application/json\" });"
+        ],
+        "type": "text/javascript"
+      }
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{NOTION_TOKEN}}",
+        "type": "string"
+      }
+    ]
+  }
+}
+

@@ -1,0 +1,359 @@
+{
+	"info": {
+		"_postman_id": "dcceff66-a830-47d1-9274-80907ca66201",
+		"name": "Lab02_Grupo2_Databases_Search",
+		"description": "Colección de pruebas para los módulos Databases y Search. Incluye CRUD de Databases y búsqueda global.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "58498180"
+	},
+	"item": [
+		{
+			"name": "00 - Setup (Crear Database y Limpiar)",
+			"item": [
+				{
+					"name": "Setup - Limpiar variables y crear base de datos",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Limpiamos las variables para que el Runner empiece limpio",
+									"pm.environment.unset(\"database_id\");",
+									"pm.environment.unset(\"data_source_id\");",
+									"pm.environment.unset(\"comment_id\");",
+									"pm.environment.unset(\"file_upload_id\");"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"El código de estado es 200 OK\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"const responseJson = pm.response.json();",
+									"pm.test(\"La base de datos se creó correctamente\", function () {",
+									"    pm.expect(responseJson.object).to.eql(\"database\");",
+									"    pm.expect(responseJson.id).to.be.a('string');",
+									"});",
+									"// Guardamos el ID para las siguientes peticiones",
+									"pm.environment.set(\"database_id\", responseJson.id);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"parent\": {\n        \"type\": \"page_id\",\n        \"page_id\": \"{{NOTION_PAGE_ID}}\"\n    },\n    \"title\": [\n        {\n            \"type\": \"text\",\n            \"text\": {\n                \"content\": \"Base de Datos para Search\"\n            }\n        }\n    ],\n    \"properties\": {\n        \"Name\": {\n            \"title\": {}\n        }\n    }\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{NOTION_BASE_URL}}/v1/databases",
+							"host": [
+								"{{NOTION_BASE_URL}}"
+							],
+							"path": [
+								"v1",
+								"databases"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "01 - Databases CRUD",
+			"item": [
+				{
+					"name": "DB - CREATE - Crear Database",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"El código de estado es 200 OK\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"const responseJson = pm.response.json();",
+									"pm.test(\"La base de datos se creó correctamente\", function () {",
+									"    pm.expect(responseJson.object).to.eql(\"database\");",
+									"    pm.expect(responseJson.id).to.be.a('string');",
+									"});",
+									"// Guardamos el ID por si acaso",
+									"pm.environment.set(\"database_id\", responseJson.id);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"parent\": {\n        \"type\": \"page_id\",\n        \"page_id\": \"{{NOTION_PAGE_ID}}\"\n    },\n    \"title\": [\n        {\n            \"type\": \"text\",\n            \"text\": {\n                \"content\": \"Test DB\"\n            }\n        }\n    ],\n    \"properties\": {\n        \"Name\": {\n            \"title\": {}\n        }\n    }\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{NOTION_BASE_URL}}/v1/databases",
+							"host": [
+								"{{NOTION_BASE_URL}}"
+							],
+							"path": [
+								"v1",
+								"databases"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "DB - READ - Recuperar Database",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"El código de estado es 200 OK\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"const responseJson = pm.response.json();",
+									"pm.test(\"Los datos de la base de datos son correctos\", function () {",
+									"    pm.expect(responseJson.object).to.eql(\"database\");",
+									"    pm.expect(responseJson.id).to.eql(pm.environment.get(\"database_id\"));",
+									"    pm.expect(responseJson).to.have.property(\"data_sources\");",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{NOTION_BASE_URL}}/v1/databases/{{database_id}}",
+							"host": [
+								"{{NOTION_BASE_URL}}"
+							],
+							"path": [
+								"v1",
+								"databases",
+								"{{database_id}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "DB - UPDATE - Actualizar título",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"El código de estado es 200 OK\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"const responseJson = pm.response.json();",
+									"pm.test(\"El título se actualizó correctamente\", function () {",
+									"    pm.expect(responseJson.title[0].text.content).to.eql(\"Título Actualizado desde Postman\");",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"title\": [\n        {\n            \"type\": \"text\",\n            \"text\": {\n                \"content\": \"Título Actualizado desde Postman\"\n            }\n        }\n    ]\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{NOTION_BASE_URL}}/v1/databases/{{database_id}}",
+							"host": [
+								"{{NOTION_BASE_URL}}"
+							],
+							"path": [
+								"v1",
+								"databases",
+								"{{database_id}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "DB - DELETE - Archivar Database",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"El código de estado es 200 OK\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"const responseJson = pm.response.json();",
+									"pm.test(\"La base de datos fue archivada\", function () {",
+									"    pm.expect(responseJson.in_trash).to.eql(true);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"in_trash\": true\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{NOTION_BASE_URL}}/v1/databases/{{database_id}}",
+							"host": [
+								"{{NOTION_BASE_URL}}"
+							],
+							"path": [
+								"v1",
+								"databases",
+								"{{database_id}}"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "02 - Search",
+			"item": [
+				{
+					"name": "Search - Búsqueda global",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"El código de estado es 200 OK\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"const responseJson = pm.response.json();",
+									"pm.test(\"La respuesta es una lista de resultados\", function () {",
+									"    pm.expect(responseJson.object).to.eql(\"list\");",
+									"    pm.expect(responseJson.results).to.be.an('array');",
+									"});",
+									"pm.test(\"Se encontró al menos un resultado\", function () {",
+									"    pm.expect(responseJson.results.length).to.be.greaterThan(0);",
+									"    // Verificamos que al menos uno sea un database",
+									"    const foundDatabase = responseJson.results.some(item => item.object === 'database');",
+									"    pm.expect(foundDatabase).to.eql(true);",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"query\": \"Base de Datos para Search\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{NOTION_BASE_URL}}/v1/search",
+							"host": [
+								"{{NOTION_BASE_URL}}"
+							],
+							"path": [
+								"v1",
+								"search"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"pm.request.headers.upsert({ key: 'Notion-Version', value: pm.environment.get('NOTION_VERSION') });",
+					"pm.request.headers.upsert({ key: 'Authorization', value: 'Bearer ' + pm.environment.get('NOTION_TOKEN') });"
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "NOTION_BASE_URL",
+			"value": "https://api.notion.com"
+		},
+		{
+			"key": "NOTION_PAGE_ID",
+			"value": "41220beb9f8180d18597d589ec4e5adc"
+		}
+	]
+}
