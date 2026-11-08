@@ -259,6 +259,127 @@ Inspecting the **`OAuth`** module of the official `Notion API (2025-09-03)` coll
 1. Review verification concepts in Postman and how tests are implemented on requests.
 2. Implement in Postman the tests written in the previous laboratory, including multiple required assertions on status code, body, headers, etc.  
 
+### 2.1 Implementation of Previous Lab Test Cases with Multi-Layer Assertions in Postman
+
+#### Gabriel Marcos Guaman Ortuño — Modules: Users & OAuth
+
+All **52 test cases** designed in Laboratory 01 (`GabrielGuamanTests.md` — 49 endpoint test cases across `Users` and `OAuth` plus 3 multi-step E2E scenarios) were implemented in Postman inside [`postman/gabriel_guaman/Notion_Users_OAuth_GabrielGuaman.postman_collection.json`](./postman/gabriel_guaman/Notion_Users_OAuth_GabrielGuaman.postman_collection.json) (paired with [`Notion_Users_OAuth_Env.postman_environment.json`](./postman/gabriel_guaman/Notion_Users_OAuth_Env.postman_environment.json)), resulting in **69 executable HTTP requests** and **345 automated `pm.test()` assertions** (5 verification layers per request).
+
+| Lab 01 Suite / Endpoint | Implemented Test Case IDs | Req. Count | Multi-Layer `pm.test()` Verifications Implemented |
+|-------------------------|---------------------------|------------|---------------------------------------------------|
+| **`GET /v1/users/me`**<br>(`01_GET_Users_Me`) | `TC_USR_ME_001` – `TC_USR_ME_008` | 8 | **Status:** `200`, `400`, `401`, `429`.<br>**Headers:** `Content-Type: application/json`, `x-notion-request-id` non-empty, `Retry-After` on `429`.<br>**SLA:** `responseTime < 5000 ms`.<br>**Body / Schema:** `object === "user"`, `type === "bot"`, canonical `UUIDv4` regex on `id`, `bot.owner`, `bot.workspace_limits.max_file_upload_size_in_bytes > 0`; error codes `"unauthorized"`, `"missing_version"`, `"validation_error"`, `"rate_limited"`. |
+| **`GET /v1/users/{user_id}`**<br>(`02_GET_User_By_ID`) | `TC_USR_GET_001` – `TC_USR_GET_009b` | 10 | **Status:** `200`, `400`, `401`, `403`, `404`.<br>**Headers & SLA:** `application/json`, `x-notion-request-id`, `< 5000 ms`.<br>**Body / Schema:** `object === "user"`, `id` equality & 32-char compact hex normalization to 36-char hyphenated `UUIDv4`, `type` (`"person"` / `"bot"`), `person` metadata; error codes `"validation_error"`, `"object_not_found"`, `"unauthorized"`, `"restricted_resource"`, `"missing_version"`. |
+| **`GET /v1/users`**<br>(`03_GET_List_All_Users`) | `TC_USR_LIST_001` – `TC_USR_LIST_009b` | 10 | **Status:** `200`, `400`, `401`.<br>**Headers & SLA:** `application/json`, `x-notion-request-id`, `< 5000 ms`.<br>**Body / Schema:** `object === "list"`, `type === "user"`, `results[]` array bounds (`=== 1` at `page_size=1`, `<= 100` at `page_size=100`), `UUIDv4` regex per item, boolean `has_more`, `next_cursor` non-overlap across pages; error codes `"validation_error"`, `"unauthorized"`, `"missing_version"`. |
+| **`POST /v1/oauth/token`**<br>(`01_POST_OAuth_Token`) | `TC_OAUTH_TOK_001` – `TC_OAUTH_TOK_009` | 10 | **Status:** `200`, `400`, `401`.<br>**Headers & SLA:** `application/json`, `x-notion-request-id`, `< 5000 ms`.<br>**Body / Schema:** `access_token` non-empty string, `token_type === "bearer"`, `bot_id` & `workspace_id` `UUIDv4` regex, `owner`, rotated `refresh_token`; OAuth/Notion error codes `"invalid_client"`, `"invalid_grant"`, `"unsupported_grant_type"`, `"invalid_request"`, `"missing_version"`. |
+| **`POST /v1/oauth/revoke`**<br>(`02_POST_OAuth_Revoke`) | `TC_OAUTH_REV_001` – `TC_OAUTH_REV_007` | 8 | **Status:** `200` (including RFC 7009 idempotent re-revocation), `400`, `401`.<br>**Headers & SLA:** `application/json`, `x-notion-request-id`, `< 5000 ms`.<br>**Body / Schema:** Valid JSON acknowledgment `{}` without `500` degradation; error codes `"invalid_client"`, `"validation_error"`, `"missing_version"`, `"invalid_json"`. |
+| **`POST /v1/oauth/introspect`**<br>(`03_POST_OAuth_Introspect`) | `TC_OAUTH_INT_001` – `TC_OAUTH_INT_008` | 8 | **Status:** `200`, `400`, `401` (never `500` on 2048-char boundary).<br>**Headers & SLA:** `application/json`, `x-notion-request-id`, `< 5000 ms`.<br>**Body / Schema:** Boolean `active` (`true` with numeric `iat` for active tokens; `false` per RFC 7662 for revoked/unknown tokens); error codes `"invalid_client"`, `"validation_error"`, `"missing_version"`. |
+| **Chained & E2E Flows**<br>(`03_Chained_And_E2E_Flows`) | `TC_E2E_001`, `TC_E2E_002`, `TC_E2E_003` | 15 | Cross-request state parity (`id === bot_user_id`, compact vs. hyphenated profile equivalence, distinct paginated user IDs, `active: true -> false` transition after `/v1/oauth/revoke`, and `401 unauthorized` enforcement). |
+
+##### Representative Postman Script 1 — Boundary & Schema Normalization (`Users` Module: `TC_USR_GET_008`)
+
+```javascript
+// [Pre-request Script] Strip hyphens from target_user_id to build a 32-char hex compact_user_id
+const sourceUuid = pm.environment.get("target_user_id") || pm.collectionVariables.get("target_user_id");
+if (sourceUuid) {
+    const compact = sourceUuid.replace(/-/g, "");
+    pm.environment.set("compact_user_id", compact);
+    pm.collectionVariables.set("compact_user_id", compact);
+}
+
+// [Post-response / Tests Script] Multi-layer verification (Status, Headers, SLA, UUIDv4 Normalization)
+pm.test("TC_USR_GET_008 - Status code is 200 OK", function () {
+    pm.response.to.have.status(200);
+});
+
+pm.test("TC_USR_GET_008 - Response Content-Type header is application/json", function () {
+    pm.expect(pm.response.headers.get("Content-Type")).to.include("application/json");
+});
+
+pm.test("TC_USR_GET_008 - Response includes x-notion-request-id tracing header", function () {
+    pm.expect(pm.response.headers.has("x-notion-request-id")).to.be.true;
+    pm.expect(pm.response.headers.get("x-notion-request-id")).to.be.a("string").and.not.empty;
+});
+
+pm.test("TC_USR_GET_008 - Response time is within 5000 ms SLA", function () {
+    pm.expect(pm.response.responseTime).to.be.below(5000);
+});
+
+pm.test("TC_USR_GET_008 - 32-char compact input is normalized to canonical 36-char hyphenated UUIDv4", function () {
+    const jsonData = pm.response.json();
+    const sentCompact = pm.environment.get("compact_user_id");
+    pm.expect(sentCompact).to.match(/^[0-9a-f]{32}$/i);
+    pm.expect(jsonData.object).to.eql("user");
+    pm.expect(jsonData.id).to.have.lengthOf(36);
+    pm.expect(jsonData.id).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+    pm.expect(jsonData.id.replace(/-/g, "").toLowerCase()).to.eql(sentCompact.toLowerCase());
+});
+```
+
+##### Representative Postman Script 2 — Negative & Error Contract Validation (`OAuth` Module: `TC_OAUTH_REV_004`)
+
+```javascript
+// [Pre-request Script] Intentionally strip Notion-Version header to validate contract rejection
+pm.request.headers.remove("Notion-Version");
+
+// [Post-response / Tests Script] Multi-layer error contract verification
+pm.test("TC_OAUTH_REV_004 - Status code is 400", function () {
+    pm.response.to.have.status(400);
+});
+
+pm.test("TC_OAUTH_REV_004 - Response Content-Type header is application/json", function () {
+    pm.expect(pm.response.headers.get("Content-Type")).to.include("application/json");
+});
+
+pm.test("TC_OAUTH_REV_004 - Response includes x-notion-request-id tracing header", function () {
+    pm.expect(pm.response.headers.has("x-notion-request-id")).to.be.true;
+    pm.expect(pm.response.headers.get("x-notion-request-id")).to.be.a("string").and.not.empty;
+});
+
+pm.test("TC_OAUTH_REV_004 - Response time is within 5000 ms SLA", function () {
+    pm.expect(pm.response.responseTime).to.be.below(5000);
+});
+
+pm.test("TC_OAUTH_REV_004 - Error schema contract matches Notion error payload (missing_version)", function () {
+    const jsonData = pm.response.json();
+    pm.expect(jsonData.object).to.eql("error");
+    pm.expect(jsonData.status).to.eql(400);
+    pm.expect(jsonData.code).to.eql("missing_version");
+    pm.expect(jsonData.message).to.be.a("string").and.not.empty;
+});
+```
+
+##### Execution Evidence — Multi-Layer Assertions (`Users` & `OAuth` Modules)
+
+- **Happy Path Assertions (`GET /v1/users/me` — `TC_USR_ME_001`, 5/5 `PASSED`):**
+
+![Users Happy Path Assertions](./caps/gabrielguaman/act2_gabriel_users_happy.png)
+
+- **Boundary & Pagination Assertions (`GET /v1/users?page_size=1` — `TC_USR_LIST_007`, 5/5 `PASSED`):**
+
+![Users Boundary Assertions](./caps/gabrielguaman/act2_gabriel_users_boundary.png)
+
+- **OAuth Negative & Contract Assertions (`POST /v1/oauth/token` — `TC_OAUTH_TOK_003`, `401 Unauthorized`, 5/5 `PASSED`):**
+
+![OAuth Negative Contract Assertions](./caps/gabrielguaman/act2_gabriel_oauth_negative.png)
+
+---
+
+#### Valentina Molina Bustillos — Module: [Pending Implementation]
+
+> *[Reserved for Valentina Molina Bustillos's multi-layer test implementation summary, code snippets, and execution screenshots.]*
+
+#### Karen Ivonne Cruz Alvarez — Module: [Pending Implementation]
+
+> *[Reserved for Karen Ivonne Cruz Alvarez's multi-layer test implementation summary, code snippets, and execution screenshots.]*
+
+#### Sebastián Pereyra — Module: [Pending Implementation]
+
+> *[Reserved for Sebastián Pereyra's multi-layer test implementation summary, code snippets, and execution screenshots.]*
+
+#### Kevin Uruchi — Module: [Pending Implementation]
+
+> *[Reserved for Kevin Uruchi's multi-layer test implementation summary, code snippets, and execution screenshots.]*
+
 ---
 
 ## Activity #3
@@ -268,12 +389,158 @@ Inspecting the **`OAuth`** module of the official `Notion API (2025-09-03)` coll
 3. Review the concept of variables, variable scopes, and environments in Postman.
 4. Implement multi-request tests using shared variables.  
 
+#### Gabriel Marcos Guaman Ortuño — Modules: Users & OAuth
+
+##### 3.1 Feasibility Evaluation of Lab 01 Test Cases in Postman
+
+All **52 test cases** from `GabrielGuamanTests.md` were evaluated for unattended execution feasibility inside Postman Collection Runner and Newman CLI:
+
+| Automation Classification | Covered Test Cases (`GabrielGuamanTests.md`) | Count | Technical Justification & Execution Strategy |
+|---------------------------|----------------------------------------------|-------|----------------------------------------------|
+| **100% Automatable (Unattended Runner)** | `TC_USR_ME_001`–`007`; `TC_USR_GET_001`–`005`, `007`–`009b`; `TC_USR_LIST_001`–`009b`; `TC_OAUTH_TOK_003`–`008b`; `TC_OAUTH_REV_001`–`007`; `TC_OAUTH_INT_002`–`008`; `TC_E2E_002` | **45 TCs** | Deterministic stateless/stateful HTTP contracts requiring only pre-provisioned secrets (`NOTION_TOKEN`, `OAUTH_CLIENT_ID`, `OAUTH_CLIENT_SECRET`) and dynamic Pre-request UUID/cursor discovery. |
+| **Conditionally Automatable (Multi-Credential Setup)** | `TC_USR_GET_006` (`403 restricted_resource`); `TC_OAUTH_TOK_002`, `TC_OAUTH_INT_001`, `TC_E2E_003` | **4 TCs** | Fully automated once `RESTRICTED_TOKEN` (secondary integration without *Read user information* capability) and an active `OAUTH_REFRESH_TOKEN` / `OAUTH_ACCESS_TOKEN` are populated in the environment. |
+| **Semi-Automated (Browser OAuth Consent / Load Runner)** | `TC_OAUTH_TOK_001`, `TC_OAUTH_TOK_009`, `TC_E2E_001` (browser `OAUTH_AUTH_CODE`); `TC_USR_ME_008` (`429` burst rate-limit) | **3 + 1 TCs** | OAuth 2.0 `authorization_code` requires interactive user consent in Notion's web UI to mint a single-use `code` before running the exchange/replay chain. `TC_USR_ME_008` requires parallel load generation (`>15 req/s` in Postman Performance Runner) rather than sequential single-thread execution; its script asserts `429` + `Retry-After` under burst or `200 OK` sequentially. |
+
+##### 3.2 Test Requirements — Preconditions & Postconditions
+
+| Suite / Scope | Required Preconditions (Before Execution) | Enforced Postconditions (After Execution) |
+|---------------|-------------------------------------------|-------------------------------------------|
+| **`01_Users_Module`**<br>(`/v1/users/*`) | 1. Active `NOTION_TOKEN` with *Read user information including email addresses* capability enabled.<br>2. Secondary `RESTRICTED_TOKEN` configured with *No user information* capability (`TC_USR_GET_006`).<br>3. Workspace contains `>= 2` accessible users (`person` + `bot`) for cursor pagination.<br>4. `target_user_id` and `bot_user_id` auto-extracted via `pm.sendRequest()` Pre-request hook if empty. | Read-only `GET` operations leave zero residual server-side mutations. Discovered `target_user_id`, `bot_user_id`, and `pagination_cursor` remain cached in environment/collection scope for downstream inspection. |
+| **`02_OAuth_Module`**<br>(`/v1/oauth/*`) | 1. Valid `OAUTH_CLIENT_ID` and `OAUTH_CLIENT_SECRET` injected via folder-level `Basic Auth`.<br>2. Registered `OAUTH_REDIRECT_URI` matching Notion portal settings.<br>3. Active `OAUTH_ACCESS_TOKEN` / `OAUTH_REFRESH_TOKEN` (and fresh `OAUTH_AUTH_CODE` for `TOK_001`/`009`). | `TC_OAUTH_REV_001` revokes an **isolated disposable token** (`isolated_revocable_token`) so shared `NOTION_TOKEN` and `OAUTH_ACCESS_TOKEN` remain intact for `03_POST_OAuth_Introspect`. |
+| **`03_Chained_And_E2E_Flows`**<br>(`TC_E2E_001`–`003`) | Executed strictly as the **final folder** in the collection after module suites finish. | `TC_E2E_002_Step5` unsets transient comparison keys (`e2e_baseline_name`, `e2e_baseline_type`). `TC_E2E_001_Step6` isolates token destruction to `oauth_access_token` and clears the revoked credential upon confirming `401 Unauthorized`. |
+
+##### 3.3 Multi-Request Chaining & Shared Variables Implementation
+
+Variables were partitioned across three Postman scopes to prevent credential leakage while supporting dynamic request chaining:
+
+| Scope Level | Variable Names | Purpose & Lifecycle |
+|-------------|----------------|---------------------|
+| **Collection Scope** | `NOTION_BASE_URL`, `NOTION_VERSION`, `extracted_user_id`, `compact_user_id`, `next_cursor`, `bot_user_id`, `oauth_access_token`, `e2e_baseline_name`, `e2e_baseline_type` | Portable contract defaults (`2025-09-03`) and cross-step runtime state shared via `pm.collectionVariables.set()` / `.get()`. |
+| **Environment Scope** (`Notion_Users_OAuth_Env`) | `NOTION_TOKEN` (*secret*), `RESTRICTED_TOKEN` (*secret*), `OAUTH_CLIENT_ID`, `OAUTH_CLIENT_SECRET` (*secret*), `OAUTH_REDIRECT_URI`, `OAUTH_AUTH_CODE`, `OAUTH_ACCESS_TOKEN` (*secret*), `OAUTH_REFRESH_TOKEN` (*secret*), `target_user_id`, `pagination_cursor` | Workspace-specific secrets masked in UI plus inspectable state persisted via `pm.environment.set()`. |
+| **Local / Pre-request Scope** | `effective_oauth_token`, `isolated_revocable_token`, `compact_user_id` (32-char stripped hex), `oversized_token` (2048-char generated string) | Ephemeral per-request values computed dynamically inside *Pre-request Scripts* via `pm.variables.set()`. |
+
+Two primary multi-request chained workflows were implemented inside `03_Chained_And_E2E_Flows`:
+
+1. **Unattended Directory Pagination & UUID Normalization Chain (`01_TC_E2E_002` — 5 Sequential Requests):**
+   - `Step 1` (`GET /v1/users?page_size=1`) extracts `results[0].id` -> `extracted_user_id`, strips hyphens -> `compact_user_id`, and stores `next_cursor` via `pm.environment.set()` and `pm.collectionVariables.set()`.
+   - `Step 2` (`GET /v1/users?page_size=1&start_cursor={{next_cursor}}`) consumes `{{next_cursor}}` and asserts `results[0].id !== extracted_user_id`.
+   - `Step 3` (`GET /v1/users/{{extracted_user_id}}`) retrieves the profile via canonical 36-char hyphenated `UUIDv4` and caches `e2e_baseline_name` and `e2e_baseline_type`.
+   - `Step 4` (`GET /v1/users/{{compact_user_id}}`) queries the same user via 32-char unhyphenated hex ID and asserts exact identity/attribute parity with `Step 3`.
+   - `Step 5` (`GET /v1/users/{{extracted_user_id}}` with invalid/revoked token) confirms `401 Unauthorized` (`code: "unauthorized"`) and cleans up temporary variables.
+2. **OAuth Lifecycle & Revocation Enforcement Chain (`02_TC_E2E_003` & `03_TC_E2E_001` — 10 Sequential Requests):**
+   - Exchanges/rotates credentials on `POST /v1/oauth/token` -> stores `oauth_access_token` & `bot_user_id` -> verifies `active: true` on `POST /v1/oauth/introspect` -> authenticates `GET /v1/users/me` (`id === bot_user_id`) -> revokes token via `POST /v1/oauth/revoke` -> confirms immediate transition to `active: false` on `POST /v1/oauth/introspect` -> verifies strict `401 Unauthorized` denial on `GET /v1/users/me`.
+
+##### Execution Evidence — Environment Scopes & Multi-Request Chaining
+
+- **Environment & Variable Scopes (`Notion_Users_OAuth_Env` — Masked Secrets & Runtime UUID/Cursor State):**
+
+![Environment and Variable Scopes](./caps/gabrielguaman/act3_gabriel_env_vars.png)
+
+- **Multi-Request Chaining Execution (`target_user_id` & `next_cursor` — `TC_E2E_002_Step2`, 5/5 `PASSED`):**
+
+![Multi-Request Chaining Execution](./caps/gabrielguaman/act3_gabriel_chaining.png)
+
+---
+
+#### Valentina Molina Bustillos — Module: [Pending Implementation]
+
+> *[Reserved for Valentina Molina Bustillos's feasibility evaluation (`3.1`), preconditions/postconditions (`3.2`), and chained multi-request implementation (`3.3`).]*
+
+#### Karen Ivonne Cruz Alvarez — Module: [Pending Implementation]
+
+> *[Reserved for Karen Ivonne Cruz Alvarez's feasibility evaluation (`3.1`), preconditions/postconditions (`3.2`), and chained multi-request implementation (`3.3`).]*
+
+#### Sebastián Pereyra — Module: [Pending Implementation]
+
+> *[Reserved for Sebastián Pereyra's feasibility evaluation (`3.1`), preconditions/postconditions (`3.2`), and chained multi-request implementation (`3.3`).]*
+
+#### Kevin Uruchi — Module: [Pending Implementation]
+
+> *[Reserved for Kevin Uruchi's feasibility evaluation (`3.1`), preconditions/postconditions (`3.2`), and chained multi-request implementation (`3.3`).]*
+
 ---
 
 ## Activity #4
 
 1. Continue implementing tests in Postman by establishing ordering, structure, and execution conventions.
 2. Review the capability to execute tests automatically.  
+
+### 4.1 Team Conventions for Ordering, Folder Structure, and Execution
+
+To ensure maintainability, deterministic execution order, and seamless peer review across all five modules of **Group 2**, the team established four mandatory structural conventions in Postman:
+
+| Convention Dimension | Standardized Team Rule | Concrete Example (`Notion_Users_OAuth_GabrielGuaman`) |
+|----------------------|------------------------|-------------------------------------------------------|
+| **3-Tier Folder Hierarchy** | `NN_<Module_Name>` → `NN_<HTTP_Verb>_<Endpoint>` → `TC_<MOD>_<ACT>_<NNN>` | `01_Users_Module` → `02_GET_User_By_ID` → `TC_USR_GET_008 - [Boundary] Accept compact 32-char hex UUID...` |
+| **Intra-Folder Request Ordering** | **`Happy Path` → `Boundary` → `Negative`** inside every endpoint subfolder so baseline health and variable bootstrapping execute before fault-injection cases. | `TC_USR_ME_001` (`[Happy Path]`) → `TC_USR_ME_007` (`[Boundary]`) → `TC_USR_ME_003` (`[Negative]`) |
+| **Suite-Level Execution Isolation** | Destructive and multi-step flows reside in the final top-level folder **`03_Chained_And_E2E_Flows`**, placing token revocation (`TC_E2E_001`) strictly last so earlier suites never lose active credentials. | `01_Users_Module` → `02_OAuth_Module` → `03_Chained_And_E2E_Flows` (`03_TC_E2E_001` last) |
+| **Assertion & Variable Naming** | Assertions prefixed with `<TC_ID> - <Check>`; static config/secrets in `UPPER_SNAKE_CASE`; dynamic chained variables in `lower_snake_case`. | `TC_USR_LIST_001 - Status code is 200 OK`; `{{NOTION_TOKEN}}` vs. `{{extracted_user_id}}` |
+
+---
+
+### 4.2 Automated Execution via Postman Collection Runner & Newman CLI
+
+Automated regression runs are supported both interactively through the **Postman Collection Runner** and headlessly from the command line / CI pipelines using **Newman CLI** (`newman` + `newman-reporter-htmlextra`), applying a **`350 ms` inter-request delay** to stay safely below Notion's `~3 requests/second` rate-limit cap:
+
+```bash
+# Full automated suite execution with CLI and HTML dashboard reports
+npx newman run postman/gabriel_guaman/Notion_Users_OAuth_GabrielGuaman.postman_collection.json \
+  -e postman/gabriel_guaman/Notion_Users_OAuth_Env.postman_environment.json \
+  --delay-request 350 \
+  --reporters cli,htmlextra \
+  --reporter-htmlextra-export reports/gabriel_guaman_newman_report.html
+
+# Unattended execution targeting a specific module folder (e.g., 01_Users_Module)
+npx newman run postman/gabriel_guaman/Notion_Users_OAuth_GabrielGuaman.postman_collection.json \
+  -e postman/gabriel_guaman/Notion_Users_OAuth_Env.postman_environment.json \
+  --folder "01_Users_Module" \
+  --delay-request 350
+```
+
+#### Gabriel Marcos Guaman Ortuño — Automated Execution Summary (`Users` & `OAuth`)
+
+| Execution Metric | Value / Specification |
+|------------------|-----------------------|
+| **Collection File** | [`postman/gabriel_guaman/Notion_Users_OAuth_GabrielGuaman.postman_collection.json`](./postman/gabriel_guaman/Notion_Users_OAuth_GabrielGuaman.postman_collection.json) |
+| **Environment File** | [`postman/gabriel_guaman/Notion_Users_OAuth_Env.postman_environment.json`](./postman/gabriel_guaman/Notion_Users_OAuth_Env.postman_environment.json) |
+| **Lab 01 Test Cases Covered** | **52 Test Cases** (`26` Users + `23` OAuth + `3` E2E Scenarios) |
+| **Iterations Executed** | **1 Iteration** (`0 Failed`) |
+| **Total HTTP Requests Executed** | **70 Requests (`0 Failed`)** — `69` collection items (`28` in `01_Users_Module`, `26` in `02_OAuth_Module`, `15` in `03_Chained_And_E2E_Flows`) + `1` `pm.sendRequest()` Pre-request user-discovery call |
+| **Total `pm.test()` Assertions** | **345 Assertions Executed — `345 Passed / 0 Failed` (`100%` Pass Rate)** (`5` multi-layer checks per collection request: Status, `Content-Type`, `x-notion-request-id`, SLA `< 5000 ms`, Schema/Error Contract) |
+| **Verified Run Telemetry** | Collection Runner: `27s 988ms` (`344 ms` avg. response time) \| Newman CLI: `28.9s` (`329 ms` avg. response time, `115` pre-request scripts, `69` test scripts, `0` failed) |
+| **Runner Configuration** | Iterations: `1` \| Inter-request Delay: `350 ms` \| Persist Variables: `Enabled` |
+
+##### Execution Evidence — Structure, Collection Runner & Newman CLI
+
+- **Collection Structure & Ordering Conventions (`01_Users_Module` → `02_OAuth_Module` → `03_Chained_And_E2E_Flows`):**
+
+![Collection Structure and Ordering Conventions](./caps/gabrielguaman/act4_gabriel_structure.png)
+
+- **Automated Execution via Postman Collection Runner (345/345 Passed - 0 Failed):**
+
+![Automated Execution via Postman Collection Runner](./caps/gabrielguaman/act4_gabriel_runner.png)
+
+- **Automated Execution via Newman CLI (345 Assertions Executed - 0 Failed):**
+
+![Automated Execution via Newman CLI](./caps/gabrielguaman/act4_gabriel_newman.png)
+
+---
+
+#### Valentina Molina Bustillos — Automated Execution Summary: [Pending Implementation]
+
+> *[Reserved for Valentina Molina Bustillos's Postman Collection Runner / Newman CLI metrics and execution screenshots.]*
+
+#### Karen Ivonne Cruz Alvarez — Automated Execution Summary: [Pending Implementation]
+
+> *[Reserved for Karen Ivonne Cruz Alvarez's Postman Collection Runner / Newman CLI metrics and execution screenshots.]*
+
+#### Sebastián Pereyra — Automated Execution Summary: [Pending Implementation]
+
+> *[Reserved for Sebastián Pereyra's Postman Collection Runner / Newman CLI metrics and execution screenshots.]*
+
+#### Kevin Uruchi — Automated Execution Summary: [Pending Implementation]
+
+> *[Reserved for Kevin Uruchi's Postman Collection Runner / Newman CLI metrics and execution screenshots.]*
 
 ---
 
