@@ -2404,6 +2404,202 @@ As reviewer of Lucas Gabriel De Los Santos's implementation, **Sebastián Pereyr
 #### Overall Audit Verdict:
 Lucas Gabriel De Los Santos delivered an **exceptionally mature, technically rigorous, and clean API automation suite**. The integration of multi-layer assertions, formal JSON Schema validation, data integrity verification via `pm.sendRequest`, and automated teardown makes this implementation an exemplary benchmark in automated API contract testing.
 
+
+
+---
+### 5.4 Evaluation of Complexity, Quantity, and Test Typology (Reviewer: Karen Ivonne Cruz Alvarez)
+
+**Reviewer:** Karen Ivonne Cruz Alvarez (Group 2 — Notion API Testing Team)  
+**Reviewed Author:** Kiara Vanessa Muñoz Bayter  
+**Reviewed System Under Test (SUT):** GitHub REST API (`version: 2026-03-10`), Gists Module  
+**Audited Artifacts:**
+- Postman Collection: `GitHub_Gists_SQE3.postman_collection.json`
+- Kiara's section of the team report `A.2 Laboratory - Week #2.docx` (Activities 1–4, screenshots included)
+- Collection Runner screenshots (Postman v12.35.5)
+- Execution Timestamp: November 07, 2026
+
+
+---
+
+#### 5.4.1 Quantitative Test Metrics & Scope Analysis
+
+Kiara implemented the Gists test cases from Laboratory 01 as **21 formal test cases** (9 `POST`, 4 `GET`, 5 `PATCH`, 3 `DELETE`) inside a **25-request collection** (21 test cases + 3 setup requests + 1 helper `DELETE` that prepares the "deleted Gist" scenario). She also added two cases that were not in Lab 01: `TC_GIST_POST_009` (public Gist) and `TC_GIST_DELETE_003` (delete a non-existent Gist).
+
+I recomputed the metrics directly from the collection file and compared them with the Runner screenshot. The reported numbers are consistent with the artifact:
+
+| Execution Metric | Audited Value | Technical Assessment |
+|---|---|---|
+| **Total Test Cases** | **21** (19 from Lab 01 + 2 added; the E2E case is not counted separately) | Complete for the four CRUD operations of a single Gist. |
+| **Total Executed Requests** | **25** (21 TCs + `00 - RESET`, `SETUP_001`, `SETUP_002` + 1 helper `DELETE`) | Small, easy-to-run suite. |
+| **Total Automated Assertions** | **118** — verified: **45** test-specific + **73** collection-level `[Common]` (3 per request, 2 on `204`) | Runner screenshot confirms `118 / 116 passed / 2 failed / 0 errors`. |
+| **Test-specific assertions per TC** | **2.0 on average** (42 across 21 TCs); 4 TCs have only 1; `GET_001` has no status assertion | **62% of all assertions are the generic collection-level checks**, so the headline "118" overstates verification depth. |
+| **Assertion Pass Rate** | **116 / 118 (98.3%)** | Both failures belong to one request (`TC_GIST_PATCH_004`). |
+| **Test Case Pass Rate** | **20 / 21 (95.2%)** | See 5.4.3: the failure is most likely a test-design issue, not an API defect. |
+| **Average Response Time** | **562 ms** (16.5 s total run) | Within the 2000 ms SLA applied at collection level. |
+| **Execution Platforms** | Postman Collection Runner only | No Newman / CLI run was delivered. |
+
+##### Context within the lab cohort (figures as reported by each author)
+
+| | Kiara (Gists) | Lucas (Issues) | Lilian (Repos) | Valentin (Labels/Milestones) |
+|---|---|---|---|---|
+| Test cases | **21** | 30 | 29 | 43 |
+| Assertions / requests in collection | 118 / 25 ≈ **4.7** | 217 / 42 ≈ 5.2 | 242 / 45 ≈ 5.4 | 318 / 54 ≈ 5.9 |
+| JSON Schema validation | **No** | Yes | Yes | Yes |
+| Data-integrity follow-up `GET` | **No** | Yes | Yes | Yes |
+| Teardown / cleanup folder | **No** | Yes | Yes | Yes |
+| Newman / CLI run delivered | **No** | Yes | Yes | Runner only |
+
+Kiara's suite is the smallest and the least layered of the group, although it covers the full CRUD lifecycle of its resource.
+
+---
+
+#### 5.4.2 Test Typology & Complexity Assessment
+
+```mermaid
+pie title Kiara - GitHub Gists Test Typology (21 Test Cases)
+    "Happy Path (11 TCs / 52.4%)" : 11
+    "Negative (6 TCs / 28.6%)" : 6
+    "Optional-field / default-value (4 TCs / 19.0%)" : 4
+    "Dedicated E2E (0 TCs)" : 0
+```
+
+1. **Positive Functional Checks (Happy Path — 11 Cases):**
+   - Create (`POST_001`, `POST_008` multiple files, `POST_009` public), retrieve (`GET_001`, `GET_003` public Gist without token, `GET_004` multi-file), update (`PATCH_001`–`PATCH_004`: description, content, rename, remove file) and delete (`DELETE_001`, `204` with empty body).
+   - `GET_003` is a good use of request-level `No Auth` to prove that public resources are readable anonymously.
+
+2. **Negative Error Validation (6 Cases):**
+   - `401` without token (`POST_002`, message `"Requires authentication"` is asserted), `422` for missing `files` or missing file `content` (`POST_003`, `POST_004`), and `404` for a deleted or non-existent Gist (`GET_002`, `DELETE_002`, `DELETE_003`).
+   - Gap: there is no `401` with an **invalid** token (only a missing one), no `404` for `PATCH` on a non-existent Gist, and no authorization-boundary case (e.g., reading or modifying someone else's private Gist).
+
+3. **Optional-field / Default-value Scenarios (4 Cases):**
+   - Empty filename (`POST_005`), no description → `description: null` (`POST_006`), no `public` field → private by default (`POST_007`) and empty `PATCH` body (`PATCH_005`).
+   - These are useful, but they are **default-behavior checks rather than true boundaries**. There are no size or quantity limits (very large content, many files per Gist, very long description), and no pagination at all.
+
+4. **Stateful Chains / E2E (0 dedicated cases):**
+   - The chains exist implicitly through environment variables (`POST_001 → GET_001 → PATCH_001–004 → DELETE_001 → GET_002`; `POST_009 → GET_003`; `POST_008 → GET_004`), and `deletedGistId` is a disposable Gist created in setup and deleted before `GET_002` so the main Gist is never consumed. That design is sound.
+   - However, the report is contradictory about E2E: Activity 2 says "the collection also includes an E2E workflow", while Activity 3 says no separate folder was created. The collection has no E2E folder.
+
+**Complexity level: basic-to-intermediate.** The suite relies on status codes plus one or two body checks, environment-variable chaining and a setup/reset step. It does not use `pm.sendRequest`, JSON Schema, dynamic data, data-driven runs or header-level assertions beyond the three common checks.
+
+---
+
+#### 5.4.3 Deep Technical Analysis of the Single Failure (`TC_GIST_PATCH_004`)
+
+- **Test ID:** `TC_GIST_PATCH_004 - Remove Gist file`
+- **Method & Endpoint:** `PATCH {{baseUrl}}/gists/{{gistId}}`
+- **Sent Body:** `{"files": {"hello.py": null}}`
+- **Expected Outcome:** `200 OK` and the file no longer present.
+- **Observed Outcome:** `422 Unprocessable Entity`; the second assertion then crashes with `Target cannot be null or undefined` (visible in the Runner screenshot).
+
+Kiara reports this as an API behavior ("File removal returns 422"). From the collection, the failure looks like a **test-design defect** instead:
+
+1. **Stale file name.** `TC_GIST_PATCH_003` runs immediately before on the same `gistId` and renames `hello.py` to `gistsrename.txt`. `PATCH_004` then tries to remove `hello.py`, which no longer exists. The test's own assertion checks for `gistsrename.txt`, which shows that the intended target was the renamed file.
+2. **Single-file Gist.** The Gist created in `POST_001` has one file. If the intended file is the only one, removing it would leave an empty Gist, which GitHub does not accept. This should be confirmed in the `422` response body (`message` / `errors`), which the report does not include.
+3. **Fragile assertion.** `expect(data.files).to.not.have.property(...)` throws when the error body has no `files`, so a clean failure becomes a script error. The same assertion would also pass if the wrong file had been removed.
+
+The other three reviewed teams kept red tests that were real deviations of the API from its documentation (Lucas: invalid `state`; Lilian: invalid `visibility`; Valentin: optional `color`). Here the evidence points to the collection, so the result should be diagnosed before it is documented as an API finding.
+
+---
+
+### 5.5 Usability, Comprehensibility, and Implementation Architecture Evaluation
+
+| Evaluation Dimension | Implementation Strategy in Kiara's Suite | Technical Evaluation |
+|---|---|---|
+| **Folder Hierarchy & Ordering** | `00 Setup`, `01 POST`, `02 GET`, `03 PATCH`, `04 DELETE`; numeric prefixes fix the run order. | **Good.** Clear and consistent with the course convention. One issue: the helper request `TC_GIST_DELETE_001_SETUP_002 - Delete existing Gist` sits inside `02 GET` and reuses the ID `DELETE_001`, which is confusing next to the real `TC_GIST_DELETE_001`. |
+| **Request & Assertion Naming** | `TC_GIST_<METHOD>_<NNN> - <description>`; assertion tags `[Common]`, `[Status]`, `[Body]`. | **Good, with inconsistencies.** Status assertions use `[Status]` in most requests but `[Common]` in `POST_002` and `POST_009`; `SETUP_002` and `DELETE_003` use an en dash (`–`) instead of the hyphen used elsewhere. There is no `[Header]`, `[Schema]` or `[Integrity]` tag because those checks do not exist. |
+| **Centralized Contract Scripts** | Collection-level Bearer auth (`{{token}}`) and a collection-level test script (response time `< 2000 ms`, `X-GitHub-Request-Id`, `Content-Type` skipped on `204`). | **Good for assertions, incomplete for headers.** The report says headers are set once with a pre-request script, but the exported collection has **no collection-level pre-request script**. 19 of 25 requests send no explicit `Accept` / `X-GitHub-Api-Version` header, 5 hard-code `2026-03-10`, and only `SETUP_002` uses `{{apiVersion}}`. API version pinning is therefore applied unevenly. |
+| **Variables & Chaining** | All shared state lives in the environment: `gistId`, `gistFileName`, `publicGistId`, `multipleGistId`, `deletedGistId`; `00 - RESET` clears them. | **Good.** Easy to follow and avoids manual copy/paste of IDs. Collection variables are not used; the report states this explicitly. The token is a secret variable and no credential appears in the exported file (checked by search). |
+| **Data Integrity Verification** | None. Each write is validated only by its own response. | **Insufficient.** The report claims "PATCH requests followed by GET requests", but no follow-up `GET` or `pm.sendRequest` exists after `PATCH`. A response that echoes the change does not prove it was stored. |
+| **Automated Teardown & Cleanup** | None. `00 - RESET` clears variables but deletes nothing. | **Insufficient.** Gists from `POST_005`, `POST_006`, `POST_007` (IDs never saved), `POST_008` and `POST_009` stay in the account after every run. `publicGistId` is a **public** Gist, so test content accumulates visibly. Gists can be deleted through the API, so a cleanup is feasible. |
+| **Reproducibility & Delivery** | Only the collection file was delivered. | **Needs improvement.** Without the environment file (even with an empty token) another member cannot run the suite directly. There is no Newman command, no `--delay-request` and no exported report; Gist creation is a content-creating operation that can hit GitHub's secondary rate limits. |
+| **Documentation vs. Implementation Consistency** | Report text, tables and screenshots. | **Needs improvement.** See the table below. |
+
+#### Consistency between the report and the delivered collection
+
+| # | Item | What the report says | What the collection contains |
+|---|---|---|---|
+| 1 | Section header | SUT "GitHub REST API · **Issues**" | Gists. A sentence copied from the Issues report ("GitHub accepts an invalid state without complaining") is left at the end of the summary. |
+| 2 | Number of test cases | "All 20 … plus two additional" (= 22) in Activity 2, and 21 elsewhere | 21 test cases. |
+| 3 | E2E workflow | Activity 2: included. Activity 3: not created. | No E2E folder. |
+| 4 | Results table (Activity 4) | 21 rows with IDs, descriptions and expected codes | **13 of 21 rows do not match the request with that ID.** Example: report `POST_002` = "Create a public Gist" (`201`); collection `POST_002` = "Create Gist without token" (`401`). Same for `POST_003`–`POST_009`, `GET_003`, `GET_004`, `PATCH_005`, `DELETE_002`, `DELETE_003`. Only `POST_001`, `GET_001`, `GET_002`, `PATCH_001`–`PATCH_004` and `DELETE_001` match. |
+| 5 | Findings table | `401` for operations that require authentication | The collection has a single `401` case (`POST_002`). The `401` cases for `GET`, `PATCH` and `DELETE` listed in the report do not exist in the collection. |
+| 6 | Example script `POST_001` | Asserts file `hello.txt` and uses `[Common]` for the status | Request uses `hello.py` and only asserts that `id` exists, with `[Status]`. |
+| 7 | Precondition table `PATCH_005` | Empty body → `422` | Assertion expects `200`, and the test passes. |
+| 8 | Header setup | Headers set "once" by a pre-request script | No such script in the exported collection. |
+| 9 | `DELETE_002` | "GET request returns 404" | The request is a second `DELETE`, not a `GET`. |
+
+The consequence is that the **per-test-case results table cannot be traced to the collection**, which weakens the traceability goal that Lab 01 → Lab 02 was meant to preserve.
+
+---
+
+### 5.6 Formal Feedback, QA Recommendations, and Technical Audit Report
+
+As reviewer of Kiara Vanessa Muñoz Bayter's implementation, **[REVIEWER NAME]** issues the following formal feedback report:
+
+#### Key Strengths & Best Practices:
+
+1. **Clear and readable structure.** Numbered folders, test-case IDs in request names and tagged assertions make a failure easy to locate in the Runner. The suite is short enough that a newcomer can understand it in a few minutes.
+2. **DRY common assertions.** Response time, `X-GitHub-Request-Id` and `Content-Type` (skipped on `204`) are written once at collection level, the same pattern used by the other teams.
+3. **Good use of environment variables for chaining.** Captured IDs (`gistId`, `publicGistId`, `multipleGistId`, `gistFileName`) remove manual copying, and `00 - RESET` helps each run start from a known state.
+4. **Disposable-resource pattern for the "deleted Gist" case.** `SETUP_002` creates a dedicated Gist (`deletedGistId`) that is deleted before `GET_002`, so the main Gist used by the update tests is not consumed.
+5. **Correct authorization handling.** Collection-level Bearer with a secret `{{token}}`, `No Auth` overrides for the `401` and public-read cases, and no credentials in the exported file.
+6. **Transparent reporting of a red test.** Kiara did not change the failing assertion to turn the run green, and her totals (`118 / 116 / 2`) reconcile exactly with the collection and the Runner screenshot.
+7. **Useful additions beyond Lab 01:** the public-Gist creation and anonymous read, and the delete of a non-existent Gist.
+
+#### Constructive Recommendations & Opportunities for Improvement:
+
+1. **Diagnose and fix `TC_GIST_PATCH_004` (high priority).**  
+   Read the `422` body first. Then create the precondition with two files and remove the one that actually exists after the rename, using the stored variable instead of a literal name. Make the body assertion safe so it does not throw on an error response:
+   ```javascript
+   pm.test("[Status] Status code is 200", () => pm.response.to.have.status(200));
+   if (pm.response.code === 200) {
+       pm.test("[Body] File was removed", () => {
+           pm.expect(pm.response.json().files).to.not.have.property(pm.environment.get("gistFileName"));
+       });
+   }
+   ```
+   Only report it as an API finding if the corrected test still fails.
+
+2. **Bring the report in line with the collection (high priority).**  
+   Regenerate the results table from the Runner or Newman output so IDs, descriptions and expected codes match the requests; fix the "Issues" header and the leftover sentence; settle the 20 + 2 vs 21 count; and state clearly whether an E2E scenario exists.
+
+3. **Add a teardown (high priority).**  
+   Save the ID of every Gist created (`POST_005`, `POST_006`, `POST_007`, `POST_008`, `POST_009`) and add a `99 - Teardown` folder that deletes them, accepting `204` or `404` so it can be re-run after a partial failure. Delete the public Gist in particular.
+
+4. **Deepen the assertions.**
+   - Add a status assertion to `GET_001`.
+   - Check more than `id` exists in `POST_001`: `description`, `public`, and the content of the created file.
+   - Store a JSON Schema for the Gist object and the error object in collection variables and validate with `pm.response.to.have.jsonSchema(...)`.
+   - Add a follow-up `GET` (`pm.sendRequest` or the next request) after `PATCH` and `DELETE` to confirm persistence, tagged `[Integrity]`.
+
+5. **Centralize the headers.**  
+   Add a collection-level pre-request script:
+   ```javascript
+   pm.request.headers.upsert({ key: 'Accept', value: 'application/vnd.github+json' });
+   pm.request.headers.upsert({ key: 'X-GitHub-Api-Version', value: pm.variables.get('apiVersion') });
+   ```
+   Remove the hard-coded `2026-03-10` values and the `PATCH_001` debug `console.log` block.
+
+6. **Complete the automation activity.**  
+   Add a Newman command with `--delay-request 500`, `--reporters cli,htmlextra` and `--reporter-htmlextra-skipHeaders Authorization`, and deliver the environment file (empty token) and the HTML report.
+
+7. **Tidy the setup helper.**  
+   Rename `TC_GIST_DELETE_001_SETUP_002` to something like `SETUP_003 - Delete disposable Gist`, move it to `00 Setup`, and use one dash style throughout.
+
+8. **Extend coverage when time allows.**  
+   `401` with an invalid token on `GET` / `PATCH` / `DELETE`, `PATCH` on a non-existent Gist (`404`), accessing a private Gist without permission, `GET /gists` with `per_page` / `page`, and true boundary cases (very large content, many files). Document the preconditions and postconditions in each request's Description tab and state that the collection must run in order.
+
+#### Overall Audit Verdict:
+
+| Criterion | Assessment |
+|---|---|
+| **Complexity** | Basic-to-intermediate: chaining and setup are present; no schema, integrity or dynamic-data layers. |
+| **Quantity** | Adequate for the CRUD scope (21 TCs, 118 assertions), but the smallest suite of the group, with 62% of assertions being generic. |
+| **Typology** | Reasonable balance of positive (52%), negative (29%) and default-value cases (19%); no true boundaries and no dedicated E2E. |
+| **Ease of use / understanding** | Good structure and naming; reduced by missing environment file, missing teardown, uneven headers and an inconsistent report. |
+
+Kiara delivered a **clear, runnable and well-organized foundation** for the Gists CRUD lifecycle, with sound chaining and honest reporting of results. To reach the level of the other teams she should (1) correct `TC_GIST_PATCH_004` and its diagnosis, (2) align the report with what the collection really contains, (3) add cleanup and data-integrity checks, and (4) deliver the Newman run and environment file. These are focused improvements, and the existing structure already supports them.
+
 ---
 
 ## Team Participation
