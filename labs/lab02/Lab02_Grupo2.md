@@ -2681,6 +2681,221 @@ As reviewer of Kiara Vanessa Muñoz Bayter's implementation, **[REVIEWER NAME]**
 Kiara delivered a **clear, runnable and well-organized foundation** for the Gists CRUD lifecycle, with sound chaining and honest reporting of results. To reach the level of the other teams she should (1) correct `TC_GIST_PATCH_004` and its diagnosis, (2) align the report with what the collection really contains, (3) add cleanup and data-integrity checks, and (4) deliver the Newman run and environment file. These are focused improvements, and the existing structure already supports them.
 
 ---
+### 5.7 Evaluation of Complexity, Quantity, and Test Typology (Reviewer: Kevin Uruchi)
+
+**Reviewer:** Kevin Uruchi (Group 2 — Notion API Testing Team)  
+**Reviewed Author:** Rosa Poma  
+**Reviewed System Under Test (SUT):** GitHub REST API (`version: 2026-03-10`), Search Module  
+**Audited Artifacts:**
+- Postman Collection: `GitHub_Search_SQE3.postman_collection.json`
+- Postman Environment: `GitHub_Search-SQE3..postman_environment.json`
+- Audit date: November 08, 2026
+
+> **Scope note.** I received the collection and the environment file, but no Runner screenshot, Newman report or written report. This is therefore a **static audit**: every number below was recomputed by reading the collection file, and I did not run it against `api.github.com`. Where I expect a result, I say so, and the points marked **[confirm in Runner]** should be checked with a real run before the report is closed.
+
+---
+
+#### 5.7.1 Quantitative Test Metrics & Scope Analysis
+
+Rosa's suite has **16 test cases** (1 authorization, 10 repository search, 3 issue search and 2 E2E scenarios) implemented in **18 HTTP requests**. The two E2E scenarios use two requests each, because the first request searches and the second one verifies the result.
+
+| Execution Metric | Audited Value | Technical Assessment |
+|---|---|---|
+| **Total Test Cases** | **16** (1 + 10 + 3 + 2 E2E) | Small suite. It covers 2 of the 7 endpoints of the Search module (`/search/repositories` and `/search/issues`). If the Lab 01 assignment was limited to those two, this is by design. |
+| **Total Requests** | **18** (1 `/user`, 16 search requests and 1 `/repos/{full_name}` detail request) | One request per test case, plus the second step of each E2E. |
+| **Total Automated Assertions (static count)** | **101** = **44** request-level + **54** collection-level `[Common]` (3 per request × 18) + **3** in a folder-level script | **53% of the assertions are the generic collection-level checks**, so the headline number overstates verification depth. |
+| **Test-specific assertions** | **2.4 per request** on average (44 / 18); `TC_SEARCH_GET_003`, `GET_005`, `GET_007`, `GET_008`, `GET_010`, `ISS_001` and `ISS_002` have only 2 | Low to moderate depth. |
+| **Status code assertion** | Present in 16 of 18 requests | Missing in the first step of `TC_SEARCH_E2E_001` and `TC_SEARCH_E2E_002`. |
+| **Expected pass rate** | **99 / 101 assertions** if the live API behaves as the tests expect | The 2 expected failures come from the misplaced folder script (see 5.7.3). **[confirm in Runner]** |
+| **Execution Platforms** | Not provided in the files I received | No Newman command, report or screenshot to review. |
+
+---
+
+#### 5.7.2 Test Typology & Complexity Assessment
+
+```mermaid
+pie title Rosa - GitHub Search Test Typology (16 Test Cases)
+    "Functional / happy path (6 TCs / 37.5%)" : 6
+    "Authorization & rate limit (2 TCs / 12.5%)" : 2
+    "Empty result (2 TCs / 12.5%)" : 2
+    "Boundary - per_page (2 TCs / 12.5%)" : 2
+    "Pagination (2 TCs / 12.5%)" : 2
+    "E2E chains (2 TCs / 12.5%)" : 2
+```
+
+1. **Functional / Happy Path (6 cases):**
+   - Search by language (`GET_001`), response structure with `total_count`, `incomplete_results` and `items` (`GET_002`), filter by stars (`GET_003`), complex qualifiers `created:>2023-01-01 language:go` (`GET_010`), issues by repository (`ISS_001`) and issues by state (`ISS_002`).
+   - `GET_003` is the best assertion of the group, because it uses `every()` to check the filter on all returned items.
+
+2. **Authorization & Rate-limit Telemetry (2 cases):**
+   - `TC_AUTH_001` (`GET /user`) asserts `X-RateLimit-Limit: 5000`, and `TC_SEARCH_GET_001` and `GET_009` assert the Search API limits (`30` authenticated and `10` unauthenticated per minute). Using the limit header to prove that the token was really applied is a good, non-intrusive idea.
+
+3. **Empty-result Scenarios (2 cases):**
+   - `GET_004` and `ISS_003` search for a term that does not exist and expect an empty `items` array.
+   - **Gap:** there is **no real negative case**. No test sends a missing or invalid `q`, an invalid token, or an invalid qualifier, so no `401`, `403` or `422` error contract is verified, and error payloads are never checked.
+
+4. **Boundary (2 cases):**
+   - `GET_005` (`per_page=100`) and `GET_006` (`per_page=101`). They are useful, but both use `at.most(100)`, which passes even if the API returned a single item. A real boundary test should assert exactly `100`.
+   - **Gap:** the best-known limit of the Search API is not tested: only the first 1,000 results are available, so a request beyond that (for example `page=201` with `per_page=5`) should be rejected. Other missing edges are `per_page=0`, `page=0` and an oversized `q`.
+
+5. **Pagination (2 cases):**
+   - `GET_007` stores the IDs of page 1, and `GET_008` checks that page 2 has no overlap. The idea is right, but the check is fragile (see 5.7.3, point 3).
+
+6. **Stateful E2E (2 cases):**
+   - `E2E_001`: search a Python repository, store `full_name` and `language`, then `GET /repos/{full_name}` and compare. This is the only real chained flow of the suite and a good integrity check.
+   - `E2E_002`: it repeats the same two requests as `GET_007` and `GET_008` (`q=test`, `page=1` and `page=2`, `per_page=5`) with a different variable name, so it adds no new coverage.
+
+**Complexity level: basic.** The suite uses status codes, one or two body checks, environment-variable chaining and collection-level common assertions. It has no JSON Schema, no `pm.sendRequest`, no dynamic data and no negative or error-contract tests.
+
+---
+
+#### 5.7.3 Deep Technical Analysis of the Main Findings
+
+Rosa did not submit an execution report, so there is no "single failure" to analyze. Reading the scripts shows five points that affect the results.
+
+1. **Misplaced folder-level script in `00_Auth` (expected failure).**
+   The folder `00_Auth` contains a **folder-level test script** that checks `total_count > 0` and that `data.items[0].language` is `Python`. It looks like a leftover from a search request. Folder scripts run for every request inside the folder, so it runs for `TC_AUTH_001` (`GET /user`), whose body has no `total_count` and no `items`. Two of its three assertions should fail (`total_count` is not a number, and `data.items[0]` throws a `TypeError`), and `Status code is 200 OK` is reported twice. **[confirm in Runner]**
+
+2. **Vacuous assertions that pass with no data.**
+   `GET_010`, `ISS_001` and `ISS_002` wrap their assertions in `if (data.items && data.items.length > 0)`. If the API returns an empty list (or a rate-limited error body), the tests pass without checking anything. `GET_001` and `GET_003` handle this correctly with an explicit `pm.expect.fail(...)`.
+
+3. **Pagination checks that can pass without evidence.**
+   `GET_008` and `E2E_002 (Step 2)` read the previous page IDs with `JSON.parse(pm.environment.get("page1Ids") || "[]")`. If the first request did not run (or failed), the list is empty, the overlap is `0` and the test **passes**. In addition, `page1Ids` and `e2ePage1Ids` are written to the environment and never reset, so a stale value from a previous run can be used.
+
+4. **Titles that contradict the assertions.**
+   - `GET_006` is titled *"per_page=101 is rejected"*, but the test expects `200 OK` and a capped list (the title should say *"is capped at 100"*).
+   - `TC_AUTH_001` is titled *"authenticated user has higher **search** rate limit"*, but it calls `/user` and checks the core limit (`5000`), not the Search limit (`30`).
+   - `GET_009` is titled *"Returns public repositories only"* but only checks that `items` is an array.
+   - `GET_007` says *"Returns exactly 5 items or less"* while using `at.most(5)`.
+
+5. **First E2E steps without status check.**
+   `E2E_001` and `E2E_002` (first request) call `pm.response.json()` and `data.items.map(...)` outside any `pm.test`, and have no status assertion. With a `403` or `429` from the Search rate limit, the script throws an error instead of reporting a clean failed assertion.
+
+---
+
+### 5.8 Usability, Comprehensibility, and Implementation Architecture Evaluation
+
+| Evaluation Dimension | Implementation Strategy in Rosa's Suite | Technical Evaluation (Kevin Uruchi) |
+|---|---|---|
+| **Folder Hierarchy & Ordering** | `00_Auth`, `01_Search_Repos`, `02_Search_Issues`, `03_E2E`, with numeric prefixes. | **Good.** Clear and consistent with the course convention, and the run order is deterministic. |
+| **Request & Assertion Naming** | `TC_<MODULE>_<ENDPOINT>_<NNN> - <description>`; tags `[Body]`, `[Header]`, `[Accuracy]`, `[Boundary]`, `[Pagination]`, `[Integrity]`, `[Common]`. | **Good, with inconsistencies.** Status assertions are untagged (`Status code is 200 OK`) while the others are tagged. There is no `[Schema]` tag because there is no schema check. `E2E_002 (Step 2)` still ends with the word **"Copy"**, and four titles contradict their assertions (see 5.7.3). |
+| **Centralized Contract Scripts** | Collection-level pre-request script upserts `Accept: application/vnd.github+json` and `X-GitHub-Api-Version: {{apiVersion}}`; collection-level tests check response time, `Content-Type` (skipped on `204`) and `X-GitHub-Request-Id`. | **Good (DRY).** The version is pinned once in the variable `apiVersion = 2026-03-10`, and the SLA is configurable with `maxResponseTime` (5000 ms). |
+| **Authentication** | Each of the 17 authenticated requests repeats its own `Bearer {{githubToken}}`; `GET_009` has no auth. | **Improvable.** Authentication should be set once at collection level, with a `No Auth` override only in `GET_009` and the auth tests. |
+| **Variables & Chaining** | Environment variables for config (`searchKeyword`, `perPage`, `nonExistentTerm`) and for runtime state (`page1Ids`, `e2eRepoFullName`, `e2eRepoLanguage`, `e2ePage1Ids`). | **Good idea, partial execution.** The environment variable `page` is never used, many requests hard-code `5`, `100` or `page=1`, and the runtime variables are never reset. |
+| **Data Integrity Verification** | Only `E2E_001 (Step 2)`, which compares the repository detail with the search result. | **Partial.** The Search module is read-only, so there is nothing to persist, but the integrity idea could be applied to pagination and to the issue and repository counts. |
+| **Teardown & Cleanup** | None. | **Not required.** The suite only reads, so it leaves no data in the account. This is not a weakness. |
+| **Reproducibility & Delivery** | Collection and environment file (the token has no value in the export). | **Good for security**, no credential is exposed. **Needs improvement:** no Newman command, no report, and the Search API has a low rate limit (see 5.9). |
+| **Documentation** | The collection description is still Postman's default text (*"Welcome to Postman! This is your first collection"*), and there are no folder or request descriptions. | **Needs improvement.** There are no documented preconditions or run order, and `GET_008` and the E2E steps depend on earlier requests. |
+
+---
+
+### 5.9 Formal Feedback, QA Recommendations, and Technical Audit Report
+
+As reviewer of Rosa Poma's implementation, **Kevin Uruchi** issues the following formal feedback report:
+
+#### Key Strengths & Best Practices:
+
+1. **Clear, ordered structure.** Numbered folders, test-case IDs in the request names and tagged assertions make it easy to locate a failure and to follow the run order.
+2. **DRY contract and common checks.** The two required headers are injected once with a collection-level pre-request script, and the response-time, `Content-Type` and `X-GitHub-Request-Id` checks are written once. The SLA is a variable (`maxResponseTime`), so it can be changed without editing every request.
+3. **Rate-limit headers used as a contract check.** Asserting `30` (authenticated search), `10` (unauthenticated search) and `5000` (core API) both documents the limits and proves that the token was actually applied.
+4. **Meaningful accuracy assertions.** `GET_003` checks every returned item with `every()`, and `GET_001` and `GET_003` fail explicitly when the response is empty instead of passing silently.
+5. **A real chained flow.** `E2E_001` passes `full_name` and `language` from the search to the detail request and compares them, which is the right way to use shared variables.
+6. **Parameterized data.** Search keyword, page size and the non-existent term live in the environment, and the real token is not stored in the exported file.
+7. **Useful boundary discovery.** `GET_006` documents that GitHub caps `per_page` at 100 instead of rejecting it (the title only needs to say so).
+
+#### Constructive Recommendations & Opportunities for Improvement:
+
+1. **Remove the folder-level script from `00_Auth` (high priority).**  
+   Delete it, or move it into a search request, and make `TC_AUTH_001` check the identity with a real expected value:
+   ```javascript
+   pm.test("Status code is 200 OK", () => pm.response.to.have.status(200));
+   pm.test("[Header] Authenticated core rate limit is 5000/hr", () => {
+       pm.expect(pm.response.headers.get("X-RateLimit-Limit")).to.eql("5000");
+   });
+   pm.test("[Body] Login matches the token owner", () => {
+       pm.expect(pm.response.json().login).to.eql(pm.environment.get("githubLogin"));
+   });
+   ```
+   Also rename it so the title says what is tested (*core* rate limit), since the search limit is already checked in `GET_001`.
+
+2. **Make every assertion able to fail (high priority).**  
+   Replace the `if (data.items.length > 0)` guards with an explicit failure, and tighten the weak boundaries:
+   ```javascript
+   pm.test("[Accuracy] All items belong to octocat/Hello-World", () => {
+       pm.expect(data.items, "items must not be empty").to.have.length.above(0);
+       pm.expect(data.items.every(i => i.repository_url.includes("octocat/Hello-World"))).to.be.true;
+   });
+   pm.test("[Boundary] per_page=100 returns exactly 100 items", () => {
+       pm.expect(data.items).to.have.lengthOf(100);
+   });
+   ```
+   Use `eql(Number(pm.environment.get("perPage")))` in `GET_007`, and `eql(0)` directly in `ISS_003` instead of the `at.least(0)` plus manual `fail`.
+
+3. **Make the pagination checks fail when there is no evidence (high priority).**  
+   Reset the stored IDs before step 1 and require them in step 2:
+   ```javascript
+   // Page 1 (test script)
+   pm.environment.set("page1Ids", JSON.stringify(data.items.map(i => i.id)));
+
+   // Page 2 (test script)
+   const page1Ids = JSON.parse(pm.environment.get("page1Ids") || "[]");
+   pm.test("[Pagination] Page 1 IDs were captured", () => pm.expect(page1Ids).to.not.be.empty);
+   pm.test("[Pagination] Page 2 has no overlap with page 1", () => {
+       pm.expect(data.items.map(i => i.id).filter(id => page1Ids.includes(id))).to.be.empty;
+   });
+   ```
+
+4. **Add a status check and a guard to the first E2E steps.**  
+   Start `E2E_001` and `E2E_002` with `pm.test("Status code is 200 OK", ...)` and read the body inside the tests, so a rate-limited response gives a clean failed assertion instead of a script error.
+
+5. **Add real negative and boundary cases (high priority).**  
+   The suite has no error-contract test. Suggested cases, with the expected codes to be confirmed against the live API:
+   - invalid token → `401` with `"Bad credentials"`;
+   - missing `q` or an invalid qualifier → `422 Validation Failed`;
+   - a page beyond the first 1,000 results (for example `page=201&per_page=5`) → `422`;
+   - `per_page=0` and `page=0`;
+   - invalid `sort` or `order` values.
+   Assert `error.message` and the response `Content-Type` in each.
+
+6. **Remove the duplicated E2E coverage.**  
+   `E2E_002` repeats `GET_007` and `GET_008`. Either delete it, or turn it into a real flow such as search → take `items[0].owner.login` → `GET /users/{login}` and compare, or check that `total_count` is the same on page 1 and page 2.
+
+7. **Add JSON Schema validation.**  
+   Store a schema for the search response (`total_count`, `incomplete_results`, `items[]` with `id`, `full_name`, `language`, `stargazers_count`) in a variable and validate it with `pm.response.to.have.jsonSchema(...)`, as the other teams did.
+
+8. **Move authentication to collection level.**  
+   Configure `Bearer {{githubToken}}` once in the collection Authorization tab and set `No Auth` only on `GET_009`. This removes 17 duplicated blocks and avoids a request being sent unauthenticated by mistake.
+
+9. **Fix naming and documentation.**  
+   Rename `TC_SEARCH_E2E_002 (Step 2) ... Copy`, correct the four titles that contradict their assertions, replace the default collection description with the scope, preconditions and run order, and remove the unused `page` variable. Use `{{perPage}}` and `{{page}}` instead of hard-coded values.
+
+10. **Complete the automation activity with a rate-limit-aware Newman run.**  
+    The Search API allows only **30 requests per minute** (10 unauthenticated), much less than the core API, and this suite sends 15 authenticated search calls in one run. A second run within the same minute would be rejected. Deliver a command with a longer delay and a report:
+    ```bash
+    npx newman run GitHub_Search_SQE3.postman_collection.json \
+      -e GitHub_Search-SQE3..postman_environment.json \
+      --env-var "githubToken=<token>" \
+      --delay-request 2000 \
+      --reporters cli,htmlextra \
+      --reporter-htmlextra-export reports/search_newman_report.html \
+      --reporter-htmlextra-skipHeaders Authorization
+    ```
+
+11. **Extend coverage when time allows.**  
+    The Search module has seven endpoints. Besides repositories and issues, add at least `GET /search/users` and `GET /search/code` (the latter requires authentication), with their own happy-path, empty-result and boundary cases.
+
+#### Overall Audit Verdict:
+
+| Criterion | Assessment |
+|---|---|
+| **Complexity** | Basic: collection-level contract scripts and one real chained flow; no schema validation, no dynamic data and no error-contract tests. |
+| **Quantity** | Small: 16 test cases and 101 assertions, 53% of them generic; the smallest suite of the group, covering 2 of the 7 Search endpoints. |
+| **Typology** | Reasonable mix of functional, boundary, pagination and E2E cases, but **no negative scenario**, and one E2E that duplicates other tests. |
+| **Ease of use / understanding** | Clear structure and naming; reduced by the default collection description, contradicting titles, a misplaced folder script and the lack of a Newman run. |
+
+Rosa delivered a **clean, readable and well-organized base** for the Search module, with a correct use of collection-level headers, rate-limit assertions and a chained search-to-detail flow. To reach the level of the other teams she should (1) remove the misplaced folder script and fix the assertions that can pass without data, (2) add real negative and boundary cases, including the 1,000-result limit, (3) add schema validation and make the pagination checks fail without evidence, and (4) deliver a Newman run that respects the Search rate limit. These are focused changes, and the existing structure already supports them.
+
+---
 
 ## Team Participation
 
