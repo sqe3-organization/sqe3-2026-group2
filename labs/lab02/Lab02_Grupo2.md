@@ -2284,6 +2284,67 @@ Lucas Gabriel demonstrated **exceptional QA maturity** by deliberately maintaini
 
 ---
 
+### 5.1 Evaluation of Complexity, Quantity, and Test Typology (Reviewer: Valentina Molina Bustillos)
+
+**Reviewer:** Valentina Molina Bustillos (Group 2 — Notion API Testing Team)  
+**Reviewed Author:** Lilian Lopez  
+**Reviewed System Under Test (SUT):** GitHub REST API, Repositories Module  
+**Audited Scope:** Complete Repository CRUD Operations & End-to-End (E2E) Workflows (`29` Test Cases)
+
+---
+
+#### Quantitative Test Metrics & Scope Analysis
+
+Lilian Lopez's Postman collection exhibits a **high and well-justified level of technical complexity**. The automation suite implements **29 test cases** spanning complete **CRUD operations** over GitHub repositories alongside **2 End-to-End (E2E) workflows**. From a quantitative standpoint, the volume of implemented tests is well-proportioned and fully appropriate for the scope of Laboratory 02, balancing functional breadth across repository endpoints with deep contract and persistence verifications.
+
+| Evaluation Metric | Audited Value / Scope | Technical Assessment from Valentina Molina Bustillos |
+|---|---|---|
+| **Overall Complexity Level** | **High (Well-Justified)** | Combines asynchronous state verification (`pm.sendRequest`) and formal JSON Schema validation beyond standard checks. |
+| **Total Test Cases** | **29 test cases** | Appropriate and well-calibrated test volume for the laboratory scope across the GitHub Repositories module. |
+| **Functional CRUD Coverage** | **Complete CRUD Operations** | Covers full repository creation, retrieval, update, and deletion lifecycles on GitHub. |
+| **End-to-End (E2E) Flows** | **2 E2E workflows** | Validates multi-step stateful interactions across chained repository operations. |
+| **Schema Contract Depth** | **`pm.response.to.have.jsonSchema`** | Enforces structural response validation via JSON Schemas, exceeding the baseline status and body checks required by the activity. |
+
+---
+
+#### Test Typology & Complexity Assessment
+
+The evaluated test suite demonstrates strong variety across test categories, combining functional, negative, boundary, data integrity, and schema-level validations:
+
+```mermaid
+flowchart TD
+    subgraph LilianSuite ["GitHub Repositories Test Suite Typology (29 Test Cases)"]
+        direction TB
+        POS["Positive Cases: Full CRUD operations on GitHub repositories + 2 E2E flows"]
+        NEG["Negative Cases: Missing token, insufficient permissions, duplicate repository names"]
+        BND["Boundary Cases: Rate-limiting thresholds and operational limits"]
+        INT["Data Integrity Cases: Persistence verification via pm.sendRequest"]
+        SCH["Contract Schema Validation: Structural checks via pm.response.to.have.jsonSchema"]
+
+        POS --> NEG
+        NEG --> BND
+        BND --> INT
+        INT --> SCH
+    end
+```
+
+1. **Positive Functional Scenarios (Happy Path & E2E):**
+   - Covers complete **CRUD operations** over GitHub repositories as well as **2 End-to-End (E2E) flows** that verify sequential repository lifecycle behavior.
+
+2. **Negative Error Validation:**
+   - Evaluates authentication, authorization, and conflict handling under invalid conditions, specifically testing **missing authentication tokens**, **insufficient permissions**, and **duplicate repository names**.
+
+3. **Boundary & Rate-Limit Testing:**
+   - Exercises operational edge conditions through **rate-limiting boundary** checks to verify predictable API behavior under request quota constraints.
+
+4. **Data Integrity & Persistence Verification (`pm.sendRequest`):**
+   - Implements follow-up persistence checks using `pm.sendRequest` to confirm that repository state changes are genuinely committed on the server rather than relying solely on primary HTTP response payloads.
+
+5. **JSON Schema Structural Validation (`pm.response.to.have.jsonSchema`):**
+   - A standout technical highlight of Lilian Lopez's implementation is the systematic use of **JSON Schemas** (`pm.response.to.have.jsonSchema`) to validate the full structure of API responses, going well beyond the baseline HTTP status code and body property verifications requested in the activity.
+
+---
+
 ### 5.2 Usability, Comprehensibility, and Implementation Architecture Evaluation
 
 The usability and architectural ergonomics of Lucas Gabriel's Postman collection were evaluated across six operational criteria:
