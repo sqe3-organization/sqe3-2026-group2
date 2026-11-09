@@ -631,25 +631,42 @@ The collection [`Lab02_Grupo2_Valentina_CRUD.postman_collection.json`](./postman
 
 ---
 
+<!-- ===================================================================== SECCION 1 — ACTIVITY #2 (reemplaza el bloque "Karen Ivonne Cruz Alvarez — Module: [Pending Implementation]") ===================================================================== -->
+Karen Ivonne Cruz Alvarez — Module: Blocks
 
-#### Karen Ivonne Cruz Alvarez — Module: Blocks
+All 72 test cases designed in Laboratory 01 (KarenCruzTests.md — 68 endpoint test cases across the five Blocks endpoints plus 4 multi-step E2E scenarios, identified as TC_BLK_* and TC_E2E_BLK_*) were implemented in Postman inside postman/karen_cruz/Notion_Blocks_KarenCruz.postman_collection.json (paired with Notion_Blocks_Env.postman_environment.json), resulting in 81 executable HTTP requests (one per test case, except TC_E2E_BLK_001 and TC_E2E_BLK_003, which are chained across 6 and 5 sequential requests), each named TC_ID - <description>. Every request verifies the response in several layers: status code, Content-Type header, response time (SLA), response body / error contract, and data integrity (a follow-up GET that confirms the change was really stored or not applied).
 
-All **72 test cases** designed in Laboratory 01 (`KarenCruzTests.md` — 68 endpoint test cases across the five `Blocks` endpoints plus 4 multi-step E2E scenarios, identified as `TC_BLK_*` and `TC_E2E_BLK_*`) were implemented in Postman inside [`postman/karen_cruz/Notion_Blocks_KarenCruz.postman_collection.json`](./postman/karen_cruz/Notion_Blocks_KarenCruz.postman_collection.json) (paired with [`Notion_Blocks_Env.postman_environment.json`](./postman/karen_cruz/Notion_Blocks_Env.postman_environment.json)), resulting in **81 executable HTTP requests** (one per test case, except `TC_E2E_BLK_001` and `TC_E2E_BLK_003`, which are chained across 6 and 5 sequential requests), each named `TC_ID - <description>`. Every request verifies the response in several layers: status code, `Content-Type` header, response time (SLA), response body / error contract, and data integrity (a follow-up `GET` that confirms the change was really stored or not applied).
+Lab 01 Suite / Endpoint	Implemented Test Case IDs	Req. Count	Multi-Layer pm.test() Verifications Implemented
+PATCH /v1/blocks/{block_id}/children
+(01_PATCH_Append_Block_Children)	TC_BLK_APP_001 – TC_BLK_APP_018	18	Status: 200, 400, 401, 403, 404, 429.
+Headers & SLA: Content-Type: application/json, responseTime < 5000 ms, Retry-After on 429.
+Body / Schema: object === "list", results[] length equal to blocks sent (100 accepted, 101 rejected), block type and order preserved, parent.page_id, has_children on nested toggles, rich_text content (2000 vs 2001 chars) stored intact; error codes "validation_error", "object_not_found", "unauthorized", "restricted_resource", "missing_version", "invalid_json", "rate_limited".
+Data integrity: GET /v1/blocks/{id}/children shows the new blocks (or no new block after a rejected request).
+GET /v1/blocks/{block_id}
+(02_GET_Retrieve_Block)	TC_BLK_GET_001 – TC_BLK_GET_011	11	Status: 200, 400, 401, 403, 404.
+Headers & SLA: application/json, < 5000 ms.
+Body / Schema: object === "block", id equality, 32-char compact id normalized to 36-char hyphenated, type, parent, boolean has_children (without embedded children), ISO-8601 created_time / last_edited_time, in_trash; identical object_not_found for non-existent and non-shared blocks (no enumeration leak); nil UUID 404 vs 31/33-char 400.
+GET /v1/blocks/{block_id}/children
+(03_GET_Retrieve_Block_Children)	TC_BLK_CHL_001 – TC_BLK_CHL_014	14	Status: 200, 400, 401, 403, 404.
+Headers & SLA: application/json, < 5000 ms.
+Body / Schema: object === "list", type === "block", results[] bounds (=== 1 at page_size=1, === 100 at page_size=100), boolean has_more, next_cursor (null on leaf blocks), no duplicates or gaps across pages, parent.block_id of toggle children; out-of-range page_size (0, -1, 101) and malformed start_cursor rejected with "validation_error".
+PATCH /v1/blocks/{block_id}
+(04_PATCH_Update_Block)	TC_BLK_UPD_001 – TC_BLK_UPD_014	14	Status: 200, 400, 401, 403, 404.
+Headers & SLA: application/json, < 5000 ms.
+Body / Schema: same id, updated rich_text, to_do.checked toggled, in_trash true/false round trip, last_edited_time updated; mismatched payload type, non-boolean checked, trashed block and 2001-char content rejected; error codes "validation_error", "invalid_json", "missing_version", "restricted_resource".
+Data integrity: a failed update leaves the block unchanged (verified with GET).
+DELETE /v1/blocks/{block_id}
+(05_DELETE_Block)	TC_BLK_DEL_001 – TC_BLK_DEL_011	11	Status: 200, 400, 401, 403, 404.
+Headers & SLA: application/json, < 5000 ms.
+Body / Schema: object === "block", id equality, in_trash === true, deterministic (never 500) response on repeated deletion and nil UUID; restore through PATCH {"in_trash": false} returns original content.
+Data integrity: the deleted block no longer appears in the parent's children list; rejected deletions leave the block active.
+Chained & E2E Flows
+(06_E2E_Flows)	TC_E2E_BLK_001 – TC_E2E_BLK_004	13	Cross-request state parity between append, retrieve, update, delete and restore; 101 first-level blocks collected across 3 pages with no duplicates; nested toggle with exactly 2 children; insertion order A, B, C → A, C → A, B, C using after; read-only token allowed on GET but 403 restricted_resource on every write, with content unchanged.
 
-| Lab 01 Suite / Endpoint | Implemented Test Case IDs | Req. Count | Multi-Layer `pm.test()` Verifications Implemented |
-|-------------------------|---------------------------|------------|---------------------------------------------------|
-| **`PATCH /v1/blocks/{block_id}/children`**<br>(`01_PATCH_Append_Block_Children`) | `TC_BLK_APP_001` – `TC_BLK_APP_018` | 18 | **Status:** `200`, `400`, `401`, `403`, `404`, `429`.<br>**Headers & SLA:** `Content-Type: application/json`, `responseTime < 5000 ms`, `Retry-After` on `429`.<br>**Body / Schema:** `object === "list"`, `results[]` length equal to blocks sent (`100` accepted, `101` rejected), block `type` and order preserved, `parent.page_id`, `has_children` on nested toggles, `rich_text` content (`2000` vs `2001` chars) stored intact; error codes `"validation_error"`, `"object_not_found"`, `"unauthorized"`, `"restricted_resource"`, `"missing_version"`, `"invalid_json"`, `"rate_limited"`.<br>**Data integrity:** `GET /v1/blocks/{id}/children` shows the new blocks (or no new block after a rejected request). |
-| **`GET /v1/blocks/{block_id}`**<br>(`02_GET_Retrieve_Block`) | `TC_BLK_GET_001` – `TC_BLK_GET_011` | 11 | **Status:** `200`, `400`, `401`, `403`, `404`.<br>**Headers & SLA:** `application/json`, `< 5000 ms`.<br>**Body / Schema:** `object === "block"`, `id` equality, 32-char compact id normalized to 36-char hyphenated, `type`, `parent`, boolean `has_children` (without embedded `children`), ISO-8601 `created_time` / `last_edited_time`, `in_trash`; identical `object_not_found` for non-existent and non-shared blocks (no enumeration leak); nil UUID `404` vs 31/33-char `400`. |
-| **`GET /v1/blocks/{block_id}/children`**<br>(`03_GET_Retrieve_Block_Children`) | `TC_BLK_CHL_001` – `TC_BLK_CHL_014` | 14 | **Status:** `200`, `400`, `401`, `403`, `404`.<br>**Headers & SLA:** `application/json`, `< 5000 ms`.<br>**Body / Schema:** `object === "list"`, `type === "block"`, `results[]` bounds (`=== 1` at `page_size=1`, `=== 100` at `page_size=100`), boolean `has_more`, `next_cursor` (`null` on leaf blocks), no duplicates or gaps across pages, `parent.block_id` of toggle children; out-of-range `page_size` (`0`, `-1`, `101`) and malformed `start_cursor` rejected with `"validation_error"`. |
-| **`PATCH /v1/blocks/{block_id}`**<br>(`04_PATCH_Update_Block`) | `TC_BLK_UPD_001` – `TC_BLK_UPD_014` | 14 | **Status:** `200`, `400`, `401`, `403`, `404`.<br>**Headers & SLA:** `application/json`, `< 5000 ms`.<br>**Body / Schema:** same `id`, updated `rich_text`, `to_do.checked` toggled, `in_trash` true/false round trip, `last_edited_time` updated; mismatched payload type, non-boolean `checked`, trashed block and `2001`-char content rejected; error codes `"validation_error"`, `"invalid_json"`, `"missing_version"`, `"restricted_resource"`.<br>**Data integrity:** a failed update leaves the block unchanged (verified with `GET`). |
-| **`DELETE /v1/blocks/{block_id}`**<br>(`05_DELETE_Block`) | `TC_BLK_DEL_001` – `TC_BLK_DEL_011` | 11 | **Status:** `200`, `400`, `401`, `403`, `404`.<br>**Headers & SLA:** `application/json`, `< 5000 ms`.<br>**Body / Schema:** `object === "block"`, `id` equality, `in_trash === true`, deterministic (never `500`) response on repeated deletion and nil UUID; restore through `PATCH {"in_trash": false}` returns original content.<br>**Data integrity:** the deleted block no longer appears in the parent's `children` list; rejected deletions leave the block active. |
-| **Chained & E2E Flows**<br>(`06_E2E_Flows`) | `TC_E2E_BLK_001` – `TC_E2E_BLK_004` | 13 | Cross-request state parity between append, retrieve, update, delete and restore; `101` first-level blocks collected across 3 pages with no duplicates; nested toggle with exactly `2` children; insertion order `A, B, C` → `A, C` → `A, B, C` using `after`; read-only token allowed on `GET` but `403 restricted_resource` on every write, with content unchanged. |
+Every request script starts with a shared helper prelude (call() wrapper over pm.sendRequest throttled to stay under Notion's ~3 requests/second, block builders such as para() / toggle(), sandbox() / cleanup(), and the assertion helpers std(), isErr() and errResp()). The two scripts below show the case-specific part.
 
-Every request script starts with a shared helper prelude (`call()` wrapper over `pm.sendRequest` throttled to stay under Notion's `~3 requests/second`, block builders such as `para()` / `toggle()`, `sandbox()` / `cleanup()`, and the assertion helpers `std()`, `isErr()` and `errResp()`). The two scripts below show the case-specific part.
-
-##### Representative Postman Script 1 — Negative & Error Contract Validation (`Blocks` Module: `TC_BLK_GET_008`)
-
-```javascript
+Representative Postman Script 1 — Negative & Error Contract Validation (Blocks Module: TC_BLK_GET_008)
+javascript
 // [Pre-request Script] Intentionally send a syntactically invalid block_id
 // Request: GET {{NOTION_BASE_URL}}/v1/blocks/{{target_id}}
 setTarget("invalid-block-id-123");
@@ -668,11 +685,8 @@ const isErr = (name, body, status, code) => pm.test(name, () => {
 const errResp = (id, status, code) => { std(id, status); isErr(`${id} - Error contract matches Notion error payload (${code})`, J(pm.response), status, code); };
 
 errResp("TC_BLK_GET_008", 400, "validation_error");
-```
-
-##### Representative Postman Script 2 — Preconditions, Data Integrity & Cleanup (`Blocks` Module: `TC_BLK_APP_001`)
-
-```javascript
+Representative Postman Script 2 — Preconditions, Data Integrity & Cleanup (Blocks Module: TC_BLK_APP_001)
+javascript
 // [Pre-request Script] Precondition created by API: an isolated sandbox page under PAGE_ID
 const sb = await sandbox("APP_001"); setTarget(sb); setBody({ children: [para("Hello")] });
 
@@ -692,10 +706,12 @@ pm.test(`${ID} - [Data integrity] GET returns the same block id and text`, () =>
 });
 // CLEANUP: Notion has no permanent delete, so the sandbox page (and its blocks) goes to the trash
 await cleanup();
-```
 
+Karen Cruz - Test Results of the Blocks module (PASS badges)
 ![Karen Cruz - Test Results of the Blocks module (PASS badges)](./caps/Karen/actividad2-1.png)
 
+
+Karen Cruz - Test Results of a negative / boundary contract check
 ![Karen Cruz - Test Results of a negative / boundary contract check](./caps/Karen/actividad2-2.png)
 
 ---
@@ -2001,18 +2017,16 @@ Executed against `Act1_Notion_Env`: 13 requests executed, **30 tests passed, 0 f
 
 ---
 
-#### Karen Ivonne Cruz Alvarez — Automated Execution Summary (`Blocks`)
+Karen Ivonne Cruz Alvarez — Automated Execution Summary (Blocks)
 
 Karen's collection follows the team conventions defined in section 4.1:
 
-| Convention Dimension | How it is applied in `Notion_Blocks_KarenCruz` |
-|----------------------|------------------------------------------------|
-| **Folder hierarchy** | One folder per endpoint (`01_PATCH_Append_Block_Children`, `02_GET_Retrieve_Block`, `03_GET_Retrieve_Block_Children`, `04_PATCH_Update_Block`, `05_DELETE_Block`) and `06_E2E_Flows` last. |
-| **Request ordering** | Inside every endpoint folder: `Happy Path` → `Negative` → `Boundary`, following the numeric order of `KarenCruzTests.md`. Destructive and permission flows live in the final `06_E2E_Flows` folder. |
-| **Naming** | Request name `TC_ID - <description>`. Assertions prefixed with `<TC_ID> - <Check>`; data integrity checks start with `[Data integrity]`. Static config and secrets in `UPPER_SNAKE_CASE` (`NOTION_TOKEN`), dynamic chained variables in `lower_snake_case` (`created_block_id`). |
-| **Execution isolation** | Each case creates its own blocks and trashes them at the end, so any case can run alone or in any folder selection. |
-
-```bash
+Convention Dimension	How it is applied in Notion_Blocks_KarenCruz
+Folder hierarchy	One folder per endpoint (01_PATCH_Append_Block_Children, 02_GET_Retrieve_Block, 03_GET_Retrieve_Block_Children, 04_PATCH_Update_Block, 05_DELETE_Block) and 06_E2E_Flows last.
+Request ordering	Inside every endpoint folder: Happy Path → Negative → Boundary, following the numeric order of KarenCruzTests.md. Destructive and permission flows live in the final 06_E2E_Flows folder.
+Naming	Request name TC_ID - <description>. Assertions prefixed with <TC_ID> - <Check>; data integrity checks start with [Data integrity]. Static config and secrets in UPPER_SNAKE_CASE (NOTION_TOKEN), dynamic chained variables in lower_snake_case (created_block_id).
+Execution isolation	Each case creates its own blocks and trashes them at the end, so any case can run alone or in any folder selection.
+bash
 # Full automated suite execution with CLI and HTML dashboard report
 npx newman run postman/karen_cruz/Notion_Blocks_KarenCruz.postman_collection.json \
   -e postman/karen_cruz/Notion_Blocks_Env.postman_environment.json \
@@ -2027,22 +2041,25 @@ npx newman run postman/karen_cruz/Notion_Blocks_KarenCruz.postman_collection.jso
   --folder "03_GET_Retrieve_Block_Children" \
   --delay-request 400 \
   --timeout-script 600000
-```
 
-The delay is `400 ms` between requests, and the helper calls made from the scripts add their own `340 ms` pause (`--delay-request` does not apply to `pm.sendRequest`), to stay below Notion's `~3 requests/second` limit, and `--timeout-script 600000` is needed because some cases create `100` and `101` blocks (`TC_BLK_CHL_013`, `TC_E2E_BLK_002`).
+The delay is 400 ms between requests, and the helper calls made from the scripts add their own 340 ms pause (--delay-request does not apply to pm.sendRequest), to stay below Notion's ~3 requests/second limit, and --timeout-script 600000 is needed because some cases create 100 and 101 blocks (TC_BLK_CHL_013, TC_E2E_BLK_002).
 
-| Execution Metric | Value / Specification |
-|------------------|-----------------------|
-| **Collection File** | [`postman/karen_cruz/Notion_Blocks_KarenCruz.postman_collection.json`](./postman/karen_cruz/Notion_Blocks_KarenCruz.postman_collection.json) |
-| **Environment File** | [`postman/karen_cruz/Notion_Blocks_Env.postman_environment.json`](./postman/karen_cruz/Notion_Blocks_Env.postman_environment.json) |
-| **Lab 01 Test Cases Covered** | **72 Test Cases** (`18` append + `11` retrieve + `14` children + `14` update + `11` delete + `4` E2E) |
-| **Total Automated Requests** | **81 HTTP Requests** (`18` + `11` + `14` + `14` + `11` endpoint requests and `13` in `06_E2E_Flows`) |
-| **Total `pm.test()` Assertions** | **[COMPLETAR: numero que muestra el Runner]** |
-| **Passed / Failed / Skipped** | **[COMPLETAR]** (skipped = cases whose optional environment variable is empty) |
-| **Runner Configuration** | Iterations: `1` \| Inter-request Delay: `400 ms` \| Persist Variables: `Enabled` |
+Execution Metric	Value / Specification
+Collection File	postman/karen_cruz/Notion_Blocks_KarenCruz.postman_collection.json
+Environment File	postman/karen_cruz/Notion_Blocks_Env.postman_environment.json
+Lab 01 Test Cases Covered	72 Test Cases (18 append + 11 retrieve + 14 children + 14 update + 11 delete + 4 E2E)
+Total Automated Requests	81 HTTP Requests (18 + 11 + 14 + 14 + 11 endpoint requests and 13 in 06_E2E_Flows)
+Total pm.test() Assertions	[COMPLETAR: numero que muestra el Runner]
+Passed / Failed / Skipped	[COMPLETAR] (skipped = cases whose optional environment variable is empty)
+Runner Configuration	Iterations: 1 | Inter-request Delay: 400 ms | Persist Variables: Enabled
 
+Finding from the first execution against the real API (TC_BLK_APP_017): the Lab 01 expected result said that toggle → toggle → paragraph (3 blocks deep) must be rejected with 400 validation_error, but Notion answered 200 OK and created the blocks. The Notion reference for Append block children states that up to two levels of nesting are allowed in a single request, which means the top-level block plus two nested levels (3 blocks deep) is valid. The test case was corrected: toggle → toggle → paragraph (two nested levels) is now the accepted case (200 OK), and toggle → toggle → toggle → paragraph (three nested levels) is the rejected boundary (400 validation_error). This is a defect in the Lab 01 test design found by the automation, not in the API.
+
+Karen Cruz - Postman Collection Runner summary
 ![Karen Cruz - Postman Collection Runner summary](./caps/Karen/actividad4-1.png)
 
+
+Karen Cruz - Newman CLI terminal output
 ![Karen Cruz - Newman CLI terminal output](./caps/Karen/actividad4-2.png)
 
 

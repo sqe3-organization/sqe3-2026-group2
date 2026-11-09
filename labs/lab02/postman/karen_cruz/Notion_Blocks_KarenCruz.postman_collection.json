@@ -1,6 +1,6 @@
 {
   "info": {
-    "_postman_id": "a577766a-8bbc-4772-af92-e73308e1451e",
+    "_postman_id": "3df88ed4-6b05-41bf-bf6d-94342efd2827",
     "name": "Notion_Blocks_KarenCruz",
     "description": "Notion REST API (2025-09-03) - Blocks module. 72 test cases from KarenCruzTests.md (TC_BLK_* and TC_E2E_BLK_*). Author: Karen Ivonne Cruz Alvarez.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
@@ -3703,7 +3703,7 @@
           }
         },
         {
-          "name": "TC_BLK_APP_017 - [Boundary] Nesting depth: 2 levels accepted, 3 levels rejected",
+          "name": "TC_BLK_APP_017 - [Boundary] Nesting depth: 2 nested levels accepted, 3 nested levels rejected",
           "event": [
             {
               "listen": "prerequest",
@@ -3788,7 +3788,7 @@
                   "",
                   "(async () => {",
                   "reset();",
-                  "const sb = await sandbox(\"APP_017\"); setTarget(sb); setBody({ children: [toggle(\"L1\", [toggle(\"L2\", [])])] });",
+                  "const sb = await sandbox(\"APP_017\"); setTarget(sb); setBody({ children: [toggle(\"L1\", [toggle(\"L2\", [para(\"L3\")])])] });",
                   "})();"
                 ]
               }
@@ -3878,8 +3878,10 @@
                   "(async () => {",
                   "if (!SKIP) {",
                   "std(ID, 200);",
-                  "const r2 = await call(\"PATCH\", `/v1/blocks/${V(\"sandbox_id\")}/children`, { children: [toggle(\"L1\", [toggle(\"L2\", [para(\"L3\")])])] });",
-                  "step(`${ID} Step2 (3 levels)`, r2, 400, \"validation_error\");",
+                  "const first = (J(pm.response).results || [])[0] || {};",
+                  "pm.test(`${ID} Step1 - Toggle with two nested levels (toggle -> toggle -> paragraph) accepted`, () => { pm.expect(first.type).to.eql(\"toggle\"); pm.expect(first.has_children).to.eql(true); });",
+                  "const r2 = await call(\"PATCH\", `/v1/blocks/${V(\"sandbox_id\")}/children`, { children: [toggle(\"L1\", [toggle(\"L2\", [toggle(\"L3\", [para(\"L4\")])])])] });",
+                  "step(`${ID} Step2 (three nested levels)`, r2, 400, \"validation_error\");",
                   "await cleanup();",
                   "}",
                   "})();"
@@ -3919,7 +3921,7 @@
                 "children"
               ]
             },
-            "description": "[Boundary] Nesting depth: 2 levels accepted, 3 levels rejected",
+            "description": "[Boundary] Nesting depth: 2 nested levels accepted, 3 nested levels rejected",
             "body": {
               "mode": "raw",
               "raw": "{}",
