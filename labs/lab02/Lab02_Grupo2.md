@@ -2190,72 +2190,158 @@ This automated CI/CD pipeline guarantees that any regression in Notion API versi
 2. Evaluate the ease of use and understandability of the implementation by other teams.
 3. Generate an evaluation and peer-review feedback report.
 
-### 5.1 Evaluation of External Team's Implementation (Complexity, Quantity, and Test Classification)
+### 5.1 Evaluation of Complexity, Quantity, and Test Typology (Reviewer: Sebastián Pereyra)
 
-As part of the cross-team quality assurance evaluation protocol for Laboratory 02, **Group 2** conducted an external peer review of the API automation test suite implemented by **Group 1** (targeting the Spotify Web API v1). The evaluation was conducted jointly with primary analytical contributions from **Sebastián Pereyra** and **Valentina Molina Bustillos**, focusing on technical complexity, test coverage volume, and categorical distribution.
-
-#### Quantitative and Categorical Distribution Analysis
-
-The evaluated external suite comprises **42 implemented requests** distributed across 4 domain modules (`Playlists`, `Tracks`, `Albums`, and `Users/Profile`):
-
-| Evaluation Metric | Observed Value (Group 1 Suite) | Group 2 Technical Assessment | QA Maturity Rating |
-|---|---|---|---|
-| **Total Requests Implemented** | 42 test requests | Sufficient breadth covering core CRUD operations across target resources. | Satisfactory |
-| **Happy Path Coverage** | 22 tests (52.4%) | Comprehensive validation of successful resource retrieval, creation, and mutation. | High |
-| **Negative Error Scenarios** | 12 tests (28.6%) | Validation of `401 Unauthorized` (expired OAuth token) and `404 Not Found`. Lacks coverage of `403 Forbidden` on private playlists. | Moderate |
-| **Boundary & Limits Scenarios** | 5 tests (11.9%) | Basic boundary checks on `limit` query parameters (`limit=0`, `limit=50`). Omission of extreme boundary payloads. | Needs Improvement |
-| **Multi-request E2E Workflows** | 3 tests (7.1%) | 1 chained workflow (Create Playlist → Add Track → Reorder Tracks). Demonstrates basic inter-request state passing. | Moderate |
-| **Average Assertions per Request** | 2.1 assertions | Primarily asserts status code and single property existence (`pm.expect(res.id).to.exist`). Lacks strict schema and latency SLA assertions. | Moderate |
-
-#### Technical Complexity Evaluation
-- **Strengths:** Group 1 demonstrated effective handling of Spotify's OAuth 2.0 Authorization Code Flow with Refresh Tokens via collection-level pre-request scripts, ensuring automated token refreshing before test runs.
-- **Identified Deficiencies:**
-  1. *Insufficient Assertion Depth:* Over 40% of test scripts assert solely `pm.response.to.have.status(200)` without inspecting the response body schema, leaving contract regressions undetected if the payload structure mutates.
-  2. *Hardcoded Resource IDs:* Several requests rely on hardcoded Spotify Track and Playlist IDs rather than dynamically generated fixtures, causing tests to fail if the external entity is modified or removed.
-  3. *Absence of Response Latency Assertions:* Non-functional performance SLAs were not audited across the collection.
+**Reviewer:** Sebastián Pereyra (Group 2 — Notion API Testing Team)  
+**Reviewed Author:** Lucas Gabriel De Los Santos  
+**Reviewed System Under Test (SUT):** GitHub REST API (`version: 2026-03-10`), Issues Module  
+**Audited Artifacts:**
+- Postman Collection: `GitHub_Issues_SQE3.postman_collection.json`
+- Postman Environment: `GitHub_Issues_SQE3.postman_environment.json`
+- Automated CLI Test Execution Report: `newman_report.html` (Newman v6.2.3 / HTML Extra)
+- Execution Timestamp: November 07, 2026
 
 ---
 
-### 5.2 Usability, Comprehensibility, and Setup Evaluation
+#### 5.1.1 Quantitative Test Metrics & Scope Analysis
 
-The team evaluated the operational ease of importing, configuring, and executing Group 1's collection and environment files in a clean Postman workspace.
+Lucas Gabriel transitioned all **28 test scenarios** designed in Laboratory 01 into an executable Postman automation suite, expanding them with **2 dedicated authorization baseline requests**, resulting in **30 formal test cases** mapped across **42 executable HTTP transactions** (including setup helpers, multi-step E2E sequences, and automated teardown routines).
 
-| Usability Dimension | Observed Implementation | Evaluation & Impact |
+```mermaid
+pie title Lucas Gabriel - GitHub Issues Execution Results (30 Test Cases)
+    "Passed Test Cases (96.7%)" : 29
+    "Failed Test Cases (3.3% - Known API Defect)" : 1
+```
+
+The quantitative audit of the test suite execution against GitHub's live production API (`https://api.github.com`) reveals the following metrics:
+
+| Execution Metric | Audited Value | Technical Assessment from Sebastián Pereyra |
 |---|---|---|
-| **Documentation & Readme** | Minimal collection description; missing request-level markdown descriptions. | **Moderate**: Requires inspecting raw payloads to infer test intent. |
-| **Environment Configuration** | Environment file provided with clear initial value placeholders (`SPOTIFY_CLIENT_ID`, `SPOTIFY_REFRESH_TOKEN`). | **High**: Fast onboarding; tokens are appropriately decoupled from the collection. |
-| **Secret Isolation (`type: "secret"`)** | `SPOTIFY_CLIENT_SECRET` configured as `type: "default"` (plain text). | **Critical Security Flaw**: Secret credentials were not masked in the Postman UI, risking leakage during demonstrations. |
-| **Folder Hierarchy & Order** | Flat folder structure organized strictly by HTTP resource (`/playlists`, `/tracks`). | **Moderate**: Lacks explicit separation between Happy Path, Negative, and Boundary test folders. |
-| **Execution Determinism in Runner** | Executed in Collection Runner with 1 iteration. 39 passed, 3 failed due to race conditions on shared track order. | **Moderate**: Tests depend on previous state without automated pre/postcondition cleanup. |
+| **Total Test Cases** | **30 test cases** (28 functional + 2 authorization) | Rigorous scope providing 100% traceability to Lab 01 specifications. |
+| **Total Executed Requests** | **42 HTTP requests** (41 test requests + 1 teardown loop) | Includes granular CRUD, lock/unlock operations, and multi-step chains. |
+| **Total Automated Assertions** | **217 `pm.test()` assertions** | High assertion density: an average of **5.16 assertions per request**. |
+| **Assertion Pass Rate** | **216 Passed / 1 Failed (99.54% assertion success)** | Near-perfect execution across status, headers, body, and schema layers. |
+| **Test Case Pass Rate** | **29 Passed / 1 Failed (96.7% test success)** | Single planned failure caused by an upstream GitHub API behavior. |
+| **Average Response Time** | **~480 ms – 636 ms** | Within acceptable latency boundaries for international cloud REST services. |
+| **Execution Platforms** | Postman Desktop (v12) & Newman CLI (v6.2.3) | Proven cross-runtime compatibility between desktop UI and headless CI/CD. |
 
 ---
 
-### 5.3 Peer-Review Feedback and Recommendations Report
+#### 5.1.2 Test Typology & Complexity Assessment
 
-Based on the empirical audit, Group 2 formulated the following concrete recommendations for Group 1:
+The suite demonstrates a well-balanced distribution across all four test categories established in the course conventions:
 
-1. **Enforce Multi-Tier Assertion Framework:**
-   Upgrade single-line status assertions to multi-tier verifications inspecting HTTP status, response time SLA (`< 2000ms`), contractual headers (`Content-Type: application/json; charset=utf-8`), and deep schema validation:
+```mermaid
+flowchart TD
+    subgraph SuiteComposition ["GitHub Issues Test Suite Typology (30 Test Cases)"]
+        direction TB
+        HP["Happy Path (14 TCs / 46.7%)<br>Resource creation, retrieval, updates, label assignment, lock/unlock"]
+        NEG["Negative Scenarios (8 TCs / 26.7%)<br>Missing/invalid tokens (401), invalid payloads (422), unshared repos (404/403)"]
+        BND["Boundary Scenarios (6 TCs / 20.0%)<br>1-char titles, 65,537-char overflow bodies, >100 issues pagination"]
+        E2E["Stateful E2E Chains (2 TCs / 6.6%)<br>10-step full lifecycle (E2E_001), 3-step permission boundary (E2E_002)"]
+        
+        HP --> NEG
+        NEG --> BND
+        BND --> E2E
+    end
+```
+
+1. **Authorization & Rate-Limit Telemetry Checks (2 Cases):**
+   - `TC_ISS_AUTH_001` (`GET /user` with Bearer token): Validates authenticated identity (`login: "lucasgabrieldls"`, numeric ID `350013379`) returning `200 OK` and `X-RateLimit-Limit: 5000`.
+   - `TC_ISS_AUTH_002` (`GET /repos/octocat/Hello-World` unauthenticated): Validates public repository consumption returning `200 OK` and `X-RateLimit-Limit: 60`.
+   - *Technical Review Insight:* Verifying the rate-limit cap differential (5,000 req/h for authenticated requests vs. 60 req/h for anonymous calls) is an elegant, non-intrusive method to cryptographically confirm token injection at the transport layer without inspecting raw Authorization headers.
+
+2. **Positive Functional Checks (Happy Path — 14 Cases):**
+   - Covers comprehensive issue lifecycle: creation with title, body, labels, and assignees (`TC_ISS_POST_001`, `POST_002`); state mutations between `open` and `closed` (`PATCH_001`, `PATCH_003`); issue locking with reason (`LOCK_001`, `LOCK_002` returning `204 No Content`); and filtered queries by state and milestone (`GET_001`, `GET_002`).
+
+3. **Negative Error Validation (8 Cases):**
+   - Validates RFC-compliant client error contracts: `401 Unauthorized` on missing or malformed tokens (`POST_003`, `POST_004`), `404 Not Found` when targeting non-existent repositories or ghost issue numbers (`POST_006`, `PATCH_005`), and `422 Unprocessable Entity` when submitting bodies lacking mandatory title keys (`POST_005`).
+
+4. **Boundary & Extreme Load Testing (6 Cases):**
+   - `TC_ISS_POST_007`: Tests minimum string boundary with a 1-character title (`"x"`), confirming that GitHub accepts single-character issue titles (`201 Created`).
+   - `TC_ISS_POST_008`: Tests maximum body boundary by submitting a payload of **65,537 characters** (exceeding GitHub's hard limit of 65,536 characters). Lucas solved this without manual copy-pasting by authoring a pre-request script that dynamically constructs `'x'.repeat(65537)`, confirming that GitHub rejects the payload with `422 Unprocessable Entity` and immediately garbage-collects the variable.
+   - `TC_ISS_GET_004`, `GET_007`, `GET_008`: Boundary checks on pagination traversals across large public datasets (`octocat/Hello-World` having `> 100` issues), asserting cursor consistency via `Link rel="next"` response headers.
+
+5. **Stateful End-to-End (E2E) Integration Workflows (2 Cases):**
+   - `E2E_001` (Complete 10-step Lifecycle): Chained flow creating an issue, retrieving it, mutating attributes, adding labels, locking the conversation, unlocking, and verifying state transitions across 10 sequential HTTP calls (46/46 assertions passed).
+   - `E2E_002` (Cross-Repository Permission Boundary): Multi-step security workflow asserting that an authenticated integration without push access to an external repository (`octocat/Hello-World`) receives strict `403 Forbidden` / `404 Not Found` rejections when attempting write mutations (12/12 assertions passed).
+
+---
+
+#### 5.1.3 Deep Technical Analysis of the Single Failure (`TC_ISS_PATCH_006`)
+
+The sole failing test in Lucas's execution report was:
+- **Test ID:** `TC_ISS_PATCH_006 - Verify that an issue cannot be updated with an invalid state`
+- **Method & Endpoint:** `PATCH {{baseUrl}}/repos/{{owner}}/{{repo}}/issues/{{issueNumber}}`
+- **Sent Body:** `{"state": "invalid_state_xyz"}`
+- **Expected Outcome:** `422 Unprocessable Entity` (`pm.response.to.have.status(422)`)
+- **Observed Outcome:** `HTTP 200 OK` (GitHub accepted the request, ignored the invalid state string, and left the issue in its prior state).
+
+##### QA Evaluation: Defect Reporting vs. Test Manipulation
+In automated QA engineering, junior testers frequently commit the mistake of modifying their expected assertions (e.g., changing expected status from `422` to `200`) simply to make the test runner report 100% green. 
+
+Lucas Gabriel demonstrated **exceptional QA maturity** by deliberately maintaining the assertion at `422 Unprocessable Entity`. Because GitHub's documentation specifies that `state` is an enum constrained strictly to `["open", "closed"]`, accepting an undocumented string without raising a validation error constitutes an intrinsic API contract bug (silent failure / permissive input validation). Maintaining the test failure serves as automated regression evidence of an upstream defect, rather than accumulating testing debt.
+
+---
+
+### 5.2 Usability, Comprehensibility, and Implementation Architecture Evaluation
+
+The usability and architectural ergonomics of Lucas Gabriel's Postman collection were evaluated across six operational criteria:
+
+| Evaluation Dimension | Implementation Strategy in Lucas's Suite | Technical Evaluation (Sebastián Pereyra) |
+|---|---|---|
+| **Folder Hierarchy & Ordering** | Numbered folder prefixes: `00 - Setup`, `01 - POST`, `02 - PATCH`, `03 - GET`, `04 - Lock`, `05-06 - E2E`, `99 - Teardown`. | **Excellent**: Enforces deterministic top-to-bottom sequential execution in Postman Collection Runner and Newman without requiring manual folder selection. |
+| **Request & Assertion Naming** | Requests named `TC_<ID> - <Description>`; assertions tagged with `[Body]`, `[Header]`, `[Schema]`, `[Integrity]`, `[Common]`. | **Outstanding**: Enables instantaneous fault localization in Newman CLI logs; an engineer immediately identifies whether a failure relates to transport, schema, or business logic. |
+| **Centralized Contract Scripts** | Collection-level Pre-request script injects `Accept: application/vnd.github+json` and `X-GitHub-Api-Version: {{apiVersion}}`. | **Optimal (DRY)**: Eliminates header redundancy across 42 requests and guarantees strict GitHub API version pinning (`2026-03-10`). |
+| **Common Collection Assertions** | Global Test script checks response time (`< 2000 ms`), JSON content-type (omitting `204 No Content`), and `X-GitHub-Request-Id`. | **High**: Non-functional SLAs and distributed tracing headers are audited uniformly across the entire attack surface. |
+| **Data Integrity Verification** | Follow-up `pm.sendRequest` GET requests executed immediately after write calls (`POST_001`, `PATCH_001`, `LOCK_001`). | **Exceptional**: Validates true database persistence on the remote server, preventing false positives caused by echoing mock responses. |
+| **Automated Teardown & Cleanup** | Dedicated `99 - Teardown` folder closes all issues tracked in `createdIssues` array (`state: "closed"`, `state_reason: "not_planned"`). | **Outstanding**: Solves GitHub API's limitation of having no issue deletion endpoint, ensuring test runs leave zero clutter in user repositories. |
+
+---
+
+### 5.3 Formal Feedback, QA Recommendations, and Technical Audit Report
+
+As reviewer of Lucas Gabriel De Los Santos's implementation, **Sebastián Pereyra** issues the following formal feedback report:
+
+#### Key Strengths & Best Practices:
+
+1. **Formal JSON Schema Validation via `ajv` (`pm.response.to.have.jsonSchema`):**  
+   Lucas defined two centralized JSON schemas stored in collection variables (`issueSchema` and `errorSchema`), validating required properties, data types, and enum constraints across all responses. This represents a substantial leap in contract validation rigor compared to basic null checks.
+2. **Promise-Wrapped `pm.sendRequest` for Newman v6.x Compatibility:**  
+   To avoid asynchronous race conditions and callback nesting issues during CLI execution, Lucas wrapped `pm.sendRequest` within native JavaScript Promises (`await sendRequest(...)`). This guarantees that Newman halts sequential execution until dynamic setup requests resolve completely.
+3. **Environment Security & Credential Isolation:**  
+   The personal access token (`githubToken`) is maintained strictly in the *Current Value* of a masked variable (`type: "secret"`). When executed via Newman, credentials are passed via CLI flags (`--env-var "githubToken=<token>"`), and sensitive headers are suppressed from test reports using `--reporter-htmlextra-skipHeaders Authorization`.
+4. **Rate Limit Throttling in Headless Automation:**  
+   Lucas correctly identified GitHub's secondary rate limits (which penalize rapid successive write operations) and configured Newman with `--delay-request 500` (adding a 500 ms inter-request throttle). This ensured 100% deterministic execution without encountering false `403 secondary rate limit` rejections.
+
+#### Constructive Recommendations & Opportunities for Improvement:
+
+1. **Defect Tracking Annotation for Known API Failures (`TC_ISS_PATCH_006`):**  
+   While keeping `TC_ISS_PATCH_006` failing at status `422` is the correct QA stance, in continuous integration pipelines a red test halts deployment builds. It is recommended to implement a conditional assertion or a defect flag:
    ```javascript
-   // Recommended assertion upgrade:
-   pm.test("Playlist creation contract conforms to Spotify specification", function () {
-       pm.response.to.have.status(201);
-       pm.expect(pm.response.responseTime).to.be.below(2000);
-       const res = pm.response.json();
-       pm.expect(res.type).to.eql("playlist");
-       pm.expect(res.id).to.be.a("string").and.to.have.lengthOf(22);
-       pm.expect(res.public).to.be.a("boolean");
-   });
+   // Recommended pattern for documented upstream API defects:
+   const isDocumentedBug = true;
+   if (isDocumentedBug && pm.response.code === 200) {
+       console.warn("[UPSTREAM BUG CONFIRMED] GitHub Issue #XYZ: API accepts invalid state string instead of 422.");
+       pm.test("[Known Bug] API improperly accepted invalid state with 200 OK", function () {
+           pm.response.to.have.status(200);
+       });
+   } else {
+       pm.test("Status code is 422 Unprocessable Entity", function () {
+           pm.response.to.have.status(422);
+       });
+   }
    ```
+   This maintains visibility of the bug in logs without breaking unattended CI/CD test gates.
 
-2. **Remediate Credential Masking in Environment Variables:**
-   Immediately update `SPOTIFY_CLIENT_SECRET` and `SPOTIFY_REFRESH_TOKEN` to `type: "secret"` within the Postman Environment manager to ensure credentials remain masked on screen and are sanitized during exports.
+2. **Decoupling JSON Schemas from Collection Variables:**  
+   The schemas `issueSchema` and `errorSchema` are currently serialized as stringified JSON inside Postman Collection Variables (`"variable": [...]`). For complex schemas with dozens of nested fields, this inflates the collection file size. A best practice for large enterprise suites is storing raw JSON schemas in an external `/schemas` directory and loading them dynamically via Newman data files or Pre-request scripts.
 
-3. **Adopt Standardized Test Naming Conventions:**
-   Replace ambiguous request names (e.g., `New Request`, `Get Tracks 2`) with the standardized formula `[Módulo] - [Tipo] - Acción (Código esperado)` to enable instant diagnostic traceability in CLI/Newman test reports.
+3. **Status Code Flexibility in Permission Boundaries (`E2E_002`):**  
+   In `E2E_002`, Lucas checked `pm.expect(pm.response.code).to.be.oneOf([403, 404])`. While this accommodates GitHub's security policy of returning `404` to conceal private repository existence, logging whether the response was `403` or `404` in the Postman Console provides immediate diagnostic clarity without requiring manual inspect-element on the response.
 
-4. **Implement Automated Teardown Hooks:**
-   Ensure all dynamically created playlists in E2E workflows are unfollowed/deleted (`DELETE /v1/playlists/{playlist_id}/followers`) at the end of the test run to guarantee idempotency and avoid cluttering the test account.
+#### Overall Audit Verdict:
+Lucas Gabriel De Los Santos delivered an **exceptionally mature, technically rigorous, and clean API automation suite**. The integration of multi-layer assertions, formal JSON Schema validation, data integrity verification via `pm.sendRequest`, and automated teardown makes this implementation an exemplary benchmark in automated API contract testing.
 
 ---
 
@@ -2263,9 +2349,10 @@ Based on the empirical audit, Group 2 formulated the following concrete recommen
 
 | Team Member | Lab 02 Contributions & Implemented Scope | Section/Item Worked On | Additional Comments & Status |
 |---|---|---|---|
-| **Sebastián Pereyra** | Implementation and verification of the `Databases` (POST, GET, PATCH) and `Search` (POST) modules in Postman. Design of multi-tier assertion scripts, stateful E2E container lifecycle workflows (`E2E_02_Database_Search_Lifecycle`), Collection Runner validation (13/13 tests passed), Newman CI/CD automation design, and cross-team peer review evaluation in Activity #5. | Actividad #2 (2.2.2), Actividad #3 (3.1, 3.2, 3.4.2), Actividad #4 (4.1, 4.2), Actividad #5 (5.1–5.3) | Author of `Lab02_Grupo2_Databases_Search.postman_collection.json`. 100% test execution success rate documented. |
-| **Valentina Molina Bustillos** | Implementation and verification of the `Data sources` (POST, GET, PATCH, Query) module along with supporting contractual checks for `Comments` and `File uploads`. Author of multi-tier assertion scripts, cursor-based pagination tests, chained E2E tabular query workflow (`E2E_01_Data_Source_Lifecycle`), Collection Runner execution (30/30 tests passed), and cross-team peer review evaluation in Activity #5. | Actividad #2 (2.2.1), Actividad #3 (3.1, 3.2, 3.4.1), Actividad #4 (4.1, 4.2), Actividad #5 (5.1–5.3) | Author of `Lab02_Grupo2_Valentina_CRUD.postman_collection.json`. 100% test execution success rate documented. |
-| **Gabriel Marcos Guaman Ortuño** | Exploration and verification of the `Users` and `OAuth` modules in Postman. Implementation of Bearer and Basic Auth verification requests in Activity #1. | Actividad #1 (1.3), Actividad #2 (`Users` & `OAuth` baseline) | Setup of initial OAuth client credentials. |
-| **Kevin Uruchi** | Specification and initial Postman request builder mapping for the `Pages` module (POST, GET, PATCH, Move). | Actividad #2 (`Pages` module baseline) | Continued integration with team collection. |
-| **Karen Ivonne Cruz Alvarez** | Verification and request construction for the `Blocks` module in Postman. | Actividad #2 (`Blocks` module baseline) | Continued integration with team collection. |
+| **Sebastián Pereyra** | Implementation and verification of the `Databases` (POST, GET, PATCH) and `Search` (POST) modules in Postman. Design of multi-tier assertion scripts, stateful E2E container lifecycle workflows (`E2E_02_Database_Search_Lifecycle`), Collection Runner validation (13/13 tests passed), Newman CI/CD automation design, and cross-team peer review evaluation of Lucas Gabriel De Los Santos (GitHub Issues) in Activity #5. | Actividad #2 (2.2.4), Actividad #3 (3.1.2, 3.2.2, 3.4.3), Actividad #4 (4.1, 4.2), Actividad #5 (5.1–5.3) | Author of `Lab02_Grupo2_Databases_Search.postman_collection.json`. 100% test execution success rate documented. |
+| **Valentina Molina Bustillos** | Implementation and verification of the `Data sources` (POST, GET, PATCH, Query) module along with supporting contractual checks for `Comments` and `File uploads`. Author of multi-tier assertion scripts, cursor-based pagination tests, chained E2E tabular query workflow (`E2E_01_Data_Source_Lifecycle`), Collection Runner execution (30/30 tests passed), and cross-team peer review collaboration in Activity #5. | Actividad #2 (2.2.2), Actividad #3 (3.1.2, 3.2.2, 3.4.2), Actividad #4 (4.1, 4.2), Actividad #5 (5.1–5.3) | Author of `Lab02_Grupo2_Valentina_CRUD.postman_collection.json`. 100% test execution success rate documented. |
+| **Gabriel Marcos Guaman Ortuño** | Exploration and verification of the `Users` and `OAuth` modules in Postman. Implementation of Bearer and Basic Auth verification requests in Activity #1, and 52 test cases across Users and OAuth in Activities #2, #3, and #4. | Actividad #1 (1.3), Actividad #2 (2.2.1), Actividad #3 (3.1.1, 3.2.1, 3.4.1), Actividad #4 (4.1, 4.2) | Author of `Notion_Users_OAuth_GabrielGuaman.postman_collection.json`. 345 assertions executed (100% pass rate). |
+| **Kevin Uruchi** | Specification and Postman implementation of the `Pages` module (POST, GET, PATCH, Move, Properties) spanning 200 automated test cases and 16 multi-step E2E flows in Activities #2, #3, and #4. | Actividad #2 (2.2.5), Actividad #3 (3.1.3, 3.2.3, 3.4.4), Actividad #4 (4.1, 4.2) | Author of `Notion_Pages.postman_collection.json`. |
+| **Karen Ivonne Cruz Alvarez** | Verification and request construction for the `Blocks` module in Postman. | Actividad #2 (2.2.3), Actividad #3, Actividad #4 | Continued integration with team collection. |
+
 
