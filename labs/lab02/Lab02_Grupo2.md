@@ -2190,7 +2190,24 @@ This automated CI/CD pipeline guarantees that any regression in Notion API versi
 2. Evaluate the ease of use and understandability of the implementation by other teams.
 3. Generate an evaluation and peer-review feedback report.
 
-### 5.1 Evaluation of Complexity, Quantity, and Test Typology (Reviewer: Sebastián Pereyra)
+| Group 2 Reviewer | Evaluated Author & Scope | Review Type | Section 5.1 (Complexity, Quantity & Types) | Section 5.2 (Ease of Use & Understandability) | Section 5.3 (Peer-Review Feedback Report) |
+|---|---|---|---|---|---|
+| **Sebastián Pereyra** | **Lucas Gabriel De Los Santos** (`GitHub Issues`) | External Team | `5.1.1` | `5.2.1` | `5.3.1` |
+| **Valentina Molina Bustillos** | **Lilian Lopez** (`GitHub Repositories`) | External Team | `5.1.2` | — | — |
+| **Gabriel Marcos Guaman Ortuño** | **Valentín Imaz** (`GitHub Labels & Milestones`) | External Team | `5.1.3` | `5.2.2` | `5.3.2` |
+| **Karen Ivonne Cruz Alvarez** | **Kiara Vanessa Muñoz Bayter** (`GitHub Gists`) | External Team | `5.1.4` | `5.2.3` | `5.3.3` |
+| **Kevin Uruchi** | **Rosa Poma** (`GitHub Search`) | External Team | `5.1.5` | `5.2.4` | `5.3.4` |
+| **Gabriel Marcos Guaman Ortuño** | **Karen Ivonne Cruz Alvarez** (`Notion Blocks`) | Intra-Team (Group 2) | *(Covered in `5.2.5`)* | `5.2.5` | *(Covered in `5.2.5`)* |
+| **Karen Ivonne Cruz Alvarez** | **Gabriel Marcos Guaman Ortuño** (`Notion Users & OAuth`) | Intra-Team (Group 2) | *(Covered in `5.2.6`)* | `5.2.6` | *(Covered in `5.2.6`)* |
+
+---
+
+### 5.1 Review and Evaluation of Complexity, Quantity, and Types of Implemented Tests
+
+> [!NOTE]
+> **Activity #5 — Item 1 (`5.1`):** Technical evaluation of the test complexity, request/assertion volume, and test typology (`Happy Path`, `Negative`, `Boundary`, `Data Integrity`, and `Chained / E2E` flows) across the audited external Postman suites.
+
+#### 5.1.1 Reviewer: Sebastián Pereyra — Reviewed: Lucas Gabriel De Los Santos (GitHub Issues)
 
 **Reviewer:** Sebastián Pereyra (Group 2 — Notion API Testing Team)  
 **Reviewed Author:** Lucas Gabriel De Los Santos  
@@ -2203,7 +2220,7 @@ This automated CI/CD pipeline guarantees that any regression in Notion API versi
 
 ---
 
-#### 5.1.1 Quantitative Test Metrics & Scope Analysis
+##### 5.1.1.1 Quantitative Test Metrics & Scope Analysis
 
 Lucas Gabriel transitioned all **28 test scenarios** designed in Laboratory 01 into an executable Postman automation suite, expanding them with **2 dedicated authorization baseline requests**, resulting in **30 formal test cases** mapped across **42 executable HTTP transactions** (including setup helpers, multi-step E2E sequences, and automated teardown routines).
 
@@ -2227,7 +2244,7 @@ The quantitative audit of the test suite execution against GitHub's live product
 
 ---
 
-#### 5.1.2 Test Typology & Complexity Assessment
+##### 5.1.1.2 Test Typology & Complexity Assessment
 
 The suite demonstrates a well-balanced distribution across all four test categories established in the course conventions:
 
@@ -2268,7 +2285,7 @@ flowchart TD
 
 ---
 
-#### 5.1.3 Deep Technical Analysis of the Single Failure (`TC_ISS_PATCH_006`)
+##### 5.1.1.3 Deep Technical Analysis of the Single Failure (`TC_ISS_PATCH_006`)
 
 The sole failing test in Lucas's execution report was:
 - **Test ID:** `TC_ISS_PATCH_006 - Verify that an issue cannot be updated with an invalid state`
@@ -2277,14 +2294,14 @@ The sole failing test in Lucas's execution report was:
 - **Expected Outcome:** `422 Unprocessable Entity` (`pm.response.to.have.status(422)`)
 - **Observed Outcome:** `HTTP 200 OK` (GitHub accepted the request, ignored the invalid state string, and left the issue in its prior state).
 
-##### QA Evaluation: Defect Reporting vs. Test Manipulation
+###### QA Evaluation: Defect Reporting vs. Test Manipulation
 In automated QA engineering, junior testers frequently commit the mistake of modifying their expected assertions (e.g., changing expected status from `422` to `200`) simply to make the test runner report 100% green. 
 
 Lucas Gabriel demonstrated **exceptional QA maturity** by deliberately maintaining the assertion at `422 Unprocessable Entity`. Because GitHub's documentation specifies that `state` is an enum constrained strictly to `["open", "closed"]`, accepting an undocumented string without raising a validation error constitutes an intrinsic API contract bug (silent failure / permissive input validation). Maintaining the test failure serves as automated regression evidence of an upstream defect, rather than accumulating testing debt.
 
 ---
 
-### 5.1 Evaluation of Complexity, Quantity, and Test Typology (Reviewer: Valentina Molina Bustillos)
+#### 5.1.2 Reviewer: Valentina Molina Bustillos — Reviewed: Lilian Lopez (GitHub Repositories)
 
 **Reviewer:** Valentina Molina Bustillos (Group 2 — Notion API Testing Team)  
 **Reviewed Author:** Lilian Lopez  
@@ -2293,7 +2310,7 @@ Lucas Gabriel demonstrated **exceptional QA maturity** by deliberately maintaini
 
 ---
 
-#### Quantitative Test Metrics & Scope Analysis
+##### 5.1.2.1 Quantitative Test Metrics & Scope Analysis
 
 Lilian Lopez's Postman collection exhibits a **high and well-justified level of technical complexity**. The automation suite implements **29 test cases** spanning complete **CRUD operations** over GitHub repositories alongside **2 End-to-End (E2E) workflows**. From a quantitative standpoint, the volume of implemented tests is well-proportioned and fully appropriate for the scope of Laboratory 02, balancing functional breadth across repository endpoints with deep contract and persistence verifications.
 
@@ -2307,7 +2324,7 @@ Lilian Lopez's Postman collection exhibits a **high and well-justified level of 
 
 ---
 
-#### Test Typology & Complexity Assessment
+##### 5.1.2.2 Test Typology & Complexity Assessment
 
 The evaluated test suite demonstrates strong variety across test categories, combining functional, negative, boundary, data integrity, and schema-level validations:
 
@@ -2345,7 +2362,7 @@ flowchart TD
 
 ---
 
-### 5.1 Evaluation of Complexity, Quantity, and Test Typology (Reviewer: Gabriel Marcos Guaman Ortuño)
+#### 5.1.3 Reviewer: Gabriel Marcos Guaman Ortuño — Reviewed: Valentín Imaz (GitHub Labels & Milestones)
 
 **Reviewer:** Gabriel Marcos Guaman Ortuño (Group 2 — Notion API Testing Team)  
 **Reviewed Author:** Valentín Imaz  
@@ -2356,7 +2373,7 @@ flowchart TD
 
 ---
 
-#### 1. Complexity, Quantity, and Types of Implemented Tests
+##### 5.1.3.1 Complexity, Quantity, and Types of Implemented Tests
 
 After importing `GitHub_Labels_Milestones_SQE3.postman_collection.json` into Postman and comparing it against Valentín Imaz's report, the collection shows a solid and well-justified level of complexity. He migrated all **43 test cases** from Lab 1 (`17` for `Labels` and `26` for `Milestones`) and added `7` helper requests in `00 - Setup` plus `4` cleanup requests in `99 - Teardown`, reaching **54 requests** in the collection. On top of those `54` requests, `8` test cases send a second `GET` request from the Post-response script using `pm.sendRequest` (to verify that updates were actually saved or to compare page 1 and page 2 in pagination), and the Setup/Teardown scripts also run dynamic `DELETE` requests to clean up `qa-pm-*` data.
 
@@ -2390,104 +2407,7 @@ flowchart TD
 
 ---
 
-#### 2. Ease of Use and Understandability of the Implementation
-
-Reviewing the collection as an external tester and comparing it with how I organized my own `Users` and `OAuth` collection (`Notion_Users_OAuth_GabrielGuaman.postman_collection.json`), Valentín's work is clean and very easy to read:
-
-| Aspect Reviewed | How Valentín Implemented It | Practical Assessment |
-|---|---|---|
-| **Folder Structure & Order** | Numbered folders: `00 - Setup`, `01 - Labels`, `02 - Milestones`, and `99 - Teardown`. | Clear execution order for the Collection Runner. Since `02 - Milestones` has `26` requests together, splitting `Labels` and `Milestones` into `POST` / `GET` / `PATCH` / `DELETE` subfolders (like I did in my modules) would make browsing even faster. |
-| **Request & Test Naming** | Requests keep their Lab 1 ID (`TC_LABEL_POST_001 - Verify that...`) and test names start with `[Common]`, `[Body]`, `[Header]`, `[Schema]`, `[Integrity]`, `[Setup]`, `[Cleanup]`, or `[Teardown]`. | Very easy to trace back to Lab 1 and quickly see in the Runner whether a failure came from a status code, a schema, or a persistence check. |
-| **Collection-Level Scripts (DRY)** | Common headers (`Accept` and `X-GitHub-Api-Version`) and the `3` `[Common]` checks (`responseTime`, `X-GitHub-Request-Id`, and `Content-Type` skipped on `204`) are written once at the collection level. | Better maintainability than repeating header and SLA checks inside every request (as I did across my `69` requests), keeping each request's script short and focused on business logic. |
-| **Variables & Environment Setup** | Uses environment variables (`baseUrl`, `owner`, `repo`, `apiVersion`, `maxResponseTime`, and secret `githubToken`), collection variables (`labelSchema`, `milestoneSchema`, `errorSchema`, `msOpen1Number`–`msCreatedNumber`), and local variables (`desc100`, `desc101`). | Good separation of scopes, and keeping `githubToken` only in *Current Value* avoids leaking credentials. However, no `.postman_environment.json` file was delivered with the collection, so another team has to create those `6` variables manually from the report first. |
-| **Runner Execution** | `SETUP_01` and `SETUP_02` delete leftover `qa-pm-*` data before creating fresh fixtures, so the full `54`-request suite can be run repeatedly in Collection Runner in one click. | Works well as a full run (`~36 s`), though individual requests like `TC_LABEL_PATCH_002` or `TC_LABEL_DELETE_001` depend on previous steps and cannot be executed out of order on their own. |
-
----
-
-#### 3. Peer-Review Feedback and Recommendations
-
-##### Strengths
-1. **Clean Setup & Teardown Cycle:** Filtering by the `qa-pm-*` prefix in both `00 - Setup` and `99 - Teardown`—and adding `TEARDOWN_02` and `TEARDOWN_04` to confirm with a `GET` that zero test items remain—makes the collection safe to re-run without deleting GitHub's default repository labels.
-2. **Schema Validation and Persistence Checks:** Saving `labelSchema`, `milestoneSchema`, and `errorSchema` as collection variables (`pm.response.to.have.jsonSchema`) and using `pm.sendRequest` to verify that changes persisted (including checking in `TC_MILESTONE_PATCH_005` that a rejected `422` update left the milestone `"open"`) gives much stronger confidence than checking status codes alone.
-3. **Honest Reporting on `TC_LABEL_POST_002`:** Keeping the Lab 1 assertion (`422`) when GitHub returned `201 Created` with default color `"ededed"` instead of editing the test just to get 100% green is the right QA practice.
-
-##### Opportunities for Improvement
-1. **Include the `.postman_environment.json` File and Newman Command:**  
-   In my own deliverable, pairing the collection with `Notion_Users_OAuth_Env.postman_environment.json` (with blank secret placeholders) allowed anyone to import and run it right away in Postman or Newman. Exporting `GitHub_Labels_Milestones_SQE3.postman_environment.json` would save other teams from setting up the `6` variables manually.
-2. **Add Negative Authentication and Permission Tests (`401` / `403`):**  
-   While building my `Users` and `OAuth` tests, checking missing, invalid, and restricted tokens (`401 Unauthorized` and `403 Forbidden`) was key to validating API security. In Valentín's collection, all `54` requests inherit the valid `{{githubToken}}`, so adding a few `No Auth` or invalid-token tests on `POST` / `PATCH` / `DELETE` would make negative coverage more complete.
-3. **Avoid Repository-Dependent Assumptions and Fixed Names:**  
-   `TC_LABEL_GET_001` checks that the default `'bug'` label exists and `TC_LABEL_GET_004` checks `labels.length >= 12`. If another teammate runs the collection on a repository where default GitHub labels were removed or customized, those assertions will fail. Also, generating unique names with `Date.now()` in a Pre-request script (instead of static `"qa-pm-post-001"`) would prevent `422 already_exists` errors when re-running a single request manually.
-4. **Small Script Fixes Found in the JSON (`TC_LABEL_POST_002`, `TC_LABEL_GET_001`, and Async Cleanup):**  
-   - In `TC_LABEL_POST_002`, `pm.expect(JSON.stringify(err)).to.include('color')` passed even though the API returned `201 Created`, because the created label JSON (`{"color": "ededed", ...}`) also contains the word `"color"`. Checking `err.errors` for `e.field === 'color'` avoids that false pass.  
-   - `TC_LABEL_GET_001` uses Postman's older `tv4.validate(...)` function while all other requests use `pm.response.to.have.jsonSchema(...)`; using `jsonSchema` everywhere keeps the scripts consistent.  
-   - `SETUP_01`/`02` and `TEARDOWN_01`/`03` fire multiple `pm.sendRequest` `DELETE` calls inside `.forEach(...)` without waiting for each callback to finish, which could cause a race condition right before `TEARDOWN_02`/`04` check that the list is empty if many leftover items exist.
-
----
-
-### 5.2 Usability, Comprehensibility, and Implementation Architecture Evaluation
-
-The usability and architectural ergonomics of Lucas Gabriel's Postman collection were evaluated across six operational criteria:
-
-| Evaluation Dimension | Implementation Strategy in Lucas's Suite | Technical Evaluation (Sebastián Pereyra) |
-|---|---|---|
-| **Folder Hierarchy & Ordering** | Numbered folder prefixes: `00 - Setup`, `01 - POST`, `02 - PATCH`, `03 - GET`, `04 - Lock`, `05-06 - E2E`, `99 - Teardown`. | **Excellent**: Enforces deterministic top-to-bottom sequential execution in Postman Collection Runner and Newman without requiring manual folder selection. |
-| **Request & Assertion Naming** | Requests named `TC_<ID> - <Description>`; assertions tagged with `[Body]`, `[Header]`, `[Schema]`, `[Integrity]`, `[Common]`. | **Outstanding**: Enables instantaneous fault localization in Newman CLI logs; an engineer immediately identifies whether a failure relates to transport, schema, or business logic. |
-| **Centralized Contract Scripts** | Collection-level Pre-request script injects `Accept: application/vnd.github+json` and `X-GitHub-Api-Version: {{apiVersion}}`. | **Optimal (DRY)**: Eliminates header redundancy across 42 requests and guarantees strict GitHub API version pinning (`2026-03-10`). |
-| **Common Collection Assertions** | Global Test script checks response time (`< 2000 ms`), JSON content-type (omitting `204 No Content`), and `X-GitHub-Request-Id`. | **High**: Non-functional SLAs and distributed tracing headers are audited uniformly across the entire attack surface. |
-| **Data Integrity Verification** | Follow-up `pm.sendRequest` GET requests executed immediately after write calls (`POST_001`, `PATCH_001`, `LOCK_001`). | **Exceptional**: Validates true database persistence on the remote server, preventing false positives caused by echoing mock responses. |
-| **Automated Teardown & Cleanup** | Dedicated `99 - Teardown` folder closes all issues tracked in `createdIssues` array (`state: "closed"`, `state_reason: "not_planned"`). | **Outstanding**: Solves GitHub API's limitation of having no issue deletion endpoint, ensuring test runs leave zero clutter in user repositories. |
-
----
-
-### 5.3 Formal Feedback, QA Recommendations, and Technical Audit Report
-
-As reviewer of Lucas Gabriel De Los Santos's implementation, **Sebastián Pereyra** issues the following formal feedback report:
-
-#### Key Strengths & Best Practices:
-
-1. **Formal JSON Schema Validation via `ajv` (`pm.response.to.have.jsonSchema`):**  
-   Lucas defined two centralized JSON schemas stored in collection variables (`issueSchema` and `errorSchema`), validating required properties, data types, and enum constraints across all responses. This represents a substantial leap in contract validation rigor compared to basic null checks.
-2. **Promise-Wrapped `pm.sendRequest` for Newman v6.x Compatibility:**  
-   To avoid asynchronous race conditions and callback nesting issues during CLI execution, Lucas wrapped `pm.sendRequest` within native JavaScript Promises (`await sendRequest(...)`). This guarantees that Newman halts sequential execution until dynamic setup requests resolve completely.
-3. **Environment Security & Credential Isolation:**  
-   The personal access token (`githubToken`) is maintained strictly in the *Current Value* of a masked variable (`type: "secret"`). When executed via Newman, credentials are passed via CLI flags (`--env-var "githubToken=<token>"`), and sensitive headers are suppressed from test reports using `--reporter-htmlextra-skipHeaders Authorization`.
-4. **Rate Limit Throttling in Headless Automation:**  
-   Lucas correctly identified GitHub's secondary rate limits (which penalize rapid successive write operations) and configured Newman with `--delay-request 500` (adding a 500 ms inter-request throttle). This ensured 100% deterministic execution without encountering false `403 secondary rate limit` rejections.
-
-#### Constructive Recommendations & Opportunities for Improvement:
-
-1. **Defect Tracking Annotation for Known API Failures (`TC_ISS_PATCH_006`):**  
-   While keeping `TC_ISS_PATCH_006` failing at status `422` is the correct QA stance, in continuous integration pipelines a red test halts deployment builds. It is recommended to implement a conditional assertion or a defect flag:
-   ```javascript
-   // Recommended pattern for documented upstream API defects:
-   const isDocumentedBug = true;
-   if (isDocumentedBug && pm.response.code === 200) {
-       console.warn("[UPSTREAM BUG CONFIRMED] GitHub Issue #XYZ: API accepts invalid state string instead of 422.");
-       pm.test("[Known Bug] API improperly accepted invalid state with 200 OK", function () {
-           pm.response.to.have.status(200);
-       });
-   } else {
-       pm.test("Status code is 422 Unprocessable Entity", function () {
-           pm.response.to.have.status(422);
-       });
-   }
-   ```
-   This maintains visibility of the bug in logs without breaking unattended CI/CD test gates.
-
-2. **Decoupling JSON Schemas from Collection Variables:**  
-   The schemas `issueSchema` and `errorSchema` are currently serialized as stringified JSON inside Postman Collection Variables (`"variable": [...]`). For complex schemas with dozens of nested fields, this inflates the collection file size. A best practice for large enterprise suites is storing raw JSON schemas in an external `/schemas` directory and loading them dynamically via Newman data files or Pre-request scripts.
-
-3. **Status Code Flexibility in Permission Boundaries (`E2E_002`):**  
-   In `E2E_002`, Lucas checked `pm.expect(pm.response.code).to.be.oneOf([403, 404])`. While this accommodates GitHub's security policy of returning `404` to conceal private repository existence, logging whether the response was `403` or `404` in the Postman Console provides immediate diagnostic clarity without requiring manual inspect-element on the response.
-
-#### Overall Audit Verdict:
-Lucas Gabriel De Los Santos delivered an **exceptionally mature, technically rigorous, and clean API automation suite**. The integration of multi-layer assertions, formal JSON Schema validation, data integrity verification via `pm.sendRequest`, and automated teardown makes this implementation an exemplary benchmark in automated API contract testing.
-
-
-
----
-### 5.4 Evaluation of Complexity, Quantity, and Test Typology (Reviewer: Karen Ivonne Cruz Alvarez)
+#### 5.1.4 Reviewer: Karen Ivonne Cruz Alvarez — Reviewed: Kiara Vanessa Muñoz Bayter (GitHub Gists)
 
 **Reviewer:** Karen Ivonne Cruz Alvarez (Group 2 — Notion API Testing Team)  
 **Reviewed Author:** Kiara Vanessa Muñoz Bayter  
@@ -2501,7 +2421,7 @@ Lucas Gabriel De Los Santos delivered an **exceptionally mature, technically rig
 
 ---
 
-#### 5.4.1 Quantitative Test Metrics & Scope Analysis
+##### 5.1.4.1 Quantitative Test Metrics & Scope Analysis
 
 Kiara implemented the Gists test cases from Laboratory 01 as **21 formal test cases** (9 `POST`, 4 `GET`, 5 `PATCH`, 3 `DELETE`) inside a **25-request collection** (21 test cases + 3 setup requests + 1 helper `DELETE` that prepares the "deleted Gist" scenario). She also added two cases that were not in Lab 01: `TC_GIST_POST_009` (public Gist) and `TC_GIST_DELETE_003` (delete a non-existent Gist).
 
@@ -2514,11 +2434,11 @@ I recomputed the metrics directly from the collection file and compared them wit
 | **Total Automated Assertions** | **118** — verified: **45** test-specific + **73** collection-level `[Common]` (3 per request, 2 on `204`) | Runner screenshot confirms `118 / 116 passed / 2 failed / 0 errors`. |
 | **Test-specific assertions per TC** | **2.0 on average** (42 across 21 TCs); 4 TCs have only 1; `GET_001` has no status assertion | **62% of all assertions are the generic collection-level checks**, so the headline "118" overstates verification depth. |
 | **Assertion Pass Rate** | **116 / 118 (98.3%)** | Both failures belong to one request (`TC_GIST_PATCH_004`). |
-| **Test Case Pass Rate** | **20 / 21 (95.2%)** | See 5.4.3: the failure is most likely a test-design issue, not an API defect. |
+| **Test Case Pass Rate** | **20 / 21 (95.2%)** | See 5.1.4.3: the failure is most likely a test-design issue, not an API defect. |
 | **Average Response Time** | **562 ms** (16.5 s total run) | Within the 2000 ms SLA applied at collection level. |
 | **Execution Platforms** | Postman Collection Runner only | No Newman / CLI run was delivered. |
 
-##### Context within the lab cohort (figures as reported by each author)
+###### Context within the lab cohort (figures as reported by each author)
 
 | | Kiara (Gists) | Lucas (Issues) | Lilian (Repos) | Valentin (Labels/Milestones) |
 |---|---|---|---|---|
@@ -2533,7 +2453,7 @@ Kiara's suite is the smallest and the least layered of the group, although it co
 
 ---
 
-#### 5.4.2 Test Typology & Complexity Assessment
+##### 5.1.4.2 Test Typology & Complexity Assessment
 
 ```mermaid
 pie title Kiara - GitHub Gists Test Typology (21 Test Cases)
@@ -2563,7 +2483,7 @@ pie title Kiara - GitHub Gists Test Typology (21 Test Cases)
 
 ---
 
-#### 5.4.3 Deep Technical Analysis of the Single Failure (`TC_GIST_PATCH_004`)
+##### 5.1.4.3 Deep Technical Analysis of the Single Failure (`TC_GIST_PATCH_004`)
 
 - **Test ID:** `TC_GIST_PATCH_004 - Remove Gist file`
 - **Method & Endpoint:** `PATCH {{baseUrl}}/gists/{{gistId}}`
@@ -2581,7 +2501,136 @@ The other three reviewed teams kept red tests that were real deviations of the A
 
 ---
 
-### 5.5 Usability, Comprehensibility, and Implementation Architecture Evaluation
+#### 5.1.5 Reviewer: Kevin Uruchi — Reviewed: Rosa Poma (GitHub Search)
+
+**Reviewer:** Kevin Uruchi (Group 2 — Notion API Testing Team)  
+**Reviewed Author:** Rosa Poma  
+**Reviewed System Under Test (SUT):** GitHub REST API (`version: 2026-03-10`), Search Module  
+**Audited Artifacts:**
+- Postman Collection: `GitHub_Search_SQE3.postman_collection.json`
+- Postman Environment: `GitHub_Search-SQE3..postman_environment.json`
+- Audit date: November 08, 2026
+
+> **Scope note.** I received the collection and the environment file, but no Runner screenshot, Newman report or written report. This is therefore a **static audit**: every number below was recomputed by reading the collection file, and I did not run it against `api.github.com`. Where I expect a result, I say so, and the points marked **[confirm in Runner]** should be checked with a real run before the report is closed.
+
+---
+
+##### 5.1.5.1 Quantitative Test Metrics & Scope Analysis
+
+Rosa's suite has **16 test cases** (1 authorization, 10 repository search, 3 issue search and 2 E2E scenarios) implemented in **18 HTTP requests**. The two E2E scenarios use two requests each, because the first request searches and the second one verifies the result.
+
+| Execution Metric | Audited Value | Technical Assessment |
+|---|---|---|
+| **Total Test Cases** | **16** (1 + 10 + 3 + 2 E2E) | Small suite. It covers 2 of the 7 endpoints of the Search module (`/search/repositories` and `/search/issues`). If the Lab 01 assignment was limited to those two, this is by design. |
+| **Total Requests** | **18** (1 `/user`, 16 search requests and 1 `/repos/{full_name}` detail request) | One request per test case, plus the second step of each E2E. |
+| **Total Automated Assertions (static count)** | **101** = **44** request-level + **54** collection-level `[Common]` (3 per request × 18) + **3** in a folder-level script | **53% of the assertions are the generic collection-level checks**, so the headline number overstates verification depth. |
+| **Test-specific assertions** | **2.4 per request** on average (44 / 18); `TC_SEARCH_GET_003`, `GET_005`, `GET_007`, `GET_008`, `GET_010`, `ISS_001` and `ISS_002` have only 2 | Low to moderate depth. |
+| **Status code assertion** | Present in 16 of 18 requests | Missing in the first step of `TC_SEARCH_E2E_001` and `TC_SEARCH_E2E_002`. |
+| **Expected pass rate** | **99 / 101 assertions** if the live API behaves as the tests expect | The 2 expected failures come from the misplaced folder script (see 5.1.5.3). **[confirm in Runner]** |
+| **Execution Platforms** | Not provided in the files I received | No Newman command, report or screenshot to review. |
+
+---
+
+##### 5.1.5.2 Test Typology & Complexity Assessment
+
+```mermaid
+pie title Rosa - GitHub Search Test Typology (16 Test Cases)
+    "Functional / happy path (6 TCs / 37.5%)" : 6
+    "Authorization & rate limit (2 TCs / 12.5%)" : 2
+    "Empty result (2 TCs / 12.5%)" : 2
+    "Boundary - per_page (2 TCs / 12.5%)" : 2
+    "Pagination (2 TCs / 12.5%)" : 2
+    "E2E chains (2 TCs / 12.5%)" : 2
+```
+
+1. **Functional / Happy Path (6 cases):**
+   - Search by language (`GET_001`), response structure with `total_count`, `incomplete_results` and `items` (`GET_002`), filter by stars (`GET_003`), complex qualifiers `created:>2023-01-01 language:go` (`GET_010`), issues by repository (`ISS_001`) and issues by state (`ISS_002`).
+   - `GET_003` is the best assertion of the group, because it uses `every()` to check the filter on all returned items.
+
+2. **Authorization & Rate-limit Telemetry (2 cases):**
+   - `TC_AUTH_001` (`GET /user`) asserts `X-RateLimit-Limit: 5000`, and `TC_SEARCH_GET_001` and `GET_009` assert the Search API limits (`30` authenticated and `10` unauthenticated per minute). Using the limit header to prove that the token was really applied is a good, non-intrusive idea.
+
+3. **Empty-result Scenarios (2 cases):**
+   - `GET_004` and `ISS_003` search for a term that does not exist and expect an empty `items` array.
+   - **Gap:** there is **no real negative case**. No test sends a missing or invalid `q`, an invalid token, or an invalid qualifier, so no `401`, `403` or `422` error contract is verified, and error payloads are never checked.
+
+4. **Boundary (2 cases):**
+   - `GET_005` (`per_page=100`) and `GET_006` (`per_page=101`). They are useful, but both use `at.most(100)`, which passes even if the API returned a single item. A real boundary test should assert exactly `100`.
+   - **Gap:** the best-known limit of the Search API is not tested: only the first 1,000 results are available, so a request beyond that (for example `page=201` with `per_page=5`) should be rejected. Other missing edges are `per_page=0`, `page=0` and an oversized `q`.
+
+5. **Pagination (2 cases):**
+   - `GET_007` stores the IDs of page 1, and `GET_008` checks that page 2 has no overlap. The idea is right, but the check is fragile (see 5.1.5.3, point 3).
+
+6. **Stateful E2E (2 cases):**
+   - `E2E_001`: search a Python repository, store `full_name` and `language`, then `GET /repos/{full_name}` and compare. This is the only real chained flow of the suite and a good integrity check.
+   - `E2E_002`: it repeats the same two requests as `GET_007` and `GET_008` (`q=test`, `page=1` and `page=2`, `per_page=5`) with a different variable name, so it adds no new coverage.
+
+**Complexity level: basic.** The suite uses status codes, one or two body checks, environment-variable chaining and collection-level common assertions. It has no JSON Schema, no `pm.sendRequest`, no dynamic data and no negative or error-contract tests.
+
+---
+
+##### 5.1.5.3 Deep Technical Analysis of the Main Findings
+
+Rosa did not submit an execution report, so there is no "single failure" to analyze. Reading the scripts shows five points that affect the results.
+
+1. **Misplaced folder-level script in `00_Auth` (expected failure).**
+   The folder `00_Auth` contains a **folder-level test script** that checks `total_count > 0` and that `data.items[0].language` is `Python`. It looks like a leftover from a search request. Folder scripts run for every request inside the folder, so it runs for `TC_AUTH_001` (`GET /user`), whose body has no `total_count` and no `items`. Two of its three assertions should fail (`total_count` is not a number, and `data.items[0]` throws a `TypeError`), and `Status code is 200 OK` is reported twice. **[confirm in Runner]**
+
+2. **Vacuous assertions that pass with no data.**
+   `GET_010`, `ISS_001` and `ISS_002` wrap their assertions in `if (data.items && data.items.length > 0)`. If the API returns an empty list (or a rate-limited error body), the tests pass without checking anything. `GET_001` and `GET_003` handle this correctly with an explicit `pm.expect.fail(...)`.
+
+3. **Pagination checks that can pass without evidence.**
+   `GET_008` and `E2E_002 (Step 2)` read the previous page IDs with `JSON.parse(pm.environment.get("page1Ids") || "[]")`. If the first request did not run (or failed), the list is empty, the overlap is `0` and the test **passes**. In addition, `page1Ids` and `e2ePage1Ids` are written to the environment and never reset, so a stale value from a previous run can be used.
+
+4. **Titles that contradict the assertions.**
+   - `GET_006` is titled *"per_page=101 is rejected"*, but the test expects `200 OK` and a capped list (the title should say *"is capped at 100"*).
+   - `TC_AUTH_001` is titled *"authenticated user has higher **search** rate limit"*, but it calls `/user` and checks the core limit (`5000`), not the Search limit (`30`).
+   - `GET_009` is titled *"Returns public repositories only"* but only checks that `items` is an array.
+   - `GET_007` says *"Returns exactly 5 items or less"* while using `at.most(5)`.
+
+5. **First E2E steps without status check.**
+   `E2E_001` and `E2E_002` (first request) call `pm.response.json()` and `data.items.map(...)` outside any `pm.test`, and have no status assertion. With a `403` or `429` from the Search rate limit, the script throws an error instead of reporting a clean failed assertion.
+
+
+---
+
+<div style="page-break-after: always;"></div>
+
+### 5.2 Evaluation of Ease of Use and Understandability of the Implementation
+
+> [!NOTE]
+> **Activity #5 — Item 2 (`5.2`):** Evaluation of folder organization, naming clarity, script maintainability (DRY), environment setup, and execution reproducibility—covering both **external peer-team collections** (`5.2.1`–`5.2.4`) and **Group 2 intra-team peer reviews** (`5.2.5`–`5.2.6`).
+
+#### 5.2.1 Reviewer: Sebastián Pereyra — Reviewed: Lucas Gabriel De Los Santos (GitHub Issues)
+
+The usability and architectural ergonomics of Lucas Gabriel's Postman collection were evaluated across six operational criteria:
+
+| Evaluation Dimension | Implementation Strategy in Lucas's Suite | Technical Evaluation (Sebastián Pereyra) |
+|---|---|---|
+| **Folder Hierarchy & Ordering** | Numbered folder prefixes: `00 - Setup`, `01 - POST`, `02 - PATCH`, `03 - GET`, `04 - Lock`, `05-06 - E2E`, `99 - Teardown`. | **Excellent**: Enforces deterministic top-to-bottom sequential execution in Postman Collection Runner and Newman without requiring manual folder selection. |
+| **Request & Assertion Naming** | Requests named `TC_<ID> - <Description>`; assertions tagged with `[Body]`, `[Header]`, `[Schema]`, `[Integrity]`, `[Common]`. | **Outstanding**: Enables instantaneous fault localization in Newman CLI logs; an engineer immediately identifies whether a failure relates to transport, schema, or business logic. |
+| **Centralized Contract Scripts** | Collection-level Pre-request script injects `Accept: application/vnd.github+json` and `X-GitHub-Api-Version: {{apiVersion}}`. | **Optimal (DRY)**: Eliminates header redundancy across 42 requests and guarantees strict GitHub API version pinning (`2026-03-10`). |
+| **Common Collection Assertions** | Global Test script checks response time (`< 2000 ms`), JSON content-type (omitting `204 No Content`), and `X-GitHub-Request-Id`. | **High**: Non-functional SLAs and distributed tracing headers are audited uniformly across the entire attack surface. |
+| **Data Integrity Verification** | Follow-up `pm.sendRequest` GET requests executed immediately after write calls (`POST_001`, `PATCH_001`, `LOCK_001`). | **Exceptional**: Validates true database persistence on the remote server, preventing false positives caused by echoing mock responses. |
+| **Automated Teardown & Cleanup** | Dedicated `99 - Teardown` folder closes all issues tracked in `createdIssues` array (`state: "closed"`, `state_reason: "not_planned"`). | **Outstanding**: Solves GitHub API's limitation of having no issue deletion endpoint, ensuring test runs leave zero clutter in user repositories. |
+
+---
+
+#### 5.2.2 Reviewer: Gabriel Marcos Guaman Ortuño — Reviewed: Valentín Imaz (GitHub Labels & Milestones)
+
+Reviewing the collection as an external tester and comparing it with how I organized my own `Users` and `OAuth` collection (`Notion_Users_OAuth_GabrielGuaman.postman_collection.json`), Valentín's work is clean and very easy to read:
+
+| Aspect Reviewed | How Valentín Implemented It | Practical Assessment |
+|---|---|---|
+| **Folder Structure & Order** | Numbered folders: `00 - Setup`, `01 - Labels`, `02 - Milestones`, and `99 - Teardown`. | Clear execution order for the Collection Runner. Since `02 - Milestones` has `26` requests together, splitting `Labels` and `Milestones` into `POST` / `GET` / `PATCH` / `DELETE` subfolders (like I did in my modules) would make browsing even faster. |
+| **Request & Test Naming** | Requests keep their Lab 1 ID (`TC_LABEL_POST_001 - Verify that...`) and test names start with `[Common]`, `[Body]`, `[Header]`, `[Schema]`, `[Integrity]`, `[Setup]`, `[Cleanup]`, or `[Teardown]`. | Very easy to trace back to Lab 1 and quickly see in the Runner whether a failure came from a status code, a schema, or a persistence check. |
+| **Collection-Level Scripts (DRY)** | Common headers (`Accept` and `X-GitHub-Api-Version`) and the `3` `[Common]` checks (`responseTime`, `X-GitHub-Request-Id`, and `Content-Type` skipped on `204`) are written once at the collection level. | Better maintainability than repeating header and SLA checks inside every request (as I did across my `69` requests), keeping each request's script short and focused on business logic. |
+| **Variables & Environment Setup** | Uses environment variables (`baseUrl`, `owner`, `repo`, `apiVersion`, `maxResponseTime`, and secret `githubToken`), collection variables (`labelSchema`, `milestoneSchema`, `errorSchema`, `msOpen1Number`–`msCreatedNumber`), and local variables (`desc100`, `desc101`). | Good separation of scopes, and keeping `githubToken` only in *Current Value* avoids leaking credentials. However, no `.postman_environment.json` file was delivered with the collection, so another team has to create those `6` variables manually from the report first. |
+| **Runner Execution** | `SETUP_01` and `SETUP_02` delete leftover `qa-pm-*` data before creating fresh fixtures, so the full `54`-request suite can be run repeatedly in Collection Runner in one click. | Works well as a full run (`~36 s`), though individual requests like `TC_LABEL_PATCH_002` or `TC_LABEL_DELETE_001` depend on previous steps and cannot be executed out of order on their own. |
+
+---
+
+#### 5.2.3 Reviewer: Karen Ivonne Cruz Alvarez — Reviewed: Kiara Vanessa Muñoz Bayter (GitHub Gists)
 
 | Evaluation Dimension | Implementation Strategy in Kiara's Suite | Technical Evaluation |
 |---|---|---|
@@ -2594,7 +2643,7 @@ The other three reviewed teams kept red tests that were real deviations of the A
 | **Reproducibility & Delivery** | Only the collection file was delivered. | **Needs improvement.** Without the environment file (even with an empty token) another member cannot run the suite directly. There is no Newman command, no `--delay-request` and no exported report; Gist creation is a content-creating operation that can hit GitHub's secondary rate limits. |
 | **Documentation vs. Implementation Consistency** | Report text, tables and screenshots. | **Needs improvement.** See the table below. |
 
-#### Consistency between the report and the delivered collection
+##### Consistency between the report and the delivered collection
 
 | # | Item | What the report says | What the collection contains |
 |---|---|---|---|
@@ -2612,11 +2661,181 @@ The consequence is that the **per-test-case results table cannot be traced to th
 
 ---
 
-### 5.6 Formal Feedback, QA Recommendations, and Technical Audit Report
+#### 5.2.4 Reviewer: Kevin Uruchi — Reviewed: Rosa Poma (GitHub Search)
+
+| Evaluation Dimension | Implementation Strategy in Rosa's Suite | Technical Evaluation (Kevin Uruchi) |
+|---|---|---|
+| **Folder Hierarchy & Ordering** | `00_Auth`, `01_Search_Repos`, `02_Search_Issues`, `03_E2E`, with numeric prefixes. | **Good.** Clear and consistent with the course convention, and the run order is deterministic. |
+| **Request & Assertion Naming** | `TC_<MODULE>_<ENDPOINT>_<NNN> - <description>`; tags `[Body]`, `[Header]`, `[Accuracy]`, `[Boundary]`, `[Pagination]`, `[Integrity]`, `[Common]`. | **Good, with inconsistencies.** Status assertions are untagged (`Status code is 200 OK`) while the others are tagged. There is no `[Schema]` tag because there is no schema check. `E2E_002 (Step 2)` still ends with the word **"Copy"**, and four titles contradict their assertions (see 5.1.5.3). |
+| **Centralized Contract Scripts** | Collection-level pre-request script upserts `Accept: application/vnd.github+json` and `X-GitHub-Api-Version: {{apiVersion}}`; collection-level tests check response time, `Content-Type` (skipped on `204`) and `X-GitHub-Request-Id`. | **Good (DRY).** The version is pinned once in the variable `apiVersion = 2026-03-10`, and the SLA is configurable with `maxResponseTime` (5000 ms). |
+| **Authentication** | Each of the 17 authenticated requests repeats its own `Bearer {{githubToken}}`; `GET_009` has no auth. | **Improvable.** Authentication should be set once at collection level, with a `No Auth` override only in `GET_009` and the auth tests. |
+| **Variables & Chaining** | Environment variables for config (`searchKeyword`, `perPage`, `nonExistentTerm`) and for runtime state (`page1Ids`, `e2eRepoFullName`, `e2eRepoLanguage`, `e2ePage1Ids`). | **Good idea, partial execution.** The environment variable `page` is never used, many requests hard-code `5`, `100` or `page=1`, and the runtime variables are never reset. |
+| **Data Integrity Verification** | Only `E2E_001 (Step 2)`, which compares the repository detail with the search result. | **Partial.** The Search module is read-only, so there is nothing to persist, but the integrity idea could be applied to pagination and to the issue and repository counts. |
+| **Teardown & Cleanup** | None. | **Not required.** The suite only reads, so it leaves no data in the account. This is not a weakness. |
+| **Reproducibility & Delivery** | Collection and environment file (the token has no value in the export). | **Good for security**, no credential is exposed. **Needs improvement:** no Newman command, no report, and the Search API has a low rate limit (see 5.3.4). |
+| **Documentation** | The collection description is still Postman's default text (*"Welcome to Postman! This is your first collection"*), and there are no folder or request descriptions. | **Needs improvement.** There are no documented preconditions or run order, and `GET_008` and the E2E steps depend on earlier requests. |
+
+---
+
+#### 5.2.5 Intra-Team Peer Review — Reviewer: Gabriel Marcos Guaman Ortuño | Reviewed: Karen Ivonne Cruz Alvarez (Notion API: `Blocks` Module)
+
+**Reviewer:** Gabriel Marcos Guaman Ortuño (Group 2 — `Users` & `OAuth` Modules)  
+**Reviewed Author:** Karen Ivonne Cruz Alvarez (Group 2 — `Blocks` Module)  
+**Module:** Notion REST API `2025-09-03`, `Blocks` (`PATCH /v1/blocks/{id}/children`, `GET /v1/blocks/{id}`, `GET /v1/blocks/{id}/children`, `PATCH /v1/blocks/{id}`, `DELETE /v1/blocks/{id}`)  
+**Audited Artifacts:**
+- Postman Collection: `postman/karen_cruz/Notion_Blocks_KarenCruz.postman_collection.json` (`81` HTTP requests across `6` folders)
+- Postman Environment: `postman/karen_cruz/Notion_Blocks_Env.postman_environment.json` (`5` variables: `3` secret tokens, `2` workspace IDs)
+- Newman HTML Extra Report: `postman/karen_cruz/newman/Notion_Blocks_KarenCruz-2026-11-08-04-46-26-859-0.html`
+- Group 2 Report Sections: Activities #2, #3, and #4 (`Blocks` subsections)
+
+##### Summary
+
+Karen automated all **72 test cases** from `KarenCruzTests.md` (`68` endpoint cases across the five `Blocks` endpoints plus `4` E2E scenarios) into **81 Postman requests** (`39 PATCH`, `30 GET`, `12 DELETE`). Inspecting her collection JSON alongside the exported Newman `htmlextra` report confirms a very thorough live run: **81 Pre-request scripts** and **75 Test scripts** ran (`6` conditional requests were cleanly skipped via `pm.execution.skipRequest()` because optional `READONLY_TOKEN` and `RESTRICTED_TOKEN` variables were empty), dispatching **308 total HTTP calls** (`75` main requests + `233` `pm.sendRequest()` calls for sandbox setup, data-integrity `GET`s, pagination, and trash cleanup) in **3m 55s** (`445 ms` average latency) with **375 assertions (`364` passed / `11` failed, `0` request crashes)**.
+
+##### Ease of Use and Understandability Assessment
+
+| Aspect Reviewed | How Karen Implemented It in `Notion_Blocks_KarenCruz` | Practical Assessment (Gabriel Marcos Guaman Ortuño) |
+|---|---|---|
+| **Folder Structure & Ordering** | `6` numbered folders: `01_PATCH_Append_Block_Children` (`18`), `02_GET_Retrieve_Block` (`11`), `03_GET_Retrieve_Block_Children` (`14`), `04_PATCH_Update_Block` (`14`), `05_DELETE_Block` (`11`), and `06_E2E_Flows` (`13`). | **Very clear.** Follows our Group 2 convention (`Happy Path` → `Negative` → `Boundary`, E2E last), making it easy to browse right next to my `Users` and `OAuth` folders. |
+| **Request & Assertion Naming** | Requests follow `TC_BLK_<OP>_<NNN> - [Category] <Description>` and assertions start with `<TC_ID> - <Check>`, using `[Data integrity]` on follow-up `GET` checks. | **Easy to trace.** Any teammate can match a Newman log line back to `KarenCruzTests.md` immediately and tell contract checks apart from persistence checks. |
+| **Standalone Isolation (`sandbox()` & `cleanup()`)** | Every test creates its own disposable child page (`"QA sandbox - <ID> - <timestamp>"`) under `PAGE_ID` in the Pre-request script and trashes it (`in_trash: true`) at the end. | **Outstanding usability.** Unlike suites where tests fail if run out of sequence, any single request or single folder (`--folder`) in Karen's collection can be run on its own in any order. |
+| **Environment Setup & Conditional Skipping** | `Notion_Blocks_Env.postman_environment.json` defines `5` clean variables (`NOTION_TOKEN`, `READONLY_TOKEN`, `RESTRICTED_TOKEN` as masked secrets with blank exported values, plus `PAGE_ID` and `UNSHARED_BLOCK_ID`). `need(var)` skips optional cases when blank. | **Very friendly for teammates.** Anyone in Group 2 only needs `NOTION_TOKEN` and `PAGE_ID` to run the `64` core cases without false `401` errors or leaked secrets. |
+| **Rate-Limit Handling (`sleep(340)`)** | Wraps `pm.sendRequest()` inside an async `call()` helper that waits `340 ms` before every helper request, paired with `--delay-request 400` and `--timeout-script 600000` in Newman. | **Smart engineering.** Because Newman's `--delay-request` does not throttle `pm.sendRequest()`, that `340 ms` helper pause kept `308` live Notion calls under the `~3 req/s` cap. |
+| **Script Readability & DRY Trade-Off** | Helper functions (`std()`, `errResp()`, `para()`, `toggle()`, `sandbox()`, `cleanup()`) make the bottom `10–15` lines of each test concise, **but** the same `~65`-line (`~5.6 KB`) helper prelude is pasted into both Pre-request and Post-response scripts of all `81` requests (`162` copies; collection-level events and auth are empty). | **Main maintainability bottleneck.** Opening any request in Postman shows `~65` lines of boilerplate before the actual test logic, and updating one shared helper requires editing `162` scripts. |
+
+##### Strengths
+
+1. **True Per-Test Sandbox Isolation:** Creating a fresh child page per test and moving it to trash (`PATCH /v1/pages/{id}` with `{"in_trash": true}`) solves Notion's lack of permanent delete while keeping our shared Group 2 workspace clean.
+2. **Consistent Data-Integrity Checks (`[Data integrity]`):** Every write (`PATCH` append, `PATCH` update, `DELETE`) and rejected write is verified with a follow-up `GET` (`getBlock()` / `listAll()`) rather than trusting only the primary response body.
+3. **Real Multi-Request Chaining + Heavy Pagination Coverage:** `TC_E2E_BLK_001` (`6` requests) and `TC_E2E_BLK_003` (`5` requests) pass `e2e_block_id`, `e2e_a_id`, and `e2e_b_id` cleanly across URLs, while `TC_E2E_BLK_002` builds `101` blocks and traverses `3` cursor pages (`page_size=50`) verifying zero duplicates.
+4. **Genuine Notion API Findings Surfaced in Newman:** The `11` failed assertions across `5` cases in her Newman report document real Notion `2025-09-03` behaviors vs. Lab 01 expectations: `3`-level nested children accepted with `200 OK` (`TC_BLK_APP_017`), `409 Conflict` returned on concurrent parallel appends to the same page (`TC_BLK_APP_018`), `page_size=0/-1/101` clamped to `200 OK` (`TC_BLK_CHL_012` — the exact same clamping behavior I saw on `GET /v1/users` in `TC_USR_LIST_009a`/`009b`), `404` when reading children of a deleted block (`TC_BLK_DEL_003`), and restored blocks reappearing at the end `["A", "C", "B"]` instead of their original middle index (`TC_E2E_BLK_003_Step5`).
+
+##### Opportunities for Improvement
+
+1. **Centralize the `~65`-Line Helper Prelude at Collection Level:** Just as Karen suggested centralizing common checks in my `Users & OAuth` review, moving `V`, `call`, `sandbox`, `cleanup`, `std`, and `errResp` into a Collection-level script (or Postman Package Library) and setting Collection-level `Bearer {{NOTION_TOKEN}}` + `Notion-Version` would remove `162` duplicated prelude blocks and leave only the `5–15` lines of test logic inside each request.
+2. **Complete the Two `[COMPLETAR]` Cells in Section `4.2`:** In the Group 2 report (Activity #4), the execution table for `Blocks` still has `[COMPLETAR]` placeholders for Total Assertions and Passed/Failed counts, even though her committed Newman HTML report already contains the exact numbers (`375` assertions: `364` passed, `11` failed, `6` skipped requests).
+3. **Wrap Async Test Bodies in `try { ... } finally { await cleanup(); }`:** Inside each request's `(async () => { ... })()` block, `await cleanup()` sits on the last line; wrapping the body in `try / finally` guarantees the sandbox page is always trashed even if an unexpected runtime error occurs mid-script.
+4. **Include `x-notion-request-id` in `std()`:** Adding `pm.response.to.have.header("x-notion-request-id")` inside `std()` (alongside status, `Content-Type`, and `< 5000 ms` SLA) would align trace-header checks with the rest of our Group 2 Notion collections.
+
+##### Verdict
+
+**Excellent engineering work.** Karen's `Blocks` collection is one of the most thorough, self-contained, and runnable suites in Group 2—especially in how it handles Notion's `~3 req/s` rate limit, per-test sandbox pages, and follow-up `GET` persistence checks across `308` live API calls. Centralizing the repeated helper prelude and filling the final Runner numbers in section `4.2` will make an already strong deliverable even cleaner.
+
+---
+
+#### 5.2.6 Intra-Team Peer Review — Reviewer: Karen Ivonne Cruz Alvarez | Reviewed: Gabriel Marcos Guaman Ortuño (Notion API: `Users` & `OAuth` Modules)
+
+**Reviewer:** Karen Ivonne Cruz Alvarez  
+**Reviewed Author:** Gabriel Marcos Guaman Ortuño (Group 2)  
+**Module:** Notion API `2025-09-03`, `Users` and `OAuth`  
+**Basis of the review:** the Group 2 report (Activities 1–4 and their screenshots). The collection file itself was not opened for this review.
+
+##### Summary
+
+Gabriel turned all **52 test cases** from Laboratory 01 into Postman: 69 requests, 345 assertions, 345 passed and 0 failed. The numbers are consistent across the report, the Collection Runner (`27 s 988 ms`) and the Newman CLI run (`28.9 s`), so the result is credible and was verified on two runners.
+
+##### Strengths
+
+1. **Complete traceability.** Every Lab 01 case has its own request and keeps its `TC_` ID, and the mapping table by endpoint makes it easy to find any test.
+2. **Uniform multi-layer verification.** Each request checks status, `Content-Type`, `x-notion-request-id`, a `< 5000 ms` SLA and the schema or error contract. This gives a predictable five-assertion pattern that is easy to read and audit.
+3. **Careful test design for OAuth.** The revoke test uses an isolated disposable token (`isolated_revocable_token`) so the shared credentials survive, and the destructive token-revocation chain runs last, so earlier suites never lose their credentials.
+4. **Real chained flows.** `TC_E2E_002` (pagination, UUID normalization and `401` check) and the OAuth lifecycle (exchange, introspect, `users/me`, revoke, introspect again, `401`) share state through variables and clean up after themselves.
+5. **Clear conventions.** Three-tier numbered folders, Happy Path → Boundary → Negative ordering, `<TC_ID> - <Check>` assertion names, and `UPPER_SNAKE_CASE` for secrets versus `lower_snake_case` for runtime variables.
+6. **Honest classification of automation limits.** The report separates 45 fully automatable cases from 4 that need extra credentials and 4 that are semi-automated (browser OAuth consent, `429` burst), instead of claiming 100%.
+
+##### Opportunities for Improvement
+
+1. **Specific vs generic assertions.** The five-layer pattern means a large share of the 345 assertions are the same transport checks repeated. Moving the shared ones (`Content-Type`, request ID, SLA) to collection level, as the other teams did, would leave each request showing only its specific checks.
+2. **Semi-automated cases.** `TC_OAUTH_TOK_001`, `TC_OAUTH_TOK_009`, `TC_E2E_001` (manual consent) and `TC_USR_ME_008` (burst `429`) still need manual steps. A short README explaining how to obtain `OAUTH_AUTH_CODE` would help whoever reruns the suite.
+3. **CI hook.** The Newman run is documented; adding the `--delay-request` value and the secret handling to the shared GitHub Actions workflow would make his collection part of the team pipeline.
+
+##### Verdict
+
+**Very good work.** Gabriel's suite is complete, well organized and verified on two runners, with thoughtful handling of the risky OAuth flows. It is one of the strongest and most reproducible parts of the Group 2 deliverable. The suggestions above are refinements, not corrections.
+
+---
+
+<div style="page-break-after: always;"></div>
+
+### 5.3 Evaluation and Peer-Review Feedback Reports
+
+> [!NOTE]
+> **Activity #5 — Item 3 (`5.3`):** Consolidated peer-review feedback reports detailing key technical strengths, prioritized QA improvement recommendations, and overall audit verdicts.
+
+#### 5.3.1 Reviewer: Sebastián Pereyra — Reviewed: Lucas Gabriel De Los Santos (GitHub Issues)
+
+As reviewer of Lucas Gabriel De Los Santos's implementation, **Sebastián Pereyra** issues the following formal feedback report:
+
+##### Key Strengths & Best Practices:
+
+1. **Formal JSON Schema Validation via `ajv` (`pm.response.to.have.jsonSchema`):**  
+   Lucas defined two centralized JSON schemas stored in collection variables (`issueSchema` and `errorSchema`), validating required properties, data types, and enum constraints across all responses. This represents a substantial leap in contract validation rigor compared to basic null checks.
+2. **Promise-Wrapped `pm.sendRequest` for Newman v6.x Compatibility:**  
+   To avoid asynchronous race conditions and callback nesting issues during CLI execution, Lucas wrapped `pm.sendRequest` within native JavaScript Promises (`await sendRequest(...)`). This guarantees that Newman halts sequential execution until dynamic setup requests resolve completely.
+3. **Environment Security & Credential Isolation:**  
+   The personal access token (`githubToken`) is maintained strictly in the *Current Value* of a masked variable (`type: "secret"`). When executed via Newman, credentials are passed via CLI flags (`--env-var "githubToken=<token>"`), and sensitive headers are suppressed from test reports using `--reporter-htmlextra-skipHeaders Authorization`.
+4. **Rate Limit Throttling in Headless Automation:**  
+   Lucas correctly identified GitHub's secondary rate limits (which penalize rapid successive write operations) and configured Newman with `--delay-request 500` (adding a 500 ms inter-request throttle). This ensured 100% deterministic execution without encountering false `403 secondary rate limit` rejections.
+
+##### Constructive Recommendations & Opportunities for Improvement:
+
+1. **Defect Tracking Annotation for Known API Failures (`TC_ISS_PATCH_006`):**  
+   While keeping `TC_ISS_PATCH_006` failing at status `422` is the correct QA stance, in continuous integration pipelines a red test halts deployment builds. It is recommended to implement a conditional assertion or a defect flag:
+   ```javascript
+   // Recommended pattern for documented upstream API defects:
+   const isDocumentedBug = true;
+   if (isDocumentedBug && pm.response.code === 200) {
+       console.warn("[UPSTREAM BUG CONFIRMED] GitHub Issue #XYZ: API accepts invalid state string instead of 422.");
+       pm.test("[Known Bug] API improperly accepted invalid state with 200 OK", function () {
+           pm.response.to.have.status(200);
+       });
+   } else {
+       pm.test("Status code is 422 Unprocessable Entity", function () {
+           pm.response.to.have.status(422);
+       });
+   }
+   ```
+   This maintains visibility of the bug in logs without breaking unattended CI/CD test gates.
+
+2. **Decoupling JSON Schemas from Collection Variables:**  
+   The schemas `issueSchema` and `errorSchema` are currently serialized as stringified JSON inside Postman Collection Variables (`"variable": [...]`). For complex schemas with dozens of nested fields, this inflates the collection file size. A best practice for large enterprise suites is storing raw JSON schemas in an external `/schemas` directory and loading them dynamically via Newman data files or Pre-request scripts.
+
+3. **Status Code Flexibility in Permission Boundaries (`E2E_002`):**  
+   In `E2E_002`, Lucas checked `pm.expect(pm.response.code).to.be.oneOf([403, 404])`. While this accommodates GitHub's security policy of returning `404` to conceal private repository existence, logging whether the response was `403` or `404` in the Postman Console provides immediate diagnostic clarity without requiring manual inspect-element on the response.
+
+##### Overall Audit Verdict:
+Lucas Gabriel De Los Santos delivered an **exceptionally mature, technically rigorous, and clean API automation suite**. The integration of multi-layer assertions, formal JSON Schema validation, data integrity verification via `pm.sendRequest`, and automated teardown makes this implementation an exemplary benchmark in automated API contract testing.
+
+---
+
+#### 5.3.2 Reviewer: Gabriel Marcos Guaman Ortuño — Reviewed: Valentín Imaz (GitHub Labels & Milestones)
+
+As reviewer of Valentín Imaz's implementation, **Gabriel Marcos Guaman Ortuño** provides the following peer-review feedback report:
+
+##### Strengths
+1. **Clean Setup & Teardown Cycle:** Filtering by the `qa-pm-*` prefix in both `00 - Setup` and `99 - Teardown`—and adding `TEARDOWN_02` and `TEARDOWN_04` to confirm with a `GET` that zero test items remain—makes the collection safe to re-run without deleting GitHub's default repository labels.
+2. **Schema Validation and Persistence Checks:** Saving `labelSchema`, `milestoneSchema`, and `errorSchema` as collection variables (`pm.response.to.have.jsonSchema`) and using `pm.sendRequest` to verify that changes persisted (including checking in `TC_MILESTONE_PATCH_005` that a rejected `422` update left the milestone `"open"`) gives much stronger confidence than checking status codes alone.
+3. **Honest Reporting on `TC_LABEL_POST_002`:** Keeping the Lab 1 assertion (`422`) when GitHub returned `201 Created` with default color `"ededed"` instead of editing the test just to get 100% green is the right QA practice.
+
+##### Opportunities for Improvement
+1. **Include the `.postman_environment.json` File and Newman Command:**  
+   In my own deliverable, pairing the collection with `Notion_Users_OAuth_Env.postman_environment.json` (with blank secret placeholders) allowed anyone to import and run it right away in Postman or Newman. Exporting `GitHub_Labels_Milestones_SQE3.postman_environment.json` would save other teams from setting up the `6` variables manually.
+2. **Add Negative Authentication and Permission Tests (`401` / `403`):**  
+   While building my `Users` and `OAuth` tests, checking missing, invalid, and restricted tokens (`401 Unauthorized` and `403 Forbidden`) was key to validating API security. In Valentín's collection, all `54` requests inherit the valid `{{githubToken}}`, so adding a few `No Auth` or invalid-token tests on `POST` / `PATCH` / `DELETE` would make negative coverage more complete.
+3. **Avoid Repository-Dependent Assumptions and Fixed Names:**  
+   `TC_LABEL_GET_001` checks that the default `'bug'` label exists and `TC_LABEL_GET_004` checks `labels.length >= 12`. If another teammate runs the collection on a repository where default GitHub labels were removed or customized, those assertions will fail. Also, generating unique names with `Date.now()` in a Pre-request script (instead of static `"qa-pm-post-001"`) would prevent `422 already_exists` errors when re-running a single request manually.
+4. **Small Script Fixes Found in the JSON (`TC_LABEL_POST_002`, `TC_LABEL_GET_001`, and Async Cleanup):**  
+   - In `TC_LABEL_POST_002`, `pm.expect(JSON.stringify(err)).to.include('color')` passed even though the API returned `201 Created`, because the created label JSON (`{"color": "ededed", ...}`) also contains the word `"color"`. Checking `err.errors` for `e.field === 'color'` avoids that false pass.  
+   - `TC_LABEL_GET_001` uses Postman's older `tv4.validate(...)` function while all other requests use `pm.response.to.have.jsonSchema(...)`; using `jsonSchema` everywhere keeps the scripts consistent.  
+   - `SETUP_01`/`02` and `TEARDOWN_01`/`03` fire multiple `pm.sendRequest` `DELETE` calls inside `.forEach(...)` without waiting for each callback to finish, which could cause a race condition right before `TEARDOWN_02`/`04` check that the list is empty if many leftover items exist.
+
+---
+
+#### 5.3.3 Reviewer: Karen Ivonne Cruz Alvarez — Reviewed: Kiara Vanessa Muñoz Bayter (GitHub Gists)
 
 As reviewer of Kiara Vanessa Muñoz Bayter's implementation, Karen Cruz issues the following formal feedback report:
 
-#### Key Strengths & Best Practices:
+##### Key Strengths & Best Practices:
 
 1. **Clear and readable structure.** Numbered folders, test-case IDs in request names and tagged assertions make a failure easy to locate in the Runner. The suite is short enough that a newcomer can understand it in a few minutes.
 2. **DRY common assertions.** Response time, `X-GitHub-Request-Id` and `Content-Type` (skipped on `204`) are written once at collection level, the same pattern used by the other teams.
@@ -2626,7 +2845,7 @@ As reviewer of Kiara Vanessa Muñoz Bayter's implementation, Karen Cruz issues t
 6. **Transparent reporting of a red test.** Kiara did not change the failing assertion to turn the run green, and her totals (`118 / 116 / 2`) reconcile exactly with the collection and the Runner screenshot.
 7. **Useful additions beyond Lab 01:** the public-Gist creation and anonymous read, and the delete of a non-existent Gist.
 
-#### Constructive Recommendations & Opportunities for Improvement:
+##### Constructive Recommendations & Opportunities for Improvement:
 
 1. **Diagnose and fix `TC_GIST_PATCH_004` (high priority).**  
    Read the `422` body first. Then create the precondition with two files and remove the one that actually exists after the rename, using the stored variable instead of a literal name. Make the body assertion safe so it does not throw on an error response:
@@ -2669,7 +2888,7 @@ As reviewer of Kiara Vanessa Muñoz Bayter's implementation, Karen Cruz issues t
 8. **Extend coverage when time allows.**  
    `401` with an invalid token on `GET` / `PATCH` / `DELETE`, `PATCH` on a non-existent Gist (`404`), accessing a private Gist without permission, `GET /gists` with `per_page` / `page`, and true boundary cases (very large content, many files). Document the preconditions and postconditions in each request's Description tab and state that the collection must run in order.
 
-#### Overall Audit Verdict:
+##### Overall Audit Verdict:
 
 | Criterion | Assessment |
 |---|---|
@@ -2680,150 +2899,13 @@ As reviewer of Kiara Vanessa Muñoz Bayter's implementation, Karen Cruz issues t
 
 Kiara delivered a **clear, runnable and well-organized foundation** for the Gists CRUD lifecycle, with sound chaining and honest reporting of results. To reach the level of the other teams she should (1) correct `TC_GIST_PATCH_004` and its diagnosis, (2) align the report with what the collection really contains, (3) add cleanup and data-integrity checks, and (4) deliver the Newman run and environment file. These are focused improvements, and the existing structure already supports them.
 
-
-### 5.7 Peer Feedback: Gabriel Marcos Guaman Ortuño (Users & OAuth)
-
-**Reviewer:** Karen Ivonne Cruz Alvarez
-**Reviewed Author:** Gabriel Marcos Guaman Ortuño (Group 2)  
-**Module:** Notion API `2025-09-03`, `Users` and `OAuth`  
-**Basis of the review:** the Group 2 report (Activities 1–4 and their screenshots). The collection file itself was not opened for this review.
-
-#### Summary
-
-Gabriel turned all **52 test cases** from Laboratory 01 into Postman: 69 requests, 345 assertions, 345 passed and 0 failed. The numbers are consistent across the report, the Collection Runner (`27 s 988 ms`) and the Newman CLI run (`28.9 s`), so the result is credible and was verified on two runners.
-
-#### Strengths
-
-1. **Complete traceability.** Every Lab 01 case has its own request and keeps its `TC_` ID, and the mapping table by endpoint makes it easy to find any test.
-2. **Uniform multi-layer verification.** Each request checks status, `Content-Type`, `x-notion-request-id`, a `< 5000 ms` SLA and the schema or error contract. This gives a predictable five-assertion pattern that is easy to read and audit.
-3. **Careful test design for OAuth.** The revoke test uses an isolated disposable token (`isolated_revocable_token`) so the shared credentials survive, and the destructive token-revocation chain runs last, so earlier suites never lose their credentials.
-4. **Real chained flows.** `TC_E2E_002` (pagination, UUID normalization and `401` check) and the OAuth lifecycle (exchange, introspect, `users/me`, revoke, introspect again, `401`) share state through variables and clean up after themselves.
-5. **Clear conventions.** Three-tier numbered folders, Happy Path → Boundary → Negative ordering, `<TC_ID> - <Check>` assertion names, and `UPPER_SNAKE_CASE` for secrets versus `lower_snake_case` for runtime variables.
-6. **Honest classification of automation limits.** The report separates 45 fully automatable cases from 4 that need extra credentials and 4 that are semi-automated (browser OAuth consent, `429` burst), instead of claiming 100%.
-
-#### Opportunities for Improvement
-
-1. **Specific vs generic assertions.** The five-layer pattern means a large share of the 345 assertions are the same transport checks repeated. Moving the shared ones (`Content-Type`, request ID, SLA) to collection level, as the other teams did, would leave each request showing only its specific checks.
-2. **Semi-automated cases.** `TC_OAUTH_TOK_001`, `TC_OAUTH_TOK_009`, `TC_E2E_001` (manual consent) and `TC_USR_ME_008` (burst `429`) still need manual steps. A short README explaining how to obtain `OAUTH_AUTH_CODE` would help whoever reruns the suite.
-3. **CI hook.** The Newman run is documented; adding the `--delay-request` value and the secret handling to the shared GitHub Actions workflow would make his collection part of the team pipeline.
-
-#### Verdict
-
-**Very good work.** Gabriel's suite is complete, well organized and verified on two runners, with thoughtful handling of the risky OAuth flows. It is one of the strongest and most reproducible parts of the Group 2 deliverable. The suggestions above are refinements, not corrections.
----
-### 5.7 Evaluation of Complexity, Quantity, and Test Typology (Reviewer: Kevin Uruchi)
-
-**Reviewer:** Kevin Uruchi (Group 2 — Notion API Testing Team)  
-**Reviewed Author:** Rosa Poma  
-**Reviewed System Under Test (SUT):** GitHub REST API (`version: 2026-03-10`), Search Module  
-**Audited Artifacts:**
-- Postman Collection: `GitHub_Search_SQE3.postman_collection.json`
-- Postman Environment: `GitHub_Search-SQE3..postman_environment.json`
-- Audit date: November 08, 2026
-
-> **Scope note.** I received the collection and the environment file, but no Runner screenshot, Newman report or written report. This is therefore a **static audit**: every number below was recomputed by reading the collection file, and I did not run it against `api.github.com`. Where I expect a result, I say so, and the points marked **[confirm in Runner]** should be checked with a real run before the report is closed.
-
 ---
 
-#### 5.7.1 Quantitative Test Metrics & Scope Analysis
-
-Rosa's suite has **16 test cases** (1 authorization, 10 repository search, 3 issue search and 2 E2E scenarios) implemented in **18 HTTP requests**. The two E2E scenarios use two requests each, because the first request searches and the second one verifies the result.
-
-| Execution Metric | Audited Value | Technical Assessment |
-|---|---|---|
-| **Total Test Cases** | **16** (1 + 10 + 3 + 2 E2E) | Small suite. It covers 2 of the 7 endpoints of the Search module (`/search/repositories` and `/search/issues`). If the Lab 01 assignment was limited to those two, this is by design. |
-| **Total Requests** | **18** (1 `/user`, 16 search requests and 1 `/repos/{full_name}` detail request) | One request per test case, plus the second step of each E2E. |
-| **Total Automated Assertions (static count)** | **101** = **44** request-level + **54** collection-level `[Common]` (3 per request × 18) + **3** in a folder-level script | **53% of the assertions are the generic collection-level checks**, so the headline number overstates verification depth. |
-| **Test-specific assertions** | **2.4 per request** on average (44 / 18); `TC_SEARCH_GET_003`, `GET_005`, `GET_007`, `GET_008`, `GET_010`, `ISS_001` and `ISS_002` have only 2 | Low to moderate depth. |
-| **Status code assertion** | Present in 16 of 18 requests | Missing in the first step of `TC_SEARCH_E2E_001` and `TC_SEARCH_E2E_002`. |
-| **Expected pass rate** | **99 / 101 assertions** if the live API behaves as the tests expect | The 2 expected failures come from the misplaced folder script (see 5.7.3). **[confirm in Runner]** |
-| **Execution Platforms** | Not provided in the files I received | No Newman command, report or screenshot to review. |
-
----
-
-#### 5.7.2 Test Typology & Complexity Assessment
-
-```mermaid
-pie title Rosa - GitHub Search Test Typology (16 Test Cases)
-    "Functional / happy path (6 TCs / 37.5%)" : 6
-    "Authorization & rate limit (2 TCs / 12.5%)" : 2
-    "Empty result (2 TCs / 12.5%)" : 2
-    "Boundary - per_page (2 TCs / 12.5%)" : 2
-    "Pagination (2 TCs / 12.5%)" : 2
-    "E2E chains (2 TCs / 12.5%)" : 2
-```
-
-1. **Functional / Happy Path (6 cases):**
-   - Search by language (`GET_001`), response structure with `total_count`, `incomplete_results` and `items` (`GET_002`), filter by stars (`GET_003`), complex qualifiers `created:>2023-01-01 language:go` (`GET_010`), issues by repository (`ISS_001`) and issues by state (`ISS_002`).
-   - `GET_003` is the best assertion of the group, because it uses `every()` to check the filter on all returned items.
-
-2. **Authorization & Rate-limit Telemetry (2 cases):**
-   - `TC_AUTH_001` (`GET /user`) asserts `X-RateLimit-Limit: 5000`, and `TC_SEARCH_GET_001` and `GET_009` assert the Search API limits (`30` authenticated and `10` unauthenticated per minute). Using the limit header to prove that the token was really applied is a good, non-intrusive idea.
-
-3. **Empty-result Scenarios (2 cases):**
-   - `GET_004` and `ISS_003` search for a term that does not exist and expect an empty `items` array.
-   - **Gap:** there is **no real negative case**. No test sends a missing or invalid `q`, an invalid token, or an invalid qualifier, so no `401`, `403` or `422` error contract is verified, and error payloads are never checked.
-
-4. **Boundary (2 cases):**
-   - `GET_005` (`per_page=100`) and `GET_006` (`per_page=101`). They are useful, but both use `at.most(100)`, which passes even if the API returned a single item. A real boundary test should assert exactly `100`.
-   - **Gap:** the best-known limit of the Search API is not tested: only the first 1,000 results are available, so a request beyond that (for example `page=201` with `per_page=5`) should be rejected. Other missing edges are `per_page=0`, `page=0` and an oversized `q`.
-
-5. **Pagination (2 cases):**
-   - `GET_007` stores the IDs of page 1, and `GET_008` checks that page 2 has no overlap. The idea is right, but the check is fragile (see 5.7.3, point 3).
-
-6. **Stateful E2E (2 cases):**
-   - `E2E_001`: search a Python repository, store `full_name` and `language`, then `GET /repos/{full_name}` and compare. This is the only real chained flow of the suite and a good integrity check.
-   - `E2E_002`: it repeats the same two requests as `GET_007` and `GET_008` (`q=test`, `page=1` and `page=2`, `per_page=5`) with a different variable name, so it adds no new coverage.
-
-**Complexity level: basic.** The suite uses status codes, one or two body checks, environment-variable chaining and collection-level common assertions. It has no JSON Schema, no `pm.sendRequest`, no dynamic data and no negative or error-contract tests.
-
----
-
-#### 5.7.3 Deep Technical Analysis of the Main Findings
-
-Rosa did not submit an execution report, so there is no "single failure" to analyze. Reading the scripts shows five points that affect the results.
-
-1. **Misplaced folder-level script in `00_Auth` (expected failure).**
-   The folder `00_Auth` contains a **folder-level test script** that checks `total_count > 0` and that `data.items[0].language` is `Python`. It looks like a leftover from a search request. Folder scripts run for every request inside the folder, so it runs for `TC_AUTH_001` (`GET /user`), whose body has no `total_count` and no `items`. Two of its three assertions should fail (`total_count` is not a number, and `data.items[0]` throws a `TypeError`), and `Status code is 200 OK` is reported twice. **[confirm in Runner]**
-
-2. **Vacuous assertions that pass with no data.**
-   `GET_010`, `ISS_001` and `ISS_002` wrap their assertions in `if (data.items && data.items.length > 0)`. If the API returns an empty list (or a rate-limited error body), the tests pass without checking anything. `GET_001` and `GET_003` handle this correctly with an explicit `pm.expect.fail(...)`.
-
-3. **Pagination checks that can pass without evidence.**
-   `GET_008` and `E2E_002 (Step 2)` read the previous page IDs with `JSON.parse(pm.environment.get("page1Ids") || "[]")`. If the first request did not run (or failed), the list is empty, the overlap is `0` and the test **passes**. In addition, `page1Ids` and `e2ePage1Ids` are written to the environment and never reset, so a stale value from a previous run can be used.
-
-4. **Titles that contradict the assertions.**
-   - `GET_006` is titled *"per_page=101 is rejected"*, but the test expects `200 OK` and a capped list (the title should say *"is capped at 100"*).
-   - `TC_AUTH_001` is titled *"authenticated user has higher **search** rate limit"*, but it calls `/user` and checks the core limit (`5000`), not the Search limit (`30`).
-   - `GET_009` is titled *"Returns public repositories only"* but only checks that `items` is an array.
-   - `GET_007` says *"Returns exactly 5 items or less"* while using `at.most(5)`.
-
-5. **First E2E steps without status check.**
-   `E2E_001` and `E2E_002` (first request) call `pm.response.json()` and `data.items.map(...)` outside any `pm.test`, and have no status assertion. With a `403` or `429` from the Search rate limit, the script throws an error instead of reporting a clean failed assertion.
-
----
-
-### 5.8 Usability, Comprehensibility, and Implementation Architecture Evaluation
-
-| Evaluation Dimension | Implementation Strategy in Rosa's Suite | Technical Evaluation (Kevin Uruchi) |
-|---|---|---|
-| **Folder Hierarchy & Ordering** | `00_Auth`, `01_Search_Repos`, `02_Search_Issues`, `03_E2E`, with numeric prefixes. | **Good.** Clear and consistent with the course convention, and the run order is deterministic. |
-| **Request & Assertion Naming** | `TC_<MODULE>_<ENDPOINT>_<NNN> - <description>`; tags `[Body]`, `[Header]`, `[Accuracy]`, `[Boundary]`, `[Pagination]`, `[Integrity]`, `[Common]`. | **Good, with inconsistencies.** Status assertions are untagged (`Status code is 200 OK`) while the others are tagged. There is no `[Schema]` tag because there is no schema check. `E2E_002 (Step 2)` still ends with the word **"Copy"**, and four titles contradict their assertions (see 5.7.3). |
-| **Centralized Contract Scripts** | Collection-level pre-request script upserts `Accept: application/vnd.github+json` and `X-GitHub-Api-Version: {{apiVersion}}`; collection-level tests check response time, `Content-Type` (skipped on `204`) and `X-GitHub-Request-Id`. | **Good (DRY).** The version is pinned once in the variable `apiVersion = 2026-03-10`, and the SLA is configurable with `maxResponseTime` (5000 ms). |
-| **Authentication** | Each of the 17 authenticated requests repeats its own `Bearer {{githubToken}}`; `GET_009` has no auth. | **Improvable.** Authentication should be set once at collection level, with a `No Auth` override only in `GET_009` and the auth tests. |
-| **Variables & Chaining** | Environment variables for config (`searchKeyword`, `perPage`, `nonExistentTerm`) and for runtime state (`page1Ids`, `e2eRepoFullName`, `e2eRepoLanguage`, `e2ePage1Ids`). | **Good idea, partial execution.** The environment variable `page` is never used, many requests hard-code `5`, `100` or `page=1`, and the runtime variables are never reset. |
-| **Data Integrity Verification** | Only `E2E_001 (Step 2)`, which compares the repository detail with the search result. | **Partial.** The Search module is read-only, so there is nothing to persist, but the integrity idea could be applied to pagination and to the issue and repository counts. |
-| **Teardown & Cleanup** | None. | **Not required.** The suite only reads, so it leaves no data in the account. This is not a weakness. |
-| **Reproducibility & Delivery** | Collection and environment file (the token has no value in the export). | **Good for security**, no credential is exposed. **Needs improvement:** no Newman command, no report, and the Search API has a low rate limit (see 5.9). |
-| **Documentation** | The collection description is still Postman's default text (*"Welcome to Postman! This is your first collection"*), and there are no folder or request descriptions. | **Needs improvement.** There are no documented preconditions or run order, and `GET_008` and the E2E steps depend on earlier requests. |
-
----
-
-### 5.9 Formal Feedback, QA Recommendations, and Technical Audit Report
+#### 5.3.4 Reviewer: Kevin Uruchi — Reviewed: Rosa Poma (GitHub Search)
 
 As reviewer of Rosa Poma's implementation, **Kevin Uruchi** issues the following formal feedback report:
 
-#### Key Strengths & Best Practices:
+##### Key Strengths & Best Practices:
 
 1. **Clear, ordered structure.** Numbered folders, test-case IDs in the request names and tagged assertions make it easy to locate a failure and to follow the run order.
 2. **DRY contract and common checks.** The two required headers are injected once with a collection-level pre-request script, and the response-time, `Content-Type` and `X-GitHub-Request-Id` checks are written once. The SLA is a variable (`maxResponseTime`), so it can be changed without editing every request.
@@ -2833,7 +2915,7 @@ As reviewer of Rosa Poma's implementation, **Kevin Uruchi** issues the following
 6. **Parameterized data.** Search keyword, page size and the non-existent term live in the environment, and the real token is not stored in the exported file.
 7. **Useful boundary discovery.** `GET_006` documents that GitHub caps `per_page` at 100 instead of rejecting it (the title only needs to say so).
 
-#### Constructive Recommendations & Opportunities for Improvement:
+##### Constructive Recommendations & Opportunities for Improvement:
 
 1. **Remove the folder-level script from `00_Auth` (high priority).**  
    Delete it, or move it into a search request, and make `TC_AUTH_001` check the identity with a real expected value:
@@ -2914,7 +2996,7 @@ As reviewer of Rosa Poma's implementation, **Kevin Uruchi** issues the following
 11. **Extend coverage when time allows.**  
     The Search module has seven endpoints. Besides repositories and issues, add at least `GET /search/users` and `GET /search/code` (the latter requires authentication), with their own happy-path, empty-result and boundary cases.
 
-#### Overall Audit Verdict:
+##### Overall Audit Verdict:
 
 | Criterion | Assessment |
 |---|---|
@@ -2927,13 +3009,15 @@ Rosa delivered a **clean, readable and well-organized base** for the Search modu
 
 ---
 
+<div style="page-break-after: always;"></div>
+
 ## Team Participation
 
-| Team Member | Lab 02 Contributions & Implemented Scope | Section/Item Worked On | Additional Comments & Status |
+| Team Member | Lab 02 Contributions & Implemented Scope | Section / Item Worked On | Additional Comments & Status |
 |---|---|---|---|
-| **Sebastián Pereyra** | Implementation and verification of the `Databases` (POST, GET, PATCH) and `Search` (POST) modules in Postman. Design of multi-tier assertion scripts, stateful E2E container lifecycle workflows (`E2E_02_Database_Search_Lifecycle`), Collection Runner validation (13/13 tests passed), Newman CI/CD automation design, and cross-team peer review evaluation of Lucas Gabriel De Los Santos (GitHub Issues) in Activity #5. | Actividad #2 (2.2.4), Actividad #3 (3.1.2, 3.2.2, 3.4.3), Actividad #4 (4.1, 4.2), Actividad #5 (5.1–5.3) | Author of `Lab02_Grupo2_Databases_Search.postman_collection.json`. 100% test execution success rate documented. |
-| **Valentina Molina Bustillos** | Implementation and verification of the `Data sources` (POST, GET, PATCH, Query) module along with supporting contractual checks for `Comments` and `File uploads`. Author of multi-tier assertion scripts, cursor-based pagination tests, chained E2E tabular query workflow (`E2E_01_Data_Source_Lifecycle`), Collection Runner execution (30/30 tests passed), and cross-team peer review collaboration in Activity #5. | Actividad #2 (2.2.2), Actividad #3 (3.1.2, 3.2.2, 3.4.2), Actividad #4 (4.1, 4.2), Actividad #5 (5.1–5.3) | Author of `Lab02_Grupo2_Valentina_CRUD.postman_collection.json`. 100% test execution success rate documented. |
-| **Gabriel Marcos Guaman Ortuño** | Exploration and verification of the `Users` and `OAuth` modules in Postman. Implementation of Bearer and Basic Auth verification requests in Activity #1, and 52 test cases across Users and OAuth in Activities #2, #3, and #4. | Actividad #1 (1.3), Actividad #2 (2.2.1), Actividad #3 (3.1.1, 3.2.1, 3.4.1), Actividad #4 (4.1, 4.2) | Author of `Notion_Users_OAuth_GabrielGuaman.postman_collection.json`. 345 assertions executed (100% pass rate). |
-| **Kevin Uruchi** | Specification and Postman implementation of the `Pages` module (POST, GET, PATCH, Move, Properties) spanning 200 automated test cases and 16 multi-step E2E flows in Activities #2, #3, and #4. | Actividad #2 (2.2.5), Actividad #3 (3.1.3, 3.2.3, 3.4.4), Actividad #4 (4.1, 4.2) | Author of `Notion_Pages.postman_collection.json`. |
-| **Karen Ivonne Cruz Alvarez** | Specification and Postman implementation of the `Blocks` module (`PATCH` append children, `GET` retrieve, `GET` children, `PATCH` update, `DELETE`): all **72 Lab 01 test cases** (68 endpoint cases + 4 E2E scenarios) implemented as **81 executable requests**, each verified in several layers (status, `Content-Type`, SLA, error contract and data integrity with a follow-up `GET`). Built a shared helper prelude (throttled `pm.sendRequest` wrapper, block builders, sandbox page creation and automatic cleanup) so every case creates its own data and trashes it at the end. Feasibility analysis of the 72 cases (64 fully automatable, 7 conditional, 1 semi-automated), preconditions and postconditions per suite, variable scopes (collection, environment, script-local), two true multi-request chains (`TC_E2E_BLK_001` with 6 steps and `TC_E2E_BLK_003` with 5 steps) plus two single-script scenarios (101-block pagination and read-only token enforcement). Defined the Newman execution with `htmlextra` report, request delay and script timeout to respect Notion's rate limit. | Actividad #2 (2.2.3), Actividad #3 (3.1, 3.2, 3.3), Actividad #4 (4.1, 4.2) | Author of `Notion_Blocks_KarenCruz.postman_collection.json` and `Notion_Blocks_Env.postman_environment.json`. Every case can run alone or in any folder selection. |
+| **Sebastián Pereyra** | • Implementation and verification of the `Databases` (`POST`, `GET`, `PATCH`) and `Search` (`POST`) modules in Postman.<br>• Design of multi-tier assertion scripts, stateful E2E container lifecycle workflows (`E2E_02_Database_Search_Lifecycle`), Collection Runner validation (`13/13` tests passed), and Newman CI/CD automation design.<br>• Cross-team peer review evaluation of Lucas Gabriel De Los Santos (`GitHub Issues`) in Activity #5. | • Activity #2 (`2.2.4`)<br>• Activity #3 (`3.1.2`, `3.2.2`, `3.4.3`)<br>• Activity #4 (`4.1`, `4.2`)<br>• Activity #5 (`5.1.1`, `5.2.1`, `5.3.1`) | • Author of `Lab02_Grupo2_Databases_Search.postman_collection.json`.<br>• 100% test execution success rate documented. |
+| **Valentina Molina Bustillos** | • Implementation and verification of the `Data sources` (`POST`, `GET`, `PATCH`, `Query`) module along with supporting contractual checks for `Comments` and `File uploads`.<br>• Author of multi-tier assertion scripts, cursor-based pagination tests, chained E2E tabular query workflow (`E2E_01_Data_Source_Lifecycle`), and Collection Runner execution (`30/30` tests passed).<br>• Cross-team peer review collaboration evaluating Lilian Lopez (`GitHub Repositories`) in Activity #5. | • Activity #2 (`2.2.2`)<br>• Activity #3 (`3.1.2`, `3.2.2`, `3.4.2`)<br>• Activity #4 (`4.1`, `4.2`)<br>• Activity #5 (`5.1.2`) | • Author of `Lab02_Grupo2_Valentina_CRUD.postman_collection.json`.<br>• 100% test execution success rate documented. |
+| **Gabriel Marcos Guaman Ortuño** | • Exploration and verification of the `Users` and `OAuth` modules in Postman.<br>• Implementation of Bearer and Basic Auth verification requests in Activity #1, and `52` test cases (`69` requests) across `Users` and `OAuth` in Activities #2, #3, and #4.<br>• Cross-team peer review of Valentín Imaz (`GitHub Labels & Milestones`) and intra-team peer review of Karen Ivonne Cruz Alvarez (`Notion Blocks`) in Activity #5. | • Activity #1 (`1.3`)<br>• Activity #2 (`2.2.1`)<br>• Activity #3 (`3.1.1`, `3.2.1`, `3.4.1`)<br>• Activity #4 (`4.1`, `4.2`)<br>• Activity #5 (`5.1.3`, `5.2.2`, `5.2.5`, `5.3.2`) | • Author of `Notion_Users_OAuth_GabrielGuaman.postman_collection.json` and `Notion_Users_OAuth_Env.postman_environment.json`.<br>• `345` assertions executed (`100%` pass rate in Runner & Newman). |
+| **Kevin Uruchi** | • Specification and Postman implementation of the `Pages` module (`POST`, `GET`, `PATCH`, `Move`, `Properties`) spanning `200` automated test cases and `16` multi-step E2E flows in Activities #2, #3, and #4.<br>• Cross-team static audit and peer review evaluation of Rosa Poma (`GitHub Search`) in Activity #5. | • Activity #2 (`2.2.5`)<br>• Activity #3 (`3.1.3`, `3.2.3`, `3.4.4`)<br>• Activity #4 (`4.1`, `4.2`)<br>• Activity #5 (`5.1.5`, `5.2.4`, `5.3.4`) | • Author of `Notion_Pages.postman_collection.json` and `Notion_Pages.postman_environment.json`. |
+| **Karen Ivonne Cruz Alvarez** | • Specification and Postman implementation of the `Blocks` module (`PATCH` append children, `GET` retrieve, `GET` children, `PATCH` update, `DELETE`): all **72 Lab 01 test cases** (`68` endpoint cases + `4` E2E scenarios) implemented as **81 executable requests**, each verified in several layers (status, `Content-Type`, SLA, error contract and data integrity with a follow-up `GET`).<br>• Built a shared helper prelude (throttled `pm.sendRequest` wrapper, block builders, sandbox page creation and automatic cleanup) so every case creates its own data and trashes it at the end.<br>• Feasibility analysis of the `72` cases (`64` fully automatable, `7` conditional, `1` semi-automated), preconditions and postconditions per suite, variable scopes (collection, environment, script-local), two true multi-request chains (`TC_E2E_BLK_001` with `6` steps and `TC_E2E_BLK_003` with `5` steps) plus two single-script scenarios (`101`-block pagination and read-only token enforcement).<br>• Defined the Newman execution with `htmlextra` report, request delay and script timeout to respect Notion's rate limit, plus cross-team peer review of Kiara Vanessa Muñoz Bayter (`GitHub Gists`) and intra-team peer review of Gabriel Marcos Guaman Ortuño (`Notion Users & OAuth`) in Activity #5. | • Activity #2 (`2.2.3`)<br>• Activity #3 (`3.1`, `3.2`, `3.3`)<br>• Activity #4 (`4.1`, `4.2`)<br>• Activity #5 (`5.1.4`, `5.2.3`, `5.2.6`, `5.3.3`) | • Author of `Notion_Blocks_KarenCruz.postman_collection.json` and `Notion_Blocks_Env.postman_environment.json`.<br>• Every case can run alone or in any folder selection. |
 
