@@ -2345,6 +2345,86 @@ flowchart TD
 
 ---
 
+### 5.1 Evaluation of Complexity, Quantity, and Test Typology (Reviewer: Gabriel Marcos Guaman Ortuño)
+
+**Reviewer:** Gabriel Marcos Guaman Ortuño (Group 2 — Notion API Testing Team)  
+**Reviewed Author:** Valentín Imaz  
+**Reviewed System Under Test (SUT):** GitHub REST API (`version: 2026-03-10`), Labels & Milestones Modules  
+**Audited Artifacts:**
+- Postman Collection: `GitHub_Labels_Milestones_SQE3.postman_collection.json` (`54` collection requests)
+- Laboratory 02 Report: Valentín Imaz's section in `Software Quality Engineering 3 – A.2 Laboratory - Week #2` (run against `ValentinImaz/github-api-testing`)
+
+---
+
+#### 1. Complexity, Quantity, and Types of Implemented Tests
+
+After importing `GitHub_Labels_Milestones_SQE3.postman_collection.json` into Postman and comparing it against Valentín Imaz's report, the collection shows a solid and well-justified level of complexity. He migrated all **43 test cases** from Lab 1 (`17` for `Labels` and `26` for `Milestones`) and added `7` helper requests in `00 - Setup` plus `4` cleanup requests in `99 - Teardown`, reaching **54 requests** in the collection. On top of those `54` requests, `8` test cases send a second `GET` request from the Post-response script using `pm.sendRequest` (to verify that updates were actually saved or to compare page 1 and page 2 in pagination), and the Setup/Teardown scripts also run dynamic `DELETE` requests to clean up `qa-pm-*` data.
+
+In his final Collection Runner execution, the suite ran **318 `pm.test()` assertions** (`259` across the `43` test cases—`105` in Labels and `154` in Milestones—plus `34` in Setup and `25` in Teardown) in about `36 seconds` (`527 ms` average response time), passing **316 of 318 assertions** (`42` of `43` test cases passed, `0` execution errors). The only failing case is `TC_LABEL_POST_002`, where Lab 1 expected `422` when creating a label without `color`, but GitHub returned `201 Created` and assigned the default color `"ededed"`.
+
+```mermaid
+flowchart TD
+    subgraph ValentinSuite ["GitHub Labels & Milestones Suite (54 Requests / 318 Assertions)"]
+        direction TB
+        SETUP["00 - Setup (7 Reqs): Clean leftovers & create 1 label + 4 milestone fixtures"]
+        HP["Happy Path (18 TCs): CRUD operations, state filters & due_on sorting"]
+        NEG["Negative Cases (17 TCs): 404 nonexistent/deleted IDs & 422 invalid fields"]
+        BND["Boundary & Pagination (8 TCs): 100/101-char descriptions & per_page=1/100"]
+        TEAR["99 - Teardown (4 Reqs): Delete qa-pm-* items & verify empty lists"]
+
+        SETUP --> HP
+        HP --> NEG
+        NEG --> BND
+        BND --> TEAR
+    end
+```
+
+| Test Category / Scope | Request Count | HTTP Methods Used | Implemented Assertions & Depth |
+|---|---|---|---|
+| **Happy Path (Positive CRUD & Queries)** | **18 TCs** (`6` Labels, `12` Milestones) | `2 POST`, `9 GET`, `5 PATCH`, `2 DELETE` | Status (`200`, `201`, `204`), body field comparisons (`name`, `color`, `title`, `state`, `closed_at`, `due_on` asc/desc order), empty body on `204` (`pm.response.text() === ''`), `labelSchema` / `milestoneSchema`, plus `[Common]` checks. |
+| **Negative & Post-Delete Validation** | **17 TCs** (`6` Labels, `11` Milestones) | `7 POST`, `5 GET`, `3 PATCH`, `2 DELETE` | Status (`404`, `422`), `errorSchema`, specific GitHub error messages (`code: "already_exists"`, `"pending is not a member of"`, `"not a valid date-time"`), and confirming deleted/renamed items return `404`. |
+| **Boundary & Pagination** | **8 TCs** (`5` Labels, `3` Milestones) | `2 POST`, `6 GET` | Pre-request `'a'.repeat(100)` (`201`) vs. `'a'.repeat(101)` (`422`), `per_page=1` two-page check with `Link` header (`rel="next"`, `rel="last"`), `per_page=100` upper limit, and `page=100` returning an empty array `[]`. |
+| **Chained & Multi-Request Flows** *(Cross-Cutting)* | **4 Chains** + **8 `pm.sendRequest` Steps** | `POST` → `GET` → `PATCH` → `DELETE` → `GET` | Full `qa-api-test` label chain (create → read → update → rename → old name `404` → delete → `404`), `{{msCreatedNumber}}` milestone chain, `4` shared setup milestone variables, and `8` follow-up `GET` persistence checks. |
+| **Setup & Teardown** | **11 Reqs** (`7` Setup + `4` Teardown) | `6 GET`, `5 POST` (+ script `DELETE`s) | `59` assertions (`34` Setup + `25` Teardown) cleaning `qa-pm-*` items, saving milestone numbers in collection variables, and checking that no test labels or milestones remain at the end. |
+| **Total Audited** | **`54` Requests** (`43` TCs + `11` Helpers) | **`26 GET`, `17 POST`, `8 PATCH`, `3 DELETE`** | **`318` Assertions (`316 Passed / 2 Failed`)** — avg. `~5.9` assertions per request (`< 2000 ms` SLA, `X-GitHub-Request-Id`, `Content-Type`, status, body, schema, and integrity). |
+
+---
+
+#### 2. Ease of Use and Understandability of the Implementation
+
+Reviewing the collection as an external tester and comparing it with how I organized my own `Users` and `OAuth` collection (`Notion_Users_OAuth_GabrielGuaman.postman_collection.json`), Valentín's work is clean and very easy to read:
+
+| Aspect Reviewed | How Valentín Implemented It | Practical Assessment |
+|---|---|---|
+| **Folder Structure & Order** | Numbered folders: `00 - Setup`, `01 - Labels`, `02 - Milestones`, and `99 - Teardown`. | Clear execution order for the Collection Runner. Since `02 - Milestones` has `26` requests together, splitting `Labels` and `Milestones` into `POST` / `GET` / `PATCH` / `DELETE` subfolders (like I did in my modules) would make browsing even faster. |
+| **Request & Test Naming** | Requests keep their Lab 1 ID (`TC_LABEL_POST_001 - Verify that...`) and test names start with `[Common]`, `[Body]`, `[Header]`, `[Schema]`, `[Integrity]`, `[Setup]`, `[Cleanup]`, or `[Teardown]`. | Very easy to trace back to Lab 1 and quickly see in the Runner whether a failure came from a status code, a schema, or a persistence check. |
+| **Collection-Level Scripts (DRY)** | Common headers (`Accept` and `X-GitHub-Api-Version`) and the `3` `[Common]` checks (`responseTime`, `X-GitHub-Request-Id`, and `Content-Type` skipped on `204`) are written once at the collection level. | Better maintainability than repeating header and SLA checks inside every request (as I did across my `69` requests), keeping each request's script short and focused on business logic. |
+| **Variables & Environment Setup** | Uses environment variables (`baseUrl`, `owner`, `repo`, `apiVersion`, `maxResponseTime`, and secret `githubToken`), collection variables (`labelSchema`, `milestoneSchema`, `errorSchema`, `msOpen1Number`–`msCreatedNumber`), and local variables (`desc100`, `desc101`). | Good separation of scopes, and keeping `githubToken` only in *Current Value* avoids leaking credentials. However, no `.postman_environment.json` file was delivered with the collection, so another team has to create those `6` variables manually from the report first. |
+| **Runner Execution** | `SETUP_01` and `SETUP_02` delete leftover `qa-pm-*` data before creating fresh fixtures, so the full `54`-request suite can be run repeatedly in Collection Runner in one click. | Works well as a full run (`~36 s`), though individual requests like `TC_LABEL_PATCH_002` or `TC_LABEL_DELETE_001` depend on previous steps and cannot be executed out of order on their own. |
+
+---
+
+#### 3. Peer-Review Feedback and Recommendations
+
+##### Strengths
+1. **Clean Setup & Teardown Cycle:** Filtering by the `qa-pm-*` prefix in both `00 - Setup` and `99 - Teardown`—and adding `TEARDOWN_02` and `TEARDOWN_04` to confirm with a `GET` that zero test items remain—makes the collection safe to re-run without deleting GitHub's default repository labels.
+2. **Schema Validation and Persistence Checks:** Saving `labelSchema`, `milestoneSchema`, and `errorSchema` as collection variables (`pm.response.to.have.jsonSchema`) and using `pm.sendRequest` to verify that changes persisted (including checking in `TC_MILESTONE_PATCH_005` that a rejected `422` update left the milestone `"open"`) gives much stronger confidence than checking status codes alone.
+3. **Honest Reporting on `TC_LABEL_POST_002`:** Keeping the Lab 1 assertion (`422`) when GitHub returned `201 Created` with default color `"ededed"` instead of editing the test just to get 100% green is the right QA practice.
+
+##### Opportunities for Improvement
+1. **Include the `.postman_environment.json` File and Newman Command:**  
+   In my own deliverable, pairing the collection with `Notion_Users_OAuth_Env.postman_environment.json` (with blank secret placeholders) allowed anyone to import and run it right away in Postman or Newman. Exporting `GitHub_Labels_Milestones_SQE3.postman_environment.json` would save other teams from setting up the `6` variables manually.
+2. **Add Negative Authentication and Permission Tests (`401` / `403`):**  
+   While building my `Users` and `OAuth` tests, checking missing, invalid, and restricted tokens (`401 Unauthorized` and `403 Forbidden`) was key to validating API security. In Valentín's collection, all `54` requests inherit the valid `{{githubToken}}`, so adding a few `No Auth` or invalid-token tests on `POST` / `PATCH` / `DELETE` would make negative coverage more complete.
+3. **Avoid Repository-Dependent Assumptions and Fixed Names:**  
+   `TC_LABEL_GET_001` checks that the default `'bug'` label exists and `TC_LABEL_GET_004` checks `labels.length >= 12`. If another teammate runs the collection on a repository where default GitHub labels were removed or customized, those assertions will fail. Also, generating unique names with `Date.now()` in a Pre-request script (instead of static `"qa-pm-post-001"`) would prevent `422 already_exists` errors when re-running a single request manually.
+4. **Small Script Fixes Found in the JSON (`TC_LABEL_POST_002`, `TC_LABEL_GET_001`, and Async Cleanup):**  
+   - In `TC_LABEL_POST_002`, `pm.expect(JSON.stringify(err)).to.include('color')` passed even though the API returned `201 Created`, because the created label JSON (`{"color": "ededed", ...}`) also contains the word `"color"`. Checking `err.errors` for `e.field === 'color'` avoids that false pass.  
+   - `TC_LABEL_GET_001` uses Postman's older `tv4.validate(...)` function while all other requests use `pm.response.to.have.jsonSchema(...)`; using `jsonSchema` everywhere keeps the scripts consistent.  
+   - `SETUP_01`/`02` and `TEARDOWN_01`/`03` fire multiple `pm.sendRequest` `DELETE` calls inside `.forEach(...)` without waiting for each callback to finish, which could cause a race condition right before `TEARDOWN_02`/`04` check that the list is empty if many leftover items exist.
+
+---
+
 ### 5.2 Usability, Comprehensibility, and Implementation Architecture Evaluation
 
 The usability and architectural ergonomics of Lucas Gabriel's Postman collection were evaluated across six operational criteria:
