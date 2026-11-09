@@ -2614,7 +2614,7 @@ The consequence is that the **per-test-case results table cannot be traced to th
 
 ### 5.6 Formal Feedback, QA Recommendations, and Technical Audit Report
 
-As reviewer of Kiara Vanessa Muñoz Bayter's implementation, **[REVIEWER NAME]** issues the following formal feedback report:
+As reviewer of Kiara Vanessa Muñoz Bayter's implementation, Karen Cruz issues the following formal feedback report:
 
 #### Key Strengths & Best Practices:
 
@@ -2680,6 +2680,36 @@ As reviewer of Kiara Vanessa Muñoz Bayter's implementation, **[REVIEWER NAME]**
 
 Kiara delivered a **clear, runnable and well-organized foundation** for the Gists CRUD lifecycle, with sound chaining and honest reporting of results. To reach the level of the other teams she should (1) correct `TC_GIST_PATCH_004` and its diagnosis, (2) align the report with what the collection really contains, (3) add cleanup and data-integrity checks, and (4) deliver the Newman run and environment file. These are focused improvements, and the existing structure already supports them.
 
+
+### 5.7 Peer Feedback: Gabriel Marcos Guaman Ortuño (Users & OAuth)
+
+**Reviewer:** Karen Ivonne Cruz Alvarez
+**Reviewed Author:** Gabriel Marcos Guaman Ortuño (Group 2)  
+**Module:** Notion API `2025-09-03`, `Users` and `OAuth`  
+**Basis of the review:** the Group 2 report (Activities 1–4 and their screenshots). The collection file itself was not opened for this review.
+
+#### Summary
+
+Gabriel turned all **52 test cases** from Laboratory 01 into Postman: 69 requests, 345 assertions, 345 passed and 0 failed. The numbers are consistent across the report, the Collection Runner (`27 s 988 ms`) and the Newman CLI run (`28.9 s`), so the result is credible and was verified on two runners.
+
+#### Strengths
+
+1. **Complete traceability.** Every Lab 01 case has its own request and keeps its `TC_` ID, and the mapping table by endpoint makes it easy to find any test.
+2. **Uniform multi-layer verification.** Each request checks status, `Content-Type`, `x-notion-request-id`, a `< 5000 ms` SLA and the schema or error contract. This gives a predictable five-assertion pattern that is easy to read and audit.
+3. **Careful test design for OAuth.** The revoke test uses an isolated disposable token (`isolated_revocable_token`) so the shared credentials survive, and the destructive token-revocation chain runs last, so earlier suites never lose their credentials.
+4. **Real chained flows.** `TC_E2E_002` (pagination, UUID normalization and `401` check) and the OAuth lifecycle (exchange, introspect, `users/me`, revoke, introspect again, `401`) share state through variables and clean up after themselves.
+5. **Clear conventions.** Three-tier numbered folders, Happy Path → Boundary → Negative ordering, `<TC_ID> - <Check>` assertion names, and `UPPER_SNAKE_CASE` for secrets versus `lower_snake_case` for runtime variables.
+6. **Honest classification of automation limits.** The report separates 45 fully automatable cases from 4 that need extra credentials and 4 that are semi-automated (browser OAuth consent, `429` burst), instead of claiming 100%.
+
+#### Opportunities for Improvement
+
+1. **Specific vs generic assertions.** The five-layer pattern means a large share of the 345 assertions are the same transport checks repeated. Moving the shared ones (`Content-Type`, request ID, SLA) to collection level, as the other teams did, would leave each request showing only its specific checks.
+2. **Semi-automated cases.** `TC_OAUTH_TOK_001`, `TC_OAUTH_TOK_009`, `TC_E2E_001` (manual consent) and `TC_USR_ME_008` (burst `429`) still need manual steps. A short README explaining how to obtain `OAUTH_AUTH_CODE` would help whoever reruns the suite.
+3. **CI hook.** The Newman run is documented; adding the `--delay-request` value and the secret handling to the shared GitHub Actions workflow would make his collection part of the team pipeline.
+
+#### Verdict
+
+**Very good work.** Gabriel's suite is complete, well organized and verified on two runners, with thoughtful handling of the risky OAuth flows. It is one of the strongest and most reproducible parts of the Group 2 deliverable. The suggestions above are refinements, not corrections.
 ---
 ### 5.7 Evaluation of Complexity, Quantity, and Test Typology (Reviewer: Kevin Uruchi)
 
@@ -2905,6 +2935,5 @@ Rosa delivered a **clean, readable and well-organized base** for the Search modu
 | **Valentina Molina Bustillos** | Implementation and verification of the `Data sources` (POST, GET, PATCH, Query) module along with supporting contractual checks for `Comments` and `File uploads`. Author of multi-tier assertion scripts, cursor-based pagination tests, chained E2E tabular query workflow (`E2E_01_Data_Source_Lifecycle`), Collection Runner execution (30/30 tests passed), and cross-team peer review collaboration in Activity #5. | Actividad #2 (2.2.2), Actividad #3 (3.1.2, 3.2.2, 3.4.2), Actividad #4 (4.1, 4.2), Actividad #5 (5.1–5.3) | Author of `Lab02_Grupo2_Valentina_CRUD.postman_collection.json`. 100% test execution success rate documented. |
 | **Gabriel Marcos Guaman Ortuño** | Exploration and verification of the `Users` and `OAuth` modules in Postman. Implementation of Bearer and Basic Auth verification requests in Activity #1, and 52 test cases across Users and OAuth in Activities #2, #3, and #4. | Actividad #1 (1.3), Actividad #2 (2.2.1), Actividad #3 (3.1.1, 3.2.1, 3.4.1), Actividad #4 (4.1, 4.2) | Author of `Notion_Users_OAuth_GabrielGuaman.postman_collection.json`. 345 assertions executed (100% pass rate). |
 | **Kevin Uruchi** | Specification and Postman implementation of the `Pages` module (POST, GET, PATCH, Move, Properties) spanning 200 automated test cases and 16 multi-step E2E flows in Activities #2, #3, and #4. | Actividad #2 (2.2.5), Actividad #3 (3.1.3, 3.2.3, 3.4.4), Actividad #4 (4.1, 4.2) | Author of `Notion_Pages.postman_collection.json`. |
-| **Karen Ivonne Cruz Alvarez** | Verification and request construction for the `Blocks` module in Postman. | Actividad #2 (2.2.3), Actividad #3, Actividad #4 | Continued integration with team collection. |
-
+| **Karen Ivonne Cruz Alvarez** | Specification and Postman implementation of the `Blocks` module (`PATCH` append children, `GET` retrieve, `GET` children, `PATCH` update, `DELETE`): all **72 Lab 01 test cases** (68 endpoint cases + 4 E2E scenarios) implemented as **81 executable requests**, each verified in several layers (status, `Content-Type`, SLA, error contract and data integrity with a follow-up `GET`). Built a shared helper prelude (throttled `pm.sendRequest` wrapper, block builders, sandbox page creation and automatic cleanup) so every case creates its own data and trashes it at the end. Feasibility analysis of the 72 cases (64 fully automatable, 7 conditional, 1 semi-automated), preconditions and postconditions per suite, variable scopes (collection, environment, script-local), two true multi-request chains (`TC_E2E_BLK_001` with 6 steps and `TC_E2E_BLK_003` with 5 steps) plus two single-script scenarios (101-block pagination and read-only token enforcement). Defined the Newman execution with `htmlextra` report, request delay and script timeout to respect Notion's rate limit. | Actividad #2 (2.2.3), Actividad #3 (3.1, 3.2, 3.3), Actividad #4 (4.1, 4.2) | Author of `Notion_Blocks_KarenCruz.postman_collection.json` and `Notion_Blocks_Env.postman_environment.json`. Every case can run alone or in any folder selection. |
 
