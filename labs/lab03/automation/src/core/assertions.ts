@@ -115,6 +115,60 @@ export const OAuthIntrospectSchema = z.object({
 });
 
 /**
+ * Zod Schema for Notion Database Container Object (Notion-Version: 2025-09-03)
+ */
+export const DatabaseObjectSchema = z.object({
+  object: z.literal('database'),
+  id: z.string().regex(UUIDv4Regex, 'Expected canonical 36-char hyphenated UUIDv4'),
+  created_time: z.string().min(1),
+  last_edited_time: z.string().min(1),
+  created_by: z
+    .object({
+      object: z.string(),
+      id: z.string(),
+    })
+    .optional(),
+  last_edited_by: z
+    .object({
+      object: z.string(),
+      id: z.string(),
+    })
+    .optional(),
+  title: z.array(z.record(z.any())),
+  description: z.array(z.record(z.any())).optional(),
+  icon: z.record(z.any()).nullable().optional(),
+  cover: z.record(z.any()).nullable().optional(),
+  properties: z.record(z.any()).optional(),
+  parent: z.object({
+    type: z.string(),
+    page_id: z.string().optional(),
+    database_id: z.string().optional(),
+    workspace: z.boolean().optional(),
+  }).passthrough(),
+  url: z.string().url().optional(),
+  public_url: z.string().nullable().optional(),
+  archived: z.boolean().optional(),
+  in_trash: z.boolean().optional(),
+  is_inline: z.boolean().optional(),
+  data_sources: z.array(z.record(z.any())).optional(),
+  request_id: z.string().optional(),
+});
+
+/**
+ * Zod Schema for Notion Search Global / Filtered List Response (POST /v1/search)
+ */
+export const PaginatedSearchListSchema = z.object({
+  object: z.literal('list'),
+  results: z.array(z.record(z.any())),
+  next_cursor: z.string().nullable(),
+  has_more: z.boolean(),
+  type: z.string().optional(),
+  page_or_database: z.record(z.unknown()).optional(),
+  page_or_data_source: z.record(z.unknown()).optional(),
+  request_id: z.string().optional(),
+});
+
+/**
  * Multi-Layer Common Transport & SLA Assertion Helper (replaces Collection-Level [Common] Script)
  */
 export function assertCommonHeadersAndSla(response: TimedAxiosResponse, maxSlaMs = 5000): void {
@@ -169,4 +223,41 @@ export function assertOAuthErrorContract(
   const actualErrorCode = response.data?.error || response.data?.code;
   expect(typeof response.data).toBe('object');
   expect(allowed).toContain(actualErrorCode);
+}
+
+/**
+ * Strict Notion Database Object Contract Validator
+ */
+export function assertDatabaseObjectContract(
+  response: TimedAxiosResponse,
+  expectedStatus = 200
+): void {
+  expect(response.status).toBe(expectedStatus);
+  assertCommonHeadersAndSla(response);
+
+  const parsed = DatabaseObjectSchema.safeParse(response.data);
+  expect(parsed.success, `Expected Database schema, got: ${JSON.stringify(response.data)}`).toBe(true);
+  expect(response.data.object).toBe('database');
+  expect(response.data.id).toMatch(UUIDv4Regex);
+  expect(Array.isArray(response.data.title)).toBe(true);
+  if (response.data.properties !== undefined) {
+    expect(typeof response.data.properties).toBe('object');
+  }
+}
+
+/**
+ * Strict Notion Search List Response Contract Validator
+ */
+export function assertSearchListContract(
+  response: TimedAxiosResponse,
+  expectedStatus = 200
+): void {
+  expect(response.status).toBe(expectedStatus);
+  assertCommonHeadersAndSla(response);
+
+  const parsed = PaginatedSearchListSchema.safeParse(response.data);
+  expect(parsed.success, `Expected Search list schema, got: ${JSON.stringify(response.data)}`).toBe(true);
+  expect(response.data.object).toBe('list');
+  expect(Array.isArray(response.data.results)).toBe(true);
+  expect(typeof response.data.has_more).toBe('boolean');
 }
