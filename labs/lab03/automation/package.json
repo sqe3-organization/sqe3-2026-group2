@@ -1,0 +1,37 @@
+{
+  "name": "sqe3-2026-group2-notion-api-automation",
+  "version": "1.0.0",
+  "description": "SQE III Lab 03 - Group 2 Notion REST API (2025-09-03) Test Automation Framework powered by Node.js, TypeScript, Axios, Zod, and Vitest",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "test": "vitest run",
+    "test:gabriel": "vitest run tests/gabriel_guaman",
+    "test:act5": "vitest run tests/gabriel_guaman/act5_stateless_users_oauth.test.ts",
+    "test:act6": "vitest run tests/gabriel_guaman/act6_preconditioned_and_e2e.test.ts",
+    "test:sebastian": "vitest run tests/sebastian_pereyra",
+    "test:sebastian:act5": "vitest run tests/sebastian_pereyra/act5_stateless_databases_search.test.ts",
+    "test:sebastian:act6": "vitest run tests/sebastian_pereyra/act6_preconditioned_and_e2e.test.ts",
+    "test:kevin": "vitest run tests/kevin_uruchi",
+    "test:kevinact5": "vitest run tests/kevin_uruchi/act5_stateless_users_oauth.test.ts",
+    "test:karen": "vitest run tests/karen_cruz/ --reporter=verbose",
+    "test:karen:act5": "vitest run tests/karen_cruz/act5_stateless_blocks.test.ts --reporter=verbose",
+    "test:karen:act6": "vitest run tests/karen_cruz/act6_preconditioned_and_e2e_blocks.test.ts --reporter=verbose",
+    "newman:lab02:databases": "newman run ../../lab02/postman/actividad_2_3_4/Act2_4_Notion_Databases_DataSources.postman_collection.json -e ../../lab02/postman/actividad_2_3_4/Act1_Notion_Env_Sebas_Vale.postman_environment.json --delay-request 350"
+    "test:report": "vitest run --reporter=verbose --reporter=json --outputFile=../reports/vitest_execution_report.json",
+    "test:ui": "vitest --ui"
+  },
+  "dependencies": {
+    "axios": "^1.7.7",
+    "dotenv": "^16.4.5",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.9.0",
+    "@vitest/ui": "^2.1.5",
+    "newman": "^6.2.3",
+    "newman-reporter-htmlextra": "^1.23.1",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.5"
+  }
+}
