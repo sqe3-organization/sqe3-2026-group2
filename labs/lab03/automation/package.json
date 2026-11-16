@@ -14,10 +14,12 @@
     "test:sebastian:act6": "vitest run tests/sebastian_pereyra/act6_preconditioned_and_e2e.test.ts",
     "test:kevin": "vitest run tests/kevin_uruchi",
     "test:kevinact5": "vitest run tests/kevin_uruchi/act5_stateless_users_oauth.test.ts",
-    "test:kevinact6": "vitest run tests/kevin_uruchi/act6_preconditioned_and_e2e.test.ts",
-    "test:report": "vitest run --reporter=verbose --reporter=json --outputFile=../reports/vitest_execution_report.json",
-    "test:ui": "vitest --ui",
+    "test:karen": "vitest run tests/karen_cruz/ --reporter=verbose",
+    "test:karen:act5": "vitest run tests/karen_cruz/act5_stateless_blocks.test.ts --reporter=verbose",
+    "test:karen:act6": "vitest run tests/karen_cruz/act6_preconditioned_and_e2e_blocks.test.ts --reporter=verbose",
     "newman:lab02:databases": "newman run ../../lab02/postman/actividad_2_3_4/Act2_4_Notion_Databases_DataSources.postman_collection.json -e ../../lab02/postman/actividad_2_3_4/Act1_Notion_Env_Sebas_Vale.postman_environment.json --delay-request 350"
+    "test:report": "vitest run --reporter=verbose --reporter=json --outputFile=../reports/vitest_execution_report.json",
+    "test:ui": "vitest --ui"
   },
   "dependencies": {
     "axios": "^1.7.7",

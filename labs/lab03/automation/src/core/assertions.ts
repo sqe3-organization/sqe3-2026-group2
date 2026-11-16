@@ -49,6 +49,51 @@ export const PaginatedUserListSchema = z.object({
 });
 
 /**
+ * Zod Schema for Notion Block Objects (Notion-Version: 2025-09-03)
+ */
+export const BlockObjectSchema = z
+  .object({
+    object: z.literal('block'),
+    id: z.string().regex(UUIDv4Regex, 'Expected canonical 36-char hyphenated UUIDv4'),
+    parent: z.object({
+      type: z.string(),
+      page_id: z.string().regex(UUIDv4Regex).optional(),
+      block_id: z.string().regex(UUIDv4Regex).optional(),
+      workspace: z.boolean().optional(),
+      database_id: z.string().regex(UUIDv4Regex).optional(),
+      data_source_id: z.string().regex(UUIDv4Regex).optional(),
+    }),
+    type: z.string().min(1),
+    created_time: z.string().min(1),
+    last_edited_time: z.string().min(1),
+    created_by: z.object({
+      object: z.literal('user'),
+      id: z.string().regex(UUIDv4Regex),
+    }),
+    last_edited_by: z.object({
+      object: z.literal('user'),
+      id: z.string().regex(UUIDv4Regex),
+    }),
+    has_children: z.boolean(),
+    archived: z.boolean(),
+    in_trash: z.boolean(),
+  })
+  .passthrough();
+
+/**
+ * Zod Schema for Paginated Block Children List (GET /v1/blocks/{block_id}/children & PATCH /v1/blocks/{block_id}/children)
+ */
+export const PaginatedBlockListSchema = z.object({
+  object: z.literal('list'),
+  results: z.array(BlockObjectSchema),
+  next_cursor: z.string().nullable(),
+  has_more: z.boolean(),
+  type: z.literal('block'),
+  block: z.record(z.unknown()).optional(),
+  request_id: z.string().regex(UUIDv4Regex).optional(),
+});
+
+/**
  * Zod Schema for Notion Standard Error Payload
  */
 export const NotionErrorSchema = z.object({
