@@ -547,22 +547,54 @@ Rather than accepting the AI-generated output verbatim, **Group 2** executed a r
 
 ## Activity #4
 
-1. Initialize and configure the code-based API test automation framework repository using the selected tools (**`Axios + Vitest`**).
-2. Document the project directory structure, environment configuration (`.env`), shared HTTP client / auth interceptors, and execution scripts (`package.json`).
-3. Implement and execute a smoke / authorization verification test suite against the assigned System Under Test (**Notion REST API `2025-09-03`**).
+1. Propose a branching structure, commit convention, PR policies, and continuous integration strategies.
+2. Document the Generative AI prompt and validation procedure used to define these conventions.
 
-### 4.1 Framework Architecture, Directory Structure & Toolchain Setup (`Axios + Vitest + TypeScript`)
+### 4.1 Team Git Workflow & Engineering Conventions
 
-> *[Placeholder — Ready to be populated next in Activity #4.]*
+To ensure seamless collaboration across the five members of **Group 2**, prevent merge conflicts in the TypeScript repository, and maintain a clean, auditable history for the professor's review, the team established a strict workflow based on **GitHub Flow** and **Conventional Commits**.
 
-### 4.2 Environment Configuration (`.env`), Base HTTP Clients & Global Interceptors
+#### A. Branching Strategy
+- **`main` Branch:** Protected. Holds the stable, production-ready version of the `Axios + Vitest` framework that the professor will review.
+- **Weekly Integration Branch (`week_X`):** Created from `main` at the start of each week (e.g., `week_3`). This acts as the integration point for all team modules during the sprint.
+- **Feature Branches (`feature/module_name`):** Created from the weekly branch (e.g., `feature/data-sources`, `feature/oauth-users`). Each member works on their assigned module here and merges back into `week_X` via Pull Request.
 
-> *[Placeholder — Ready to be populated next in Activity #4.]*
+![Convención de Ramas](./caps/valentinamolina/convencion_ramas.png)
 
-### 4.3 Authorization & Smoke Verification Test Suite on Notion REST API (`2025-09-03`)
+#### B. Commit Convention (Conventional Commits)
+All commits must follow the `<type>(<scope>): <description>` format to ensure readability and facilitate automated changelog generation:
+- **`feat(module):`** New test implementation (e.g., `feat(databases): add CRUD tests for database endpoints`).
+- **`fix(module):`** Correction of a failing assertion (e.g., `fix(comments): update expected status code to 403`).
+- **`refactor:`** Code structure changes without altering behavior (e.g., `refactor: extract axios client to common config`).
+- **`docs:`** Updates to the README or Markdown documentation.
+- **`chore:`** Dependency updates, `.env` configuration, or `.gitignore` tweaks.
 
-> *[Placeholder — Ready to be populated next in Activity #4.]*
+![Convención de Commits](./caps/valentinamolina/convencion_commits.png)
 
+#### C. Pull Request (PR) Policies
+- **Mandatory Review:** No code is merged into `week_X` or `main` without at least one approval from another team member.
+- **PR Title:** Must follow the same commit convention (e.g., `feat(pages): migrate pages module to vitest`).
+- **PR Description Requirements:**
+  1. Brief summary of the changes (files added/modified).
+  2. Instructions on how to run the new tests (`npm run test:pages`).
+  3. Evidence of success (CLI screenshot or `htmlextra` report snippet).
+
+![Políticas de Pull Request](./caps/valentinamolina/convencion_pull_requests.png)
+
+#### D. Continuous Integration (CI) Strategy
+- **GitHub Actions:** A CI pipeline is configured to trigger on every Pull Request to the `week_X` branch.
+- **Pipeline Steps:** The workflow installs dependencies (`npm ci`), compiles TypeScript (`tsc --noEmit`), and executes the test suite (`npm run test:ci`).
+- **Environment Injection:** The pipeline securely injects `NOTION_TOKEN` and `NOTION_PAGE_ID` via GitHub Repository Secrets, avoiding hardcoded credentials in the repository.
+
+![Estrategia de Integración Continua](./caps/valentinamolina/convencion_ci.png)
+
+### 4.2 Generative AI Usage (Prompt & Validation Procedure)
+
+**Prompt Used:**
+```text
+Act as a Senior QA Automation Engineer and DevOps Specialist. Our team of 5 QA engineers is migrating a Postman API test suite for the Notion REST API to a code-based framework using TypeScript, Axios, and Vitest.
+Propose a Git workflow (branching strategy, commit conventions, PR policies, and CI/CD strategy) for this repository. The workflow must facilitate parallel work on 5 different Notion modules, protect the main branch, and ensure that the professor can easily review the final consolidated code at the end of the week.
+```
 ---
 
 <div style="page-break-after: always;"></div>
@@ -1053,7 +1085,7 @@ To prevent module-resolution errors (`ERR_REQUIRE_ESM`), type-definition mismatc
 | Team Member | Lab 03 Contributions & Implemented Scope | Section / Item Worked On | Additional Comments & Status |
 |---|---|---|---|
 | **Gabriel Marcos Guaman Ortuño** | • Refactored `Notion_Users_OAuth_GabrielGuaman.postman_collection.json` (`69` requests, `345` assertions) and `Notion_Users_OAuth_Env.postman_environment.json` incorporating all 4 peer-review suggestions from Lilian Rosario López Coca (strict single status codes, collection-level DRY `[Common]` assertions, unified `OAUTH_ACCESS_TOKEN` & `next_cursor` variables, and in-collection Markdown setup guide).<br>• Executed unattended Newman `v6.2.3` CLI + `htmlextra` validation (`70` HTTP requests, `345` assertions: `328 Passed / 17 Failed`, `95.07%` pass rate) and documented the full root-cause classification of all `17` failed assertions across Category A (Notion API contract defects) and Category B (unattended CLI/OAuth constraints).<br>• Authored the complete Activity #2 HTTP Client evaluation (`Axios` vs. `Supertest` vs. `Native Fetch / Undici` vs. `Got`), architectural justification (`axios.create` + `validateStatus: () => true`), and GenAI validation protocol.<br>• Built the Group 2 code-based automation framework (`labs/lab03/automation/` with TypeScript, Axios, Zod, and Vitest) and migrated all `69` `Users` & `OAuth` requests across `act5_stateless_users_oauth.test.ts` (`42` stateless tests: `32 Passed / 10 Failed` in `33.71s`) and `act6_preconditioned_and_e2e.test.ts` (`27` preconditioned & chained E2E tests; full `69`-test suite: `56 Passed / 13 Failed`, `81.16%` pass rate in `65.67s`) in Activities #5 and #6. | • Activity #1 (`1.1.1`, `1.2.1`, `1.3.1`)<br>• Activity #2 (`2.1`, `2.2`, `2.3`, `2.4`, `2.5`)<br>• Activity #5 (`5.1`, `5.2`, `5.3`, `5.4.1`)<br>• Activity #6 (`6.1`, `6.2.1`, `6.3`) | • Refactored Lab 03 Postman artifacts committed under `labs/lab03/postman/gabriel_guaman/`.<br>• Code-based framework & `69` Vitest tests (`56 Passed / 13 Failed`) committed under `labs/lab03/automation/`.<br>• Activities #1 (Gabriel's section), #2, #5 (Gabriel's section), and #6 (Gabriel's section) 100% completed. |
-| **Valentina Molina Bustillos** | *[Placeholder — To be completed by Valentina Molina Bustillos]* | • Activity #1 (`1.1.2`, `1.2.2`, `1.3.2`)<br>• Activity #5 (`5.4.2`)<br>• Activity #6 (`6.2.2`) | *[Pending completion]* |
+| **Valentina Molina Bustillos** | • Authored the complete Activity #4 Git workflow proposal, including the branching strategy (`main` / `week_X` / `feature/`), Conventional Commits guidelines, Pull Request policies, and CI/CD strategy (GitHub Actions) with a documented Generative AI prompt and validation procedure.<br>• Designed and generated the 4 visual reference guides (infographics) for the team's engineering conventions using AI image generation with a unified color palette. | • Activity #4 (Full section) | • Activity #4 100% completed.<br>• |
 | **Karen Ivonne Cruz Alvarez** | *[Placeholder — To be completed by Karen Ivonne Cruz Alvarez]* | • Activity #1 (`1.1.3`, `1.2.3`, `1.3.3`)<br>• Activity #5 (`5.4.3`)<br>• Activity #6 (`6.2.3`) | *[Pending completion]* |
 | **Sebastián Pereyra** | *[Placeholder — To be completed by Sebastián Pereyra]* | • Activity #1 (`1.1.4`, `1.2.4`, `1.3.4`)<br>• Activity #5 (`5.4.4`)<br>• Activity #6 (`6.2.4`) | *[Pending completion]* |
 | **Kevin Uruchi** | *[Placeholder — To be completed by Kevin Uruchi]* | • Activity #1 (`1.1.5`, `1.2.5`, `1.3.5`)<br>• Activity #5 (`5.4.5`)<br>• Activity #6 (`6.2.5`) | *[Pending completion]* |
