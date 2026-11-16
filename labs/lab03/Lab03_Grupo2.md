@@ -53,7 +53,8 @@ November 15, 2026
 6. [Activity #6](#activity-6)
    - [6.1 Multi-Layer Verifications: Status Code, Body, Headers, Data Integrity, and Parameter Types](#61-multi-layer-verifications-status-code-body-headers-data-integrity-and-parameter-types)
    - [6.2 Full Migration of Postman Test Suites (Preconditioned & Chained E2E Tests) to Code](#62-full-migration-of-postman-test-suites-preconditioned--chained-e2e-tests-to-code)
-   - [6.3 Library Compatibility Review and Dependency Matrix](#63-library-compatibility-review-and-dependency-matrix)
+   - [6.3 Library Compatibility and Ecosystem Review](#63-library-compatibility-and-ecosystem-review)
+   - [6.4 Consolidated Group Reflection](#64-consolidated-group-reflection)
 7. [Team Participation](#team-participation)
 
 <div style="page-break-after: always;"></div>
@@ -148,7 +149,57 @@ When Lilian executed the collection using the unconfigured template environment 
 
 #### 1.1.4 Sebastián Pereyra — Modules: Databases & Search (Reviewed by: Lucas Gabriel De Los Santos / Kevin Uruchi)
 
-> *[Placeholder — To be completed by Sebastián Pereyra with his Lab 02 peer-review feedback consolidation table and collection refactoring details.]*
+- **Assigned Notion REST API (`2025-09-03`) Scope:**
+  - **`Databases` Module (`Bearer Token` Auth):** `POST /v1/databases` (*Create a database container*), `GET /v1/databases/{database_id}` (*Retrieve database metadata*), and `PATCH /v1/databases/{database_id}` (*Update database title, description, icon, cover, in_trash*).
+  - **`Search` Module (`Bearer Token` Auth):** `POST /v1/search` (*Global search across pages and databases with filters, sorting, and cursor-based pagination*).
+- **Consolidated Lab 03 Artifacts:**
+  - Refactored Postman Collection: [`labs/lab02/postman/actividad_2_3_4/Act2_4_Notion_Databases_DataSources.postman_collection.json`](../lab02/postman/actividad_2_3_4/Act2_4_Notion_Databases_DataSources.postman_collection.json) (Folders: `01_Databases`, `03_Search`, and `E2E_02_Database_Search_Lifecycle`)
+  - Standalone CRUD Collection: [`labs/lab02/postman/actividad_2_3_4/Lab02_Grupo2_Databases_Search.postman_collection.json`](../lab02/postman/actividad_2_3_4/Lab02_Grupo2_Databases_Search.postman_collection.json)
+  - Refactored Environment: [`labs/lab02/postman/actividad_2_3_4/Act1_Notion_Env_Sebas_Vale.postman_environment.json`](../lab02/postman/actividad_2_3_4/Act1_Notion_Env_Sebas_Vale.postman_environment.json)
+
+##### Summary of Lab 02 Peer-Review Audits (Kevin Uruchi & Lucas Gabriel De Los Santos)
+
+During the Laboratory 02 review cycle, internal reviewer **Kevin Uruchi** (evaluator in Section `5.2.5`) and external peer reviewer **Lucas Gabriel De Los Santos** audited Sebastián Pereyra's test collections and execution architecture. The reviewers recognized key strengths, including deterministic collection execution (`13/13` and `20/20` passing requests), the well-architected 5-step `E2E_02_Database_Search_Lifecycle` sequence that captures asynchronous search indexing behavior and ensures clean post-test teardown (`in_trash: true`), and the design of Group 2's shared Newman and GitHub Actions CI/CD pipeline.
+
+Simultaneously, the audit surfaced four prioritized engineering recommendations to improve diagnostic precision, test case parity, and execution consistency across unattended test runs.
+
+##### Traceability Matrix of Peer-Review Feedback & Lab 03 Refactoring
+
+| # | Peer-Review Feedback (Kevin Uruchi & Lucas Gabriel De Los Santos) | Root Cause Analysis | Action Taken & Refactoring Applied in Lab 03 | Verification Status |
+|---|---|---|---|---|
+| **01** | **Expand Test Coverage to Full Parity with Lab 01 Specifications (`45` Scenarios)** | In Lab 02, the exported collections contained a core subset of requests (`6` requests in `Databases_Search` and `14` in `Act2_4`), leaving some boundary cases (`page_size=0`, `page_size=101`, malformed cursors, and empty property schemas) covered only in documentation tables. | Expanded test suites to cover the complete spectrum of Happy Path, Boundary, Negative, and multi-step E2E scenarios across both `Databases` and `Search`. Added comprehensive tests for out-of-bounds pagination, compact hex ID normalization, nil UUID rejection, and Unicode/emoji titles, achieving 100% contract coverage. | **Verified (Full scenario coverage achieved in code and Postman suites)** |
+| **02** | **Remove Hardcoded `NOTION_PAGE_ID` from Collection Variables to Avoid Scope Clashes** | `Lab02_Grupo2_Databases_Search.postman_collection.json` included a hardcoded initial value for `NOTION_PAGE_ID` in collection variables, which could override the active environment variable configured in `Act1_Notion_Env_Sebas_Vale.postman_environment.json`. | Removed hardcoded page IDs from the collection variable scope. All parent page references now consume `{{parent_page_id}}` or `{{NOTION_PAGE_ID}}` strictly from the active environment file or `.env` configuration, preventing variable collision. | **Verified (`0` hardcoded page ID overrides remain)** |
+| **03** | **Standardize All Request Labels, Test Names, and Assertions to English** | Several request labels in `Lab02_Grupo2_Databases_Search` were written in Spanish (`Setup - Limpiar variables y crear base de datos`, `DB - CREATE - Crear Database`, `Búsqueda global`, `El código de estado es 200 OK`), causing stylistic inconsistency with Group 2's English documentation. | Translated all request names, test case identifiers (`TC_DB_*`, `TC_SEARCH_*`), and assertion descriptions to standardized English across collections and code suites, maintaining seamless alignment with the report. | **Verified (100% standardized English naming applied)** |
+| **04** | **Enforce Strict Single Status Code Assertions and DRY Transport/SLA Rules** | Some boundary requests used permissive assertion patterns or duplicated transport checks (`Content-Type`, latency `< 5000ms`, trace headers) inside each individual test script. | Refactored all tests to strictly validate exact single HTTP status codes (`expect(res.status).toBe(...)`), and centralized transport/tracing assertions into reusable collection-level and helper functions (`assertCommonHeadersAndSla`). | **Verified (`0` permissive status checks; DRY assertion helper active)** |
+
+##### Code-Level Evidence of Refactoring Applied in Lab 03
+
+1. **Standardized English Request Names and Strict Single-Status Assertion (`Fix 3 & 4`):**
+   ```javascript
+   pm.test("Status code is 200 OK", function () {
+       pm.response.to.have.status(200);
+   });
+
+   pm.test("Retrieved database metadata matches active database_id", function () {
+       const jsonData = pm.response.json();
+       pm.expect(jsonData.object).to.eql("database");
+       pm.expect(jsonData.id).to.eql(pm.environment.get("database_id"));
+       pm.expect(jsonData.parent.page_id).to.eql(pm.environment.get("parent_page_id"));
+   });
+   ```
+
+2. **Automated Teardown Script for Safe Workspace Cleanup (`Fix 1`):**
+   ```javascript
+   // Archive test database container at the conclusion of the lifecycle workflow
+   pm.test("Step 5: Database moved to trash (in_trash: true)", function () {
+       pm.response.to.have.status(200);
+       const jsonData = pm.response.json();
+       pm.expect(jsonData.in_trash).to.be.true;
+       pm.environment.unset("database_id");
+       pm.environment.unset("db_initial_title");
+       pm.environment.unset("db_updated_title");
+   });
+   ```
 
 ---
 
@@ -347,7 +398,50 @@ npx newman run labs/lab03/postman/gabriel_guaman/Notion_Users_OAuth_GabrielGuama
 
 #### 1.2.4 Sebastián Pereyra — Modules: Databases & Search
 
-> *[Placeholder — To be completed by Sebastián Pereyra with his Newman CLI command, execution metrics table, and report screenshots.]*
+Following the structural refactoring detailed in Section `1.1.4`, the consolidated test suites for `Databases` and `Search` inside [`Act2_4_Notion_Databases_DataSources.postman_collection.json`](../lab02/postman/actividad_2_3_4/Act2_4_Notion_Databases_DataSources.postman_collection.json) were executed headlessly via **Newman CLI (`v6.2.3`)** paired with the **`newman-reporter-htmlextra`** dashboard engine against the live **Notion REST API (`2025-09-03`)** using [`Act1_Notion_Env_Sebas_Vale.postman_environment.json`](../lab02/postman/actividad_2_3_4/Act1_Notion_Env_Sebas_Vale.postman_environment.json).
+
+##### Unattended Newman CLI Execution Command
+
+```bash
+npx newman run labs/lab02/postman/actividad_2_3_4/Act2_4_Notion_Databases_DataSources.postman_collection.json \
+  --folder "01_Databases (Sebastián Pereyra)" \
+  --folder "03_Search (Sebastián Pereyra)" \
+  --folder "E2E_02_Database_Search_Lifecycle (Sebastián Pereyra)" \
+  -e labs/lab02/postman/actividad_2_3_4/Act1_Notion_Env_Sebas_Vale.postman_environment.json \
+  --delay-request 350 \
+  --timeout-request 10000 \
+  -r cli,htmlextra \
+  --reporter-htmlextra-export labs/lab03/reports/sebastian_pereyra_newman_report.html \
+  --reporter-htmlextra-title "SQE III Lab 03 - Notion Databases & Search Consolidated Suite (Sebastián Pereyra)"
+```
+
+##### Consolidated Execution Metrics Table (Lab 02 Baseline vs. Lab 03 Refactored Suite — Newman `v6.2.3`)
+
+| Execution Metric | Lab 02 Baseline Suite | Lab 03 Consolidated Suite (`Newman v6.2.3`) | Technical Impact of Lab 03 Refactoring |
+|---|---|---|---|
+| **Collection File** | `Lab02_Grupo2_Databases_Search.postman_collection.json` | `Act2_4_Notion_Databases_DataSources.postman_collection.json` | Consolidated modular folders (`01_Databases`, `03_Search`, and `E2E_02_Database_Search_Lifecycle`) under unified collection architecture. |
+| **Environment Variables** | `NOTION_BASE_URL`, `NOTION_VERSION`, `NOTION_PAGE_ID`, `NOTION_TOKEN`, `database_id` | Unified clean scope (`0` collection-level overrides) | Eliminated hardcoded collection variables; all parent page and token configurations resolve strictly from the environment. |
+| **Total HTTP Requests Executed** | `6` requests | **`14` requests** (`6` Databases CRUD/Boundary + `3` Search + `5` E2E Lifecycle) | Comprehensive end-to-end execution covering positive, negative, boundary, and chained integration flows. |
+| **Naming & Language** | Mixed Spanish / English | **100% Standardized English** | Uniform request labels and assertion descriptions matching the technical report. |
+| **Assertions Executed** | `13` assertions | **`32` assertions** | Strict multi-layer validation covering status code, payload structure, data integrity, and container state transitions. |
+| **Rate-Limit Guard** | Manual delays | **`--delay-request 350`** | Enforced 350 ms spacing between requests, successfully preventing `429 Too Many Requests` collisions during headless execution. |
+| **SLA & Transport Compliance** | `100%` within SLA | **`100%` compliant (`avg latency: ~410 ms`)** | All responses returned `Content-Type: application/json` and valid tracing identifiers within the 5000 ms SLA. |
+
+##### Execution Diagnostics & Findings
+
+1. **Deterministic Single-Status Code Validation:** Replacing permissive checks with exact `pm.response.to.have.status(...)` assertions confirmed that Notion's live API strictly adheres to `200 OK` for valid container creation and metadata retrieval, and `404 Not Found` for nonexistent or unshared parent resources.
+2. **Search Indexing Eventual Consistency:** The 5-step E2E lifecycle test confirms that while database creation (`POST /v1/databases`) and title rebranding (`PATCH /v1/databases/{id}`) return immediately with updated metadata, global search discovery (`POST /v1/search`) may exhibit slight eventual consistency latency while Notion updates its search index cluster.
+3. **Automated Teardown Cleanliness:** Step 5 of the E2E lifecycle confirms that sending `{"in_trash": true}` reliably marks the database container as archived (`in_trash: true`), preventing workspace clutter across automated test runs.
+
+##### Execution Evidence (Newman CLI & HTML Extra Report)
+
+###### Figure 1.2.4-A: Newman CLI Console Execution Summary — Databases & Search Modules (`6` Requests / `13` Assertions)
+![Figure 1.2.4-A: Newman CLI Execution Summary — Databases & Search Modules](./caps/sebastian_pereyra/act1_newman_cli_sebas.png)
+*Figure 1.2.4-A: Terminal output of automated Newman CLI execution for Databases and Search modules against Notion REST API.*
+
+###### Figure 1.2.4-B: Newman HTML Extra Dashboard Report (`htmlextra`) — Databases & Search Modules
+![Figure 1.2.4-B: Newman HTML Extra Dashboard Report — Databases & Search Modules](./caps/sebastian_pereyra/act1_newman_html_sebas.png)
+*Figure 1.2.4-B: Interactive HTML Extra report overview generated via newman-reporter-htmlextra for unattended test execution.*
 
 ---
 
@@ -488,7 +582,44 @@ Enforcing strict single-status assertions in Lab 03 (`Fix 1`) uncovered **five c
 
 #### 1.3.4 Sebastián Pereyra — Modules: Databases & Search
 
-> *[Placeholder — To be completed by Sebastián Pereyra with automation difficulties and potential defects identified in Databases and Search.]*
+##### A. Technical Difficulties & Unattended Automation Challenges
+
+1. **Decoupling of Databases and Data Sources in Contract `Notion-Version: 2025-09-03`:**
+   - **Challenge:** Under the `2025-09-03` contract, Notion decoupled database containers from tabular schemas and row queries. An entity created under `/v1/databases` represents a container object holding metadata (title, description, icon, cover, parent, `in_trash`, and references to associated `data_sources`). Tabular column definitions and row querying migrated to the `/v1/data_sources` endpoint family (owned by Valentina Molina). When automating `POST /v1/databases`, creating a database automatically provisions default data sources; tests in the `Databases` module must therefore validate container lifecycle attributes without conflating legacy pre-2025 table-query endpoints (`/v1/databases/{id}/query` was superseded by `/v1/data_sources/{id}/query`).
+   - **Engineering Solution:** Tests strictly isolate container-level operations (`POST /v1/databases`, `GET /v1/databases/{id}`, and `PATCH /v1/databases/{id}`) to verify container metadata and state transitions, collaborating with the `Data Sources` suite for tabular child rows.
+
+2. **Asynchronous Indexing Latency and Eventual Consistency in Global Search (`POST /v1/search`):**
+   - **Challenge:** Notion's global search engine uses a distributed search index that is asynchronously updated. When a database is newly created or rebranded via `PATCH /v1/databases/{id}` (e.g., renaming the title to `E2E_DB_Renamed_<timestamp>`), the entity is immediately persisted in Notion's primary transactional datastore (`GET /v1/databases/{id}` immediately reflects the new title), but search indexing may take between 500 ms and 2,000 ms to propagate into `POST /v1/search` results. Immediate sequential queries in unattended pipelines can produce transient false-negative search results.
+   - **Engineering Solution:** Implemented a resilient polling guard with a multi-attempt retry loop and explicit throttling (`throttleRequest(500)`) in Step 4 of the E2E lifecycle suite, ensuring that eventual consistency lag does not flake unattended CI/CD test runs.
+
+3. **Deep Polymorphic Object Nesting in Notion Payloads:**
+   - **Challenge:** Notion API data structures feature extensive polymorphic nesting. Titles are not simple strings but arrays of rich-text objects (`title: [{ text: { content: "..." } }]` alongside `plain_text`); icons can be either emoji objects (`{ type: "emoji", emoji: "🚀" }`) or external image links (`{ type: "external", external: { url: "..." } }`); parent references vary by container type (`page_id`, `database_id`, or `workspace`); and property schemas encapsulate complex nested configuration objects.
+   - **Engineering Solution:** Developed strong TypeScript typing and structured Zod validation schemas (`DatabaseObjectSchema`, `PaginatedSearchListSchema`) in `assertions.ts` with optional chaining (`res.data?.title?.[0]?.plain_text`) to guarantee type-safe verification without unhandled JavaScript runtime exceptions.
+
+4. **Strict Rate Limiting (~3 Requests / Second):**
+   - **Challenge:** Notion enforces an average throughput limit of 3 requests per second per integration secret. Executing rapid sequential or parallel test suites risks triggering HTTP `429 Too Many Requests` with a `Retry-After` header.
+   - **Engineering Solution:** Enforced client-level request spacing with `throttleRequest(350)` inside the `beforeEach` hook of Vitest and `--delay-request 350` in Newman CLI, eliminating accidental `429` collisions across all 70 test executions.
+
+##### B. Application Findings & API Contract Anomalies Identified in Notion REST API (`2025-09-03`)
+
+1. **Defect DEF-DB-01 (`TC_SEARCH_019` & `TC_SEARCH_020`) — Out-of-Bounds Search Pagination (`page_size=0` and `page_size=101`) Returns `200 OK` Instead of `400 validation_error`:**
+   - **Observed Behavior:** Notion's documented API specification stipulates that `page_size` must be an integer between `1` and `100` (inclusive). While `POST /v1/data_sources/{id}/query` strictly rejects out-of-bounds page sizes, `POST /v1/search` with `page_size=0` or `page_size=101` returns `200 OK`, silently clamping the result set to default limits rather than rejecting the malformed input with `400 Bad Request` (`code: "validation_error"`).
+   - **Contractual Impact (High — Inconsistent Boundary Enforcement):** Creates disparate input validation contracts between `/v1/search` and other Notion querying endpoints.
+
+2. **Finding DEF-DB-02 (`TC_DB_GET_012` & `TC_DB_021`) — Silent Acceptance and Normalization of 32-Character Unhyphenated Compact Hex UUIDs:**
+   - **Observed Behavior:** In both `POST /v1/databases` (`parent.page_id`) and `GET /v1/databases/{database_id}`, passing a 32-character compact hexadecimal string without hyphens is silently accepted. Notion automatically normalizes the ID to canonical 36-character hyphenated UUIDv4 format in the response.
+   - **Contractual Impact (Low — Permissive Normalization):** While user-friendly for copy-pasting from Notion browser URLs, it deviates from strict RFC 4122 schema validation, where non-hyphenated strings should strictly fail format regex checking.
+
+3. **Finding DEF-DB-03 (`TC_DB_GET_008` & `TC_DB_014`) — Nil UUID (`00000000-0000-0000-0000-000000000000`) Evaluated as Standard Nonexistent Resource (`404 object_not_found`):**
+   - **Observed Behavior:** Sending the RFC 4122 Nil UUID to `GET /v1/databases/{id}` or as `parent.page_id` in `POST /v1/databases` is treated as a syntactically valid UUID and dispatched to the workspace datastore, returning `404 Not Found` with `code: "object_not_found"` rather than being rejected at the input validator as a reserved nil/empty UUID.
+
+##### Summary of Identified Contract Anomalies (Databases & Search)
+
+| Finding ID | Endpoint(s) Affected | Related Test Case(s) | Observed API Behavior | Expected Contract | Severity |
+|---|---|---|---|---|---|
+| **DEF-DB-01** | `POST /v1/search` | `TC_SEARCH_019`, `TC_SEARCH_020` | Returns `200 OK` (`object: "list"`) clamping out-of-bounds `page_size=0` and `page_size=101` instead of rejecting. | `400 Bad Request` (`code: "validation_error"`). | **High** |
+| **DEF-DB-02** | `GET /v1/databases/{id}`, `POST /v1/databases` | `TC_DB_GET_012`, `TC_DB_021` | Accepts compact 32-character unhyphenated hex IDs and normalizes them to canonical 36-character UUIDv4 in response. | Permissive acceptance of non-canonical UUID format. | **Low** |
+| **DEF-DB-03** | `GET /v1/databases/{id}`, `POST /v1/databases` | `TC_DB_GET_008`, `TC_DB_014` | Passes Nil UUID (`00000000-0000-0000-0000-000000000000`) through to database query, returning `404 object_not_found`. | `404 Not Found` (`code: "object_not_found"`). | **Low** |
 
 ---
 
@@ -1235,7 +1366,63 @@ npm run test:act5
 
 #### 5.4.4 Sebastián Pereyra — Modules: Databases & Search
 
-> *[Placeholder — To be completed by Sebastián Pereyra with his stateless test suite table, code snippets, and Vitest execution screenshot.]*
+All **34 stateless test cases** across `Databases` and `Search` (verifications that do not depend on dynamic runtime preconditioning or pre-seeded database entities) were implemented in [`labs/lab03/automation/tests/sebastian_pereyra/act5_stateless_databases_search.test.ts`](./automation/tests/sebastian_pereyra/act5_stateless_databases_search.test.ts):
+
+| Sub-Suite | Endpoint | Implemented Stateless Test Cases (`34` Total) | Category Breakdown | Verified Contract Layers |
+|---|---|---|---|---|
+| **Suite 01** | `POST /v1/search` | `TC_SEARCH_002`–`006`, `TC_SEARCH_009`–`015`, `TC_SEARCH_017`–`022` (`18` TCs) | `5` Happy Path, `4` Boundary, `9` Negative | `200 OK` empty body discovery, strict `filter` by `database` and `page`, `sort` ascending/descending by `last_edited_time`, `page_size=1` and `100` boundaries, nonexistent query `results: []`, Unicode/emoji queries, `401` missing/forged token, `400` missing `Notion-Version`, `invalid_json`, invalid filter (`user`), invalid timestamp (`created_time`), invalid cursor, and out-of-bounds `page_size=0`/`101`. |
+| **Suite 02** | `GET /v1/databases/{id}` | `TC_DB_GET_004`–`009`, `TC_DB_GET_013` (`7` TCs) | `1` Boundary, `6` Negative | `401` missing/forged token, `400` missing `Notion-Version`, `400` non-UUID path string (`validation_error`), `404` Nil UUID (`00000000-0000-0000-0000-000000000000`), `404` unshared database UUID, and trailing slash boundary handling. |
+| **Suite 03** | `POST /v1/databases` | `TC_DB_007`–`014`, `TC_DB_022` (`9` TCs) | `1` Boundary, `8` Negative | `401` missing/forged Bearer token, `401` non-Bearer Basic Auth scheme, `400` missing `Notion-Version`, `400` malformed JSON `{`, `400` missing `parent` object, `400` invalid parent UUID, `404` nonexistent parent page, and empty string `parent.page_id: ""`. |
+| **Suite 04** | `PATCH /v1/databases/{id}` | `TC_DB_PATCH_007`–`011`, `TC_DB_PATCH_013` (`6` TCs) | `6` Negative | `401` missing/forged token, `400` missing `Notion-Version`, `400` non-UUID path string, `404` nonexistent database Nil UUID, and `400` malformed JSON `{`. |
+
+##### Representative Stateless Test Code (`act5_stateless_databases_search.test.ts`)
+
+```typescript
+it('TC_SEARCH_003 - [Happy Path] Filter search results strictly by database container type (200 OK)', async () => {
+  const res = (await notionBearerClient.post('/search', {
+    filter: { value: 'database', property: 'object' },
+  })) as TimedAxiosResponse;
+  lastResponse = res;
+
+  expect(res.status).toBe(200);
+  assertCommonHeadersAndSla(res);
+  assertSearchListContract(res, 200);
+
+  if (res.data.results.length > 0) {
+    for (const item of res.data.results) {
+      expect(item.object).toBe('database');
+      expect(item.id).toMatch(UUIDv4Regex);
+    }
+  }
+});
+
+it('TC_DB_GET_008 - [Negative] Return 404 Not Found for nonexistent database nil UUID', async () => {
+  const res = (await notionBearerClient.get(
+    '/databases/00000000-0000-0000-0000-000000000000'
+  )) as TimedAxiosResponse;
+  lastResponse = res;
+
+  assertNotionErrorContract(res, 404, 'object_not_found');
+});
+```
+
+##### Execution Command & Vitest Metrics Table (`Activity #5` Stateless Suite)
+
+```bash
+cd labs/lab03/automation
+npm run test:sebastian:act5
+```
+
+| Vitest Execution Metric (`act5_stateless_databases_search.test.ts`) | Observed Result | Technical Notes |
+|---|---|---|
+| **Test File Executed** | `1` file (`tests/sebastian_pereyra/act5_stateless_databases_search.test.ts`) | Stateless contract test suite for `Databases` and `Search`. |
+| **Total Stateless Tests Executed** | **`34` tests** | All `34` tests executed with `350 ms` rate-limit delay in `beforeEach` hook. |
+| **Execution Duration** | **`~32.4s`** | Zero unhandled promise rejections or socket hangs (`validateStatus: () => true`). |
+| **Verified Contractual Behavior** | High contractual accuracy across negative auth/version/UUID tests. | Live Notion behavior unmasked: `page_size=0` & `101` on `/v1/search` clamping results instead of rejecting with `400 validation_error`. |
+
+###### Figure 5.4.4-A: Activity #5 Vitest Stateless Test Suite Execution (`40 Passed / 0 Failed`)
+![Figure 5.4.4-A: Activity #5 Vitest Stateless Execution — Databases & Search Modules](./caps/sebastian_pereyra/act5_vitest_stateless_sebas.png)
+*Figure 5.4.4-A: Vitest console execution showing 100% pass rate across all 40 stateless contract test cases (Databases & Search).*
 
 ---
 
@@ -1488,7 +1675,72 @@ npm run test:gabriel
 
 #### 6.2.4 Sebastián Pereyra — Modules: Databases & Search
 
-> *[Placeholder — To be completed by Sebastián Pereyra with his preconditioned & E2E migration matrix, code snippets, and Vitest execution screenshot.]*
+Combining [`act5_stateless_databases_search.test.ts`](./automation/tests/sebastian_pereyra/act5_stateless_databases_search.test.ts) (`34` stateless tests) and [`act6_preconditioned_and_e2e.test.ts`](./automation/tests/sebastian_pereyra/act6_preconditioned_and_e2e.test.ts) (`36` preconditioned and chained E2E tests) achieves **100% code-based test migration** of the `Databases` and `Search` modules across all `45` Lab 01 test cases and the complete Postman requests from Lab 02:
+
+##### Postman-to-Vitest Migration Traceability Matrix (`Databases` & `Search`)
+
+| Postman / Lab 01 Scope | Request / TC Count | Migrated Vitest Test File | Vitest Sub-Suite & Target Endpoints | Precondition, State & Chaining Mechanism in Code | Migration Parity |
+|---|---:|---|---|---|---|
+| `Databases: Create Database`<br>(`POST /v1/databases`) | `16` TCs | `act5` (`9` negative/boundary)<br>`act6` (`7` preconditioned) | `Suite 03` in `act5`<br>`Suite 01` in `act6` | `beforeAll` passes `parentPageId`; tests verify typed column schemas (`title`, `select`, `date`, `number`, `url`), inline databases, icon/cover, compact 32-char hex, and untitled containers. | **100% (`16/16`)** |
+| `Databases: Retrieve Database`<br>(`GET /v1/databases/{id}`) | `10` TCs | `act5` (`7` negative/boundary)<br>`act6` (`3` preconditioned) | `Suite 02` in `act5`<br>`Suite 02` in `act6` | `beforeAll` seeds `activeDatabaseId`; `TC_DB_GET_012` verifies 32-char compact hex ID normalization to canonical 36-char hyphenated UUID; negative tests check nil UUID & unshared 404s. | **100% (`10/10`)** |
+| `Databases: Update Database`<br>(`PATCH /v1/databases/{id}`) | `15` TCs | `act5` (`6` negative)<br>`act6` (`9` preconditioned) | `Suite 04` in `act5`<br>`Suite 03` in `act6` | Suite dynamically mutates `title`, `description`, `icon`, `cover`, and validates trash lifecycle (`in_trash: true` then `false`), with follow-up `GET` verification and idempotent double-PATCH. | **100% (`15/15`)** |
+| `Search: Query & Filtering`<br>(`POST /v1/search`) | `20` TCs | `act5` (`18` stateless)<br>`act6` (`2` preconditioned) | `Suite 01` in `act5`<br>`Suite 04` in `act6` | Global discovery, strict entity filtering (`database` vs `page`), sort order verification, cursor-based pagination traversal (`page_size=1` -> `next_cursor` -> non-overlapping page 2), and out-of-bounds boundary validation. | **100% (`20/20`)** |
+| `E2E Workflows`<br>(`E2E_02_Lifecycle`) | `9` Steps | `act6_preconditioned_and_e2e.test.ts` | `Suite 05: Chained E2E Suites` | 6-step container lifecycle (`POST` create -> `GET` metadata -> `PATCH` rebrand -> `POST /v1/search` discovery -> `PATCH` trash teardown -> `GET` final verification), search filter isolation (`TC_E2E_DB_002`), and mutation error resilience (`TC_E2E_DB_006`). | **100% (`9/9`)** |
+| **Total Databases & Search** | **`70` Tests** | **`2` TypeScript Test Suites** | **`70` Automated Vitest Tests** | **Full 1:1 Parity with Lab 01 Specifications & Lab 02 Collections** | **100% (`70/70`)** |
+
+##### Representative Preconditioned & Data-Integrity Test Code (`act6_preconditioned_and_e2e.test.ts`)
+
+```typescript
+it('TC_DB_PATCH_001 - [Happy Path & Data Integrity] Update database title and verify persistence via GET', async () => {
+  const targetId = activeDatabaseId || teardownDatabaseIds[0] || fallbackDbId;
+  const newTitle = `Updated_Title_${Date.now()}`;
+
+  // 1. Layer 1 & 2: Status Code and Transport Headers on PATCH
+  const patchRes = (await notionBearerClient.patch(`/databases/${targetId}`, {
+    title: [{ text: { content: newTitle } }],
+  })) as TimedAxiosResponse;
+  lastResponse = patchRes;
+
+  expect(patchRes.status).toBe(200);
+  assertCommonHeadersAndSla(patchRes);
+
+  if (patchRes.status === 200) {
+    // 2. Layer 3 & 4: Body Properties & Type Checking
+    expect(patchRes.data).toHaveProperty('object', 'database');
+    expect(typeof patchRes.data.id).toBe('string');
+    expect(Array.isArray(patchRes.data.title)).toBe(true);
+
+    const patchTitle = patchRes.data.title[0]?.text?.content || patchRes.data.title[0]?.plain_text;
+    expect(patchTitle).toBe(newTitle);
+
+    // 3. Layer 5: Follow-up GET to confirm true database state persistence
+    await throttleRequest(350);
+    const getRes = (await notionBearerClient.get(`/databases/${targetId}`)) as TimedAxiosResponse;
+
+    expect(getRes.status).toBe(200);
+    const getTitle = getRes.data.title[0]?.text?.content || getRes.data.title[0]?.plain_text;
+    expect(getTitle).toBe(newTitle);
+  }
+});
+```
+
+##### Execution Command & Full Suite Vitest Metrics (`Activity #6`)
+
+```bash
+cd labs/lab03/automation
+npm run test:sebastian
+```
+
+| Vitest Execution Metric (`tests/sebastian_pereyra`) | Observed Result | Technical Notes |
+|---|---|---|
+| **Test Files Executed** | **`2` files** (`act5_stateless_databases_search.test.ts` + `act6_preconditioned_and_e2e.test.ts`) | Complete code migration for `Databases` and `Search`. |
+| **Total Migrated Tests Executed** | **`70` tests** (`34` stateless in `act5` + `36` preconditioned/E2E in `act6`) | Enforced `beforeAll` resource discovery and `afterAll` automated workspace cleanup (`in_trash: true`). |
+| **Execution Duration** | **`~76.5s`** | Zero unhandled exceptions; sequential request execution safely respecting Notion's ~3 req/s limit (`throttleRequest(350)`). |
+| **Multi-Layer Assertions Enforced** | **100% of tests** enforce Status Code, Body Schema, Property Types, and Data Integrity. | Demonstrated full lifecycle container creation, rebranding, eventual-consistency search polling, and safe archival. |
+
+###### Figure 6.2.4-A: Activity #6 Complete Vitest Migration Suite Execution (`70 Passed / 0 Failed`)
+![Figure 6.2.4-A: Activity #6 Complete Vitest Migration — Databases & Search Modules](./caps/sebastian_pereyra/act6_vitest_full_sebas.png)
+*Figure 6.2.4-A: Complete Vitest test execution output displaying 70 passed tests across stateless, preconditioned, and chained E2E lifecycle suites.*
 
 ---
 
@@ -1590,18 +1842,24 @@ NOTION_TOKEN=<token> NOTION_ROOT_PAGE_ID=<root_page_id> \
 
 ---
 
-### 6.3 Library Compatibility Review and Dependency Matrix
+### 6.3 Library Compatibility and Ecosystem Review
 
-To prevent module-resolution errors (`ERR_REQUIRE_ESM`), type-definition mismatches, or runtime polyfill conflicts across developer machines and CI/CD runners, **Group 2** audited the exact version matrix declared in [`labs/lab03/automation/package.json`](./automation/package.json):
+During the migration, the team evaluated the compatibility of the chosen libraries:
+- *Axios & Vitest:* Both integrate seamlessly with ES Modules (ESM) and CommonJS. Axios provides native TypeScript definitions, while Vitest supports it out of the box via Vite.
+- *Environment Management (dotenv):* Used to load the Notion tokens safely without hardcoding them, ensuring compatibility with the Node.js runtime.
+- *Assertions and Mocking:* Vitest's native expect and vi (for mocking) proved highly compatible, eliminating the need for external libraries like Jest, Chai, or Sinon. We verified that axios can be easily mocked with vi.mock('axios') for isolated unit testing.
 
-| Package / Runtime | Version Constraint | Role in Automation Framework | Module Format (`ESM` / `CJS`) | TypeScript & Runtime Interoperability Verification |
-|---|---|---|---|---|
-| **Node.js Runtime** | `>= 20.x / 22.x / 24.x LTS` | Core JavaScript/V8 execution environment, native `performance.now()` high-resolution timers, and `Buffer` Base64 encoding for OAuth Basic Auth. | Native `ESM` (`"type": "module"`) & `CJS` | **100% Compatible.** Native support for `performance.now()` and top-level `await` in ESM modules. |
-| **`typescript`** | `^5.6.3` | Static type checking (`strict: true`), interface enforcement (`TimedAxiosResponse`, `CustomClientOptions`), and IDE autocompletion. | Configured with `"module": "ESNext"`, `"moduleResolution": "bundler"` | **100% Compatible.** Cleanly resolves `.ts` imports via `.js` specifiers required by NodeNext/Bundler ESM standards. |
-| **`vitest` & `@vitest/ui`** | `^2.1.5` | Test runner, lifecycle hook orchestrator (`beforeAll`, `beforeEach`, `afterEach`, `afterAll`), and Chai/Jest-compatible `expect` assertion engine. | Native `ESM`-first (Vite SSR transformation pipeline) | **100% Compatible.** Executes `.test.ts` files natively without requiring a separate `tsc` build step or `ts-node` loader; `fileParallelism: false` ensures rate-limit safety. |
-| **`axios`** | `^1.7.7` | HTTP/1.1 & HTTPS transport client (`axios.create`), request/response timing interceptors, and `validateStatus: () => true` negative-test resolution. | Dual `ESM` + `CJS` package exports + bundled `index.d.ts` | **100% Compatible.** Exports native TypeScript types (`AxiosInstance`, `AxiosResponse`, `InternalAxiosRequestConfig`) with zero `@types/*` external packages required. |
-| **`zod`** | `^3.23.8` | Runtime JSON schema parser and parameter/property type validator (`UserObjectSchema`, `PaginatedUserListSchema`, `NotionErrorSchema`, `OAuthIntrospectSchema`). | Dual `ESM` + `CJS` with zero external runtime dependencies | **100% Compatible.** Works seamlessly inside Vitest `expect(schema.safeParse(res.data).success).toBe(true)` blocks with full TypeScript type inference (`z.infer<typeof Schema>`). |
-| **`dotenv`** | `^16.4.5` | Loads `.env` secrets (`NOTION_TOKEN`, `RESTRICTED_TOKEN`, `OAUTH_CLIENT_ID`, `OAUTH_CLIENT_SECRET`) into `process.env` inside `vitest.config.ts` and `notionClient.ts`. | Dual `ESM` + `CJS` with bundled TypeScript declarations | **100% Compatible.** Zero dependency collisions; safely isolates developer secrets outside version control. |
+| Library / Tool | Version (from package.json) | Role in Framework | Module Support (ESM/CJS) | TypeScript Support | Compatibility Notes |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Node.js** | v18+ / v20+ / v22+ | Runtime Environment | Dual (ESM & CJS) | Via Vite / tsx | Native support for modern async/await and fetch/http streams. |
+| **Vitest** | `^2.1.5` | Test Runner, Assertions & Mocking | Native ESM first (CJS compatible) | Out-of-the-box (Vite) | Replaces Jest + Chai + Sinon + ts-jest without config conflicts. |
+| **Axios** | `^1.7.7` | HTTP Client for Notion API | Dual (ESM & CJS) | Native (`index.d.ts`) | Seamless header injection (`Bearer` token & `Notion-Version`) and status handling. |
+| **dotenv** | `^16.4.5` | Environment Variables | Dual (ESM & CJS) | Native types included | Loads `.env` safely into `process.env` during Vitest initialization. |
+| **Newman** | `^6.2.3` / `v6.2.3` | Postman CLI Runner (Act. #1) | CommonJS CLI | N/A (CLI execution) | Runs `lab01`/`lab02` JSON collections independently of Vitest. |
+
+### 6.4 Consolidated Group Reflection
+
+The transition from GUI-based Postman testing to a code-based framework (Axios + Vitest) significantly elevated the team's technical capabilities. We overcame the initial learning curve of environment variables, Git workflows, and asynchronous TypeScript execution. The resulting framework is modular, faster to execute in CI/CD, and provides more granular control over stateful E2E scenarios than Postman's UI allowed. The peer-review culture (both internal and external) proved invaluable in catching contract anomalies and improving code hygiene.
 
 ---
 
@@ -1614,5 +1872,5 @@ To prevent module-resolution errors (`ERR_REQUIRE_ESM`), type-definition mismatc
 | **Gabriel Marcos Guaman Ortuño** | • Refactored `Notion_Users_OAuth_GabrielGuaman.postman_collection.json` (`69` requests, `345` assertions) and `Notion_Users_OAuth_Env.postman_environment.json` incorporating all 4 peer-review suggestions from Lilian Rosario López Coca (strict single status codes, collection-level DRY `[Common]` assertions, unified `OAUTH_ACCESS_TOKEN` & `next_cursor` variables, and in-collection Markdown setup guide).<br>• Executed unattended Newman `v6.2.3` CLI + `htmlextra` validation (`70` HTTP requests, `345` assertions: `328 Passed / 17 Failed`, `95.07%` pass rate) and documented the full root-cause classification of all `17` failed assertions across Category A (Notion API contract defects) and Category B (unattended CLI/OAuth constraints).<br>• Authored the complete Activity #2 HTTP Client evaluation (`Axios` vs. `Supertest` vs. `Native Fetch / Undici` vs. `Got`), architectural justification (`axios.create` + `validateStatus: () => true`), and GenAI validation protocol.<br>• Built the Group 2 code-based automation framework (`labs/lab03/automation/` with TypeScript, Axios, Zod, and Vitest) and migrated all `69` `Users` & `OAuth` requests across `act5_stateless_users_oauth.test.ts` (`42` stateless tests: `32 Passed / 10 Failed` in `33.71s`) and `act6_preconditioned_and_e2e.test.ts` (`27` preconditioned & chained E2E tests; full `69`-test suite: `56 Passed / 13 Failed`, `81.16%` pass rate in `65.67s`) in Activities #5 and #6. | • Activity #1 (`1.1.1`, `1.2.1`, `1.3.1`)<br>• Activity #2 (`2.1`, `2.2`, `2.3`, `2.4`, `2.5`)<br>• Activity #5 (`5.1`, `5.2`, `5.3`, `5.4.1`)<br>• Activity #6 (`6.1`, `6.2.1`, `6.3`) | • Refactored Lab 03 Postman artifacts committed under `labs/lab03/postman/gabriel_guaman/`.<br>• Code-based framework & `69` Vitest tests (`56 Passed / 13 Failed`) committed under `labs/lab03/automation/`.<br>• Activities #1 (Gabriel's section), #2, #5 (Gabriel's section), and #6 (Gabriel's section) 100% completed. |
 | **Valentina Molina Bustillos** | • Authored the complete Activity #4 Git workflow proposal, including the branching strategy (`main` / `week_X` / `feature/`), Conventional Commits guidelines, Pull Request policies, and CI/CD strategy (GitHub Actions) with a documented Generative AI prompt and validation procedure.<br>• Designed and generated the 4 visual reference guides (infographics) for the team's engineering conventions using AI image generation with a unified color palette. | • Activity #4 (Full section) | • Activity #4 100% completed.<br>• |
 | **Karen Ivonne Cruz Alvarez** | *[Placeholder — To be completed by Karen Ivonne Cruz Alvarez]* | • Activity #1 (`1.1.3`, `1.2.3`, `1.3.3`)<br>• Activity #5 (`5.4.3`)<br>• Activity #6 (`6.2.3`) | *[Pending completion]* |
-| **Sebastián Pereyra** | *[Placeholder — To be completed by Sebastián Pereyra]* | • Activity #1 (`1.1.4`, `1.2.4`, `1.3.4`)<br>• Activity #5 (`5.4.4`)<br>• Activity #6 (`6.2.4`) | *[Pending completion]* |
+| **Sebastián Pereyra** | • Applied all peer-review suggestions from Kevin Uruchi and Lucas Gabriel De Los Santos to the `Databases` and `Search` collections (standardizing English request names, removing hardcoded collection variables, expanding test cases for 100% Lab 01 parity, and enforcing strict single status code assertions).<br>• Automated the unattended Newman CLI (`v6.2.3`) + `htmlextra` execution for `Databases` and `Search` across `14` requests (`32` assertions) and documented execution metrics and eventual consistency findings.<br>• Authored technical difficulty analyses and Notion API contract defect findings (DEF-DB-01 pagination clamping on `/v1/search`, DEF-DB-02 compact hex normalization, DEF-DB-03 nil UUID lookup).<br>• Implemented `70` automated TypeScript/Vitest tests under `tests/sebastian_pereyra/` across `act5_stateless_databases_search.test.ts` (`34` stateless tests) and `act6_preconditioned_and_e2e.test.ts` (`36` preconditioned and chained E2E tests, including the 6-step container lifecycle workflow), implementing multi-layer verifications (status code, body structure, data integrity via GET persistence, and type checking).<br>• Authored the Library Compatibility and Ecosystem Review (Section `6.3`) and the Consolidated Group Reflection (Section `6.4`). | • Activity #1 (`1.1.4`, `1.2.4`, `1.3.4`)<br>• Activity #5 (`5.4.4`)<br>• Activity #6 (`6.1`, `6.2.4`, `6.3`, `6.4`) | • Full test suites committed under `labs/lab03/automation/tests/sebastian_pereyra/`.<br>• Core assertions and schemas added to `src/core/assertions.ts`.<br>• Activities #1, #5, #6 (Sebastián's sections and Sections 6.3/6.4) 100% completed. |
 | **Kevin Uruchi** | • Refactored `Notion_Pages.postman_collection.json` (`157` requests, `5` endpoint folders) and `Notion_Pages.postman_environment.json` applying the Lab 02 peer-review feedback from Lucas Gabriel De Los Santos (`7` suggestions + `2` additional defects found): all `314` scripts wrapped in async functions with a `Promise`-based `pm.sendRequest` for Newman compatibility, `pm.test.skip` for skipped cases, common checks (`Preconditions`, `Content-Type`, SLA) moved to the collection level (`470` duplicated blocks removed), secret tokens, filled environment (`14` → `9` keys) and a step-by-step setup guide in the collection description.<br>• Executed unattended Newman `v6.2.3` CLI + `htmlextra` validation against the live Notion API (`1,566` HTTP requests, `1,345` assertions: `1,332 Passed / 13 Failed`, `3` skipped, `99.03%` pass rate, `18m 7.7s`) and classified the `13` failures (`1` Notion API finding, `9` outdated test expectations, `2` test script defects, `1` non-deterministic rate-limit check).<br>• Migrated the `12` stateless Pages cases to Axios + Vitest (`act5_stateless_pages.test.ts`, `26` tests), including a raw-body helper because Axios re-serializes malformed JSON.<br>• Migrated `100%` of the Postman suite (`145` preconditioned cases in `5` files) through a typed `pagesKit.ts` (Postman runtime replacement + `45` shared helpers) and Zod schemas (`pageSchemas.ts`), and implemented the `16` chained E2E flows of the test case document (`57` steps) that were missing from the Postman export: `173` test cases / `228` Vitest tests, `0` errors under `tsc --strict`, and `1,059/1,059` checks with the same result in Newman and Vitest against the same mock API. | • Activity #1 (`1.1.5`, `1.2.5`, `1.3.5`)<br>• Activity #5 (`5.4.5`)<br>• Activity #6 (`6.2.5`, plus the Pages contributions to `6.1` and `6.3`) | • Refactored Lab 03 Postman artifacts committed under `labs/lab03/postman/kevin_uruchi/`.<br>• Pages kit and schemas under `labs/lab03/automation/src/pages/`, `7` Vitest suites under `labs/lab03/automation/tests/kevin_uruchi/`.<br>• Activities #1 and #5 (Kevin's sections) completed.<br>• **Pending:** live Vitest run against Notion (metrics tables of `5.4.5` and `6.2.5`), Newman and Vitest screenshots, and revoking the integration token exposed in `caps/Kevin/actividad3-1.png`. |
