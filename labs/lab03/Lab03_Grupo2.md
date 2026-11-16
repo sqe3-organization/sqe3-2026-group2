@@ -136,7 +136,18 @@ When Lilian executed the collection using the unconfigured template environment 
 
 #### 1.1.2 Valentina Molina Bustillos — Modules: Data Sources, Comments & File Uploads (Reviewed by: Lilian Rosario López Coca / Sebastián Pereyra)
 
-> *[Placeholder — To be completed by Valentina Molina Bustillos with her Lab 02 peer-review feedback consolidation table and collection refactoring details.]*
+##### Summary of Lab 02 Peer-Review Audit
+External reviewers Lilian Rosario López Coca and Sebastián Pereyra audited the Lab 02 Postman collection. They highlighted the modular folder structure and the 4-step File Uploads lifecycle. However, they identified critical areas for improvement regarding diagnostic precision, state cleanup, and schema validation.
+
+##### Traceability Matrix of Peer-Review Feedback & Lab 03 Refactoring
+
+| # | Feedback Item | Root Cause Analysis | Action Taken & Refactoring Applied in Lab 03 |
+|---|---|---|---|
+| **01** | **Move `NOTION_PAGE_ID` to the environment and add setup instructions.** | The Page ID was hardcoded in the collection variables, lacking onboarding steps. | Moved `NOTION_PAGE_ID` to `Lab03_Grupo2_Valentina.postman_enviroment.json`. Added a 4-step Markdown guide in the collection's description. |
+| **02** | **Stop the run when the setup fails (fail-fast).** | If the `Setup` request failed, requests were sent to `/null`, generating cascading failures. | Added a Pre-request script to `00 - Setup` and `01 - Data Sources`: `if (!pm.environment.get("database_id")) { pm.execution.setNextRequest(null); }` to halt execution. |
+| **03** | **Add deeper checks (SLA, Content-Type, Integrity).** | Assertions only checked status codes, missing header validations and state persistence. | Added collection-level `[Common]` assertions for `Content-Type: application/json` and `responseTime < 5000ms`. Added a `GET` request (`TC_DS_INTEGRITY_001`) after `PATCH` to confirm the schema persisted. |
+| **04** | **Add a Teardown to archive resources and clear variables.** | Resources created during the run were left in the workspace. | Added a `99 - Teardown` folder that archives the database via `PATCH` (`in_trash: true`) and clears all environment variables using `pm.environment.unset()`. |
+| **05** | **Match report with matrix and use English language.** | Discrepancy between promised cases and implemented ones; mixed languages. | Implemented missing cases (integrity checks, negative validations) and renamed all requests with `TC_` IDs. Unified all assertion descriptions to English. |
 
 ---
 
@@ -434,7 +445,31 @@ npx newman run labs/lab03/postman/gabriel_guaman/Notion_Users_OAuth_GabrielGuama
 
 #### 1.2.2 Valentina Molina Bustillos — Modules: Data Sources, Comments & File Uploads
 
-> *[Placeholder — To be completed by Valentina Molina Bustillos with her Newman CLI command, execution metrics table, and report screenshots.]*
+Following the refactorings detailed in Section `1.1.2`, the consolidated suite [`Lab03_Grupo2_Valentina(Refactored).postman_collection.json`](./postman/valentinamolina/Lab03_Grupo2_Valentina(Refactored).postman_collection.json) was executed unattended via **Newman CLI** paired with **`newman-reporter-htmlextra`** against the live **Notion REST API (`2025-09-03`)**.
+
+##### Unattended Newman CLI Execution Command
+
+```bash
+newman run "Valentina_Collection.json" \
+  -e "Lab03_Grupo2_Valentina.postman_enviroment.json" \
+  --delay-request 350 \
+  -r cli,htmlextra \
+  --reporter-htmlextra-export "Valentina_Molina_Report.html"
+```
+## Consolidated Execution Metrics
+
+| Execution Metric | Lab 02 Baseline | Lab 03 Consolidated Suite | Technical Impact of Refactoring |
+|---|---|---|---|
+| Total HTTP Requests | 14 | 8 | Consolidated redundant tests into precise checks. |
+| Total Assertions | 42 | 30 | Added schema validation, integrity GET checks, and collection-level SLA headers. |
+| Setup Fail-Fast | None | Pre-request check active | Stops execution immediately if database_id is missing. |
+| Pass Rate | 100% (masked) | 100% (30 Passed / 0 Failed) | Fail-fast script and strict assertions ensure deterministic results. |
+
+## Execution Evidence (Newman CLI & HTML Extra Report)
+
+![Newman CLI Execution](./caps/valentinamolina/act1_newman_cli.png)
+
+![Newman HTML Extra Report](./caps/valentinamolina/act1_newman_html.png)
 
 ---
 
@@ -645,7 +680,17 @@ Enforcing strict single-status assertions in Lab 03 (`Fix 1`) uncovered **five c
 
 #### 1.3.2 Valentina Molina Bustillos — Modules: Data Sources, Comments & File Uploads
 
-> *[Placeholder — To be completed by Valentina Molina Bustillos with automation difficulties and potential defects identified in Data Sources, Comments, and File Uploads.]*
+##### A. Technical Difficulties Encountered
+1. **Fail-Fast Implementation:** If the `Setup` request failed, the runner would send requests to `/null`, generating 24 masking failures. Resolved using `pm.execution.setNextRequest(null)`.
+2. **Environment Secret Export in Newman:** Postman omits variables of type `secret` (like `NOTION_TOKEN`) when exporting the environment. For unattended Newman runs, the token must be explicitly passed via `--env-var` flags or the `.env` file to prevent `401 Unauthorized` errors.
+
+##### B. Application Findings
+1. **Finding 1 — Comments Update Support (Live API vs. Documentation):**
+   - **Observed Behavior:** While older Notion API documentation suggested that `PATCH /v1/comments/{id}` was unsupported, live execution against `2025-09-03` confirmed that the server accepts the update and returns a `200 OK` with the modified payload.
+   - **QA Conclusion:** The test `TC_CMT_UPDATE_001` was adjusted to assert the `200 OK` response and verify the updated text. This highlights the importance of validating documentation against live API behavior.
+2. **Finding 2 — Rate Limiting Constraints:**
+   - **Observed Behavior:** Executing the suite without a delay results in `429 Too Many Requests`.
+   - **QA Conclusion:** The Newman runner enforces a `--delay-request 350` to align with Notion's strict rate limits (3 req/sec).
 
 ---
 
@@ -1594,7 +1639,66 @@ npm run test:act5
 
 #### 5.4.2 Valentina Molina Bustillos — Modules: Data Sources, Comments & File Uploads
 
-> *[Placeholder — To be completed by Valentina Molina Bustillos with her stateless test suite table, code snippets, and Vitest execution screenshot.]*
+All **6 stateless test cases** across `Data Sources`, `Comments`, and `File Uploads` were implemented in [`labs/lab03/automation/tests/valentina_molina/act5_act6_valentina_modules.test.ts`](./automation/tests/valentina_molina/act5_act6_valentina_modules.test.ts):
+
+| Sub-Suite | Endpoint | Implemented Stateless Test Cases (`6` Total) | Category Breakdown | Verified Contract Layers |
+|---|---|---|---|---|
+| **Suite 01** | `POST /v1/data_sources` | `TC_DS_CREATE_001` (`1` TC) | `1` Happy Path | `200 OK` `data_source` object, verifies the `properties` schema includes `Name` and `Count`. |
+| **Suite 02** | `GET /v1/data_sources/{id}` | `TC_DS_GET_001` (`1` TC) | `1` E2E Integrity | `200 OK`, verifies the returned `id` matches the created Data Source and the schema persisted. |
+| **Suite 03** | `POST /v1/comments` | `TC_CMT_CREATE_NEG` (`1` TC) | `1` Negative | `400 missing_version` when the mandatory `Notion-Version` header is explicitly omitted using a custom Axios client (`omitNotionVersion: true`). |
+| **Suite 04** | `POST /v1/comments` | `TC_CMT_CREATE_001` (`1` TC) | `1` Happy Path | `200 OK` `comment` object, verifies `parent.type === "page_id"` and that `rich_text` is returned. |
+| **Suite 05** | `POST /v1/file_uploads` | `TC_FU_CREATE_001` (`1` TC) | `1` Happy Path | `200 OK` `file_upload` object, initial `status: "pending"`, and valid UUIDv4 in the `id` field. |
+| **Suite 06** | `GET /v1/file_uploads/{id}` | `TC_FU_GET_001` (`1` TC) | `1` E2E Integrity | `200 OK`, verifies the `id` matches the initialized file upload to confirm state persistence. |
+
+##### Representative Stateless Test Code (`act5_act6_valentina_modules.test.ts`)
+
+```typescript
+it('TC_CMT_CREATE_NEG - [Negative Contract] Reject comment creation without Notion-Version header', async () => {
+  await throttleRequest(350);
+  const noVersionClient = createCustomNotionClient({
+    authType: 'bearer',
+    bearerToken: process.env.NOTION_TOKEN || '',
+    omitNotionVersion: true,
+  });
+
+  const res = (await noVersionClient.post('/comments', {
+    parent: { page_id: pageId },
+    rich_text: [{ text: { content: 'Comentario sin version' } }],
+  })) as TimedAxiosResponse;
+
+  assertNotionErrorContract(res, 400, 'missing_version');
+});
+
+it('TC_FU_CREATE_001 - [Happy Path] Initialize a file upload and verify pending status', async () => {
+  await throttleRequest(350);
+  const res = (await notionBearerClient.post('/file_uploads', {
+    name: 'test_report.pdf',
+    content_type: 'application/pdf',
+    mode: 'single_part',
+  })) as TimedAxiosResponse;
+
+  expect(res.status).toBe(200);
+  expect(res.data.object).toBe('file_upload');
+  expect(res.data.status).toBe('pending');
+  fileUploadId = res.data.id;
+});
+```
+
+##### Execution Command, Vitest Metrics & Evidence (`Activity #5` Stateless Suite)
+
+```bash
+cd labs/lab03/automation
+npx vitest run tests/valentina_molina/act5_act6_valentina_modules.test.ts
+```
+
+| **Vitest Execution Metric** | **Observed Result** | **Technical Notes** |
+| :--- | :--- | :--- |
+| **Test Files Executed** | `1` file (`act5_act6_valentina_modules.test.ts`) | Stateless positive, negative, and integrity checks. |
+| **Total Stateless Tests Executed** | `6` tests — `6 Passed / 0 Failed` (**`100%` pass rate**) | All `6` HTTP calls completed successfully with `beforeAll` hook creating the precondition Database. |
+| **Total Execution Duration** | `~8.5s` | Enforced `350 ms` throttling between tests to prevent `429 Too Many Requests`. |
+| **Key Validation** | **Header Omission & Integrity Checks** | `createCustomNotionClient` successfully omitted `Notion-Version` to assert `400 missing_version`. State persistence verified via `GET` after `POST`. |
+
+![Vitest Execution](./caps/valentinamolina/act5_vitest_run.png)
 
 ---
 
@@ -2014,7 +2118,15 @@ npm run test:gabriel
 
 #### 6.2.2 Valentina Molina Bustillos — Modules: Data Sources, Comments & File Uploads
 
-> *[Placeholder — To be completed by Valentina Molina Bustillos with her preconditioned & E2E migration matrix, code snippets, and Vitest execution screenshot.]*
+The migration from Postman to Axios + Vitest for these modules focused on replacing visual checks with strict TypeScript assertions and implementing test hooks for workspace preparation.
+
+##### Implementation Details
+1. **Lifecycle Hooks (`beforeAll`):** A `beforeAll` hook was implemented to automatically create a temporary Database via `axios.post('/databases')`. This ensures the Data Source tests have a valid `database_id` (precondition) without manual setup.
+2. **Stateless Negative Tests:** A negative test for Comments was migrated using `createCustomNotionClient({ omitNotionVersion: true })` to assert that omitting the `Notion-Version` header returns a `400 missing_version` error, proving the contract enforcement in code.
+3. **Data Integrity:** After creating a Data Source, the test retrieves it via `axios.get('/data_sources/{id}')` to verify that the schema (`Name`, `Count`) persisted correctly.
+
+##### Execution Evidence (Vitest)
+![Vitest Execution - Valentina](./caps/valentinamolina/act5_vitest_run.png)
 
 ---
 
@@ -2352,7 +2464,7 @@ To prevent module-resolution errors (`ERR_REQUIRE_ESM`), type-definition mismatc
 | Team Member | Lab 03 Contributions & Implemented Scope | Section / Item Worked On | Additional Comments & Status |
 |---|---|---|---|
 | **Gabriel Marcos Guaman Ortuño** | • Refactored `Notion_Users_OAuth_GabrielGuaman.postman_collection.json` (`69` requests, `345` assertions) and `Notion_Users_OAuth_Env.postman_environment.json` incorporating all 4 peer-review suggestions from Lilian Rosario López Coca (strict single status codes, collection-level DRY `[Common]` assertions, unified `OAUTH_ACCESS_TOKEN` & `next_cursor` variables, and in-collection Markdown setup guide).<br>• Executed unattended Newman `v6.2.3` CLI + `htmlextra` validation (`70` HTTP requests, `345` assertions: `328 Passed / 17 Failed`, `95.07%` pass rate) and documented the full root-cause classification of all `17` failed assertions across Category A (Notion API contract defects) and Category B (unattended CLI/OAuth constraints).<br>• Authored the complete Activity #2 HTTP Client evaluation (`Axios` vs. `Supertest` vs. `Native Fetch / Undici` vs. `Got`), architectural justification (`axios.create` + `validateStatus: () => true`), and GenAI validation protocol.<br>• Built the Group 2 code-based automation framework (`labs/lab03/automation/` with TypeScript, Axios, Zod, and Vitest) and migrated all `69` `Users` & `OAuth` requests across `act5_stateless_users_oauth.test.ts` (`42` stateless tests: `32 Passed / 10 Failed` in `33.71s`) and `act6_preconditioned_and_e2e.test.ts` (`27` preconditioned & chained E2E tests; full `69`-test suite: `56 Passed / 13 Failed`, `81.16%` pass rate in `65.67s`) in Activities #5 and #6. | • Activity #1 (`1.1.1`, `1.2.1`, `1.3.1`)<br>• Activity #2 (`2.1`, `2.2`, `2.3`, `2.4`, `2.5`)<br>• Activity #5 (`5.1`, `5.2`, `5.3`, `5.4.1`)<br>• Activity #6 (`6.1`, `6.2.1`, `6.3`) | • Refactored Lab 03 Postman artifacts committed under `labs/lab03/postman/gabriel_guaman/`.<br>• Code-based framework & `69` Vitest tests (`56 Passed / 13 Failed`) committed under `labs/lab03/automation/`.<br>• Activities #1 (Gabriel's section), #2, #5 (Gabriel's section), and #6 (Gabriel's section) 100% completed. |
-| **Valentina Molina Bustillos** | • Authored the complete Activity #4 Git workflow proposal, including the branching strategy (`main` / `week_X` / `feature/`), Conventional Commits guidelines, Pull Request policies, and CI/CD strategy (GitHub Actions) with a documented Generative AI prompt and validation procedure.<br>• Designed and generated the 4 visual reference guides (infographics) for the team's engineering conventions using AI image generation with a unified color palette. | • Activity #4 (Full section) | • Activity #4 100% completed.<br>• |
+| **Valentina Molina Bustillos** | • Refactored the Lab 02 Postman collection (`Lab03_Grupo2_Valentina(Refactored).json`) applying all 5 peer-review suggestions (fail-fast setup, teardown, deeper assertions, unified language, and TC IDs).<br>• Executed the consolidated suite via Newman CLI, achieving `100% (30 Passed / 0 Failed)` and documenting the live API findings.<br>• Authored the complete Activity #4 Git workflow proposal (branching, commits, PRs, CI/CD) with AI-generated visual guides.<br>• Migrated Data Sources, Comments & File Uploads to Vitest + Axios, implementing `beforeAll` hooks for database creation and strict negative contract assertions. | • Activity #1 (`1.1.2`, `1.2.2`, `1.3.2`)<br>• Activity #4 (Full section)<br>• Activity #5 (`5.4.2`)<br>• Activity #6 (`6.2.2`) | • All assigned activities (1, 4, 5, 6) 100% completed. |
 | **Karen Ivonne Cruz Alvarez** | • Refactored `Notion_Blocks_KarenCruz.postman_collection.json` (`72` test cases / `81` HTTP requests across `6` folders, reduced by `1,455` lines) and `Notion_Blocks_Env.postman_environment.json` incorporating all 4 peer-review suggestions from Kiara Vanessa Muñoz Bayter (centralized Collection-level `[Common]` assertions for `Content-Type`, `x-notion-request-id`, and `< 5000 ms` SLA; environment-first variable resolution without collection shadowing and `try / finally` sandbox teardown; strict single-status contract assertions preserving the 4 Notion API defect findings; and in-collection Markdown setup documentation).<br>• Executed the consolidated `Blocks` suite unattended in Newman `v6.2.3` (`308` total HTTP requests, `162` prerequest-scripts and `150` test-scripts with `0 failed`, `457` assertions: `448 Passed / 9 Failed`, `98.03%` pass rate in `4m 44.7s`), exported `reports/karen_cruz_newman_report.html`, and documented automation difficulties and the 4 Notion API contract discrepancies (`TC_BLK_APP_017`, `TC_BLK_APP_018`, `TC_BLK_CHL_012`, `TC_BLK_DEL_003`).<br>• Extended `src/core/assertions.ts` with `BlockObjectSchema` and `PaginatedBlockListSchema` (`Zod`) and migrated all `81` `Blocks` requests into **Axios + Vitest** across `tests/karen_cruz/act5_stateless_blocks.test.ts` (`51` stateless tests: `48 Passed / 3 Failed` in `43.28s`) and `tests/karen_cruz/act6_preconditioned_and_e2e_blocks.test.ts` (`30` preconditioned & chained E2E tests: `26 Passed / 4 Failed`; combined `81`-test suite: `74 Passed / 7 Failed`, `91.36%` pass rate in `128.51s`). | • Activity #1 (`1.1.3`, `1.2.3`, `1.3.3`)<br>• Activity #5 (`5.1`, `5.2`, `5.3`, `5.4.3`)<br>• Activity #6 (`6.1.2`, `6.2.3`, `6.3`) | • Refactored Lab 03 Postman collection & environment committed under `labs/lab03/postman/karen_cruz/`.<br>• Full `81`-test Vitest migration (`74 Passed / 7 Failed`), Newman HTML report (`labs/lab03/reports/karen_cruz_newman_report.html`), and all 4 screenshots (`labs/lab03/caps/karencruz/`) completed.<br>• Activities #1, #5, and #6 (Karen's sections) 100% completed. |
 | **Sebastián Pereyra** | • Applied all peer-review suggestions from Kevin Uruchi and Lucas Gabriel De Los Santos to the `Databases` and `Search` collections (standardizing English request names, removing hardcoded collection variables, expanding test cases for 100% Lab 01 parity, and enforcing strict single status code assertions).<br>• Automated the unattended Newman CLI (`v6.2.3`) + `htmlextra` execution for `Databases` and `Search` across `14` requests (`32` assertions) and documented execution metrics and eventual consistency findings.<br>• Authored technical difficulty analyses and Notion API contract defect findings (DEF-DB-01 pagination clamping on `/v1/search`, DEF-DB-02 compact hex normalization, DEF-DB-03 nil UUID lookup).<br>• Implemented `70` automated TypeScript/Vitest tests under `tests/sebastian_pereyra/` across `act5_stateless_databases_search.test.ts` (`34` stateless tests) and `act6_preconditioned_and_e2e.test.ts` (`36` preconditioned and chained E2E tests, including the 6-step container lifecycle workflow), implementing multi-layer verifications (status code, body structure, data integrity via GET persistence, and type checking).<br>• Authored the Library Compatibility and Ecosystem Review (Section `6.3`) and the Consolidated Group Reflection (Section `6.4`). | • Activity #1 (`1.1.4`, `1.2.4`, `1.3.4`)<br>• Activity #5 (`5.4.4`)<br>• Activity #6 (`6.1`, `6.2.4`, `6.3`, `6.4`) | • Full test suites committed under `labs/lab03/automation/tests/sebastian_pereyra/`.<br>• Core assertions and schemas added to `src/core/assertions.ts`.<br>• Activities #1, #5, #6 (Sebastián's sections and Sections 6.3/6.4) 100% completed. |
 | **Kevin Uruchi** | • Refactored `Notion_Pages.postman_collection.json` (`157` requests, `5` endpoint folders) and `Notion_Pages.postman_environment.json` applying the Lab 02 peer-review feedback from Lucas Gabriel De Los Santos (`7` suggestions + `2` additional defects found): all `314` scripts wrapped in async functions with a `Promise`-based `pm.sendRequest` for Newman compatibility, `pm.test.skip` for skipped cases, common checks (`Preconditions`, `Content-Type`, SLA) moved to the collection level (`470` duplicated blocks removed), secret tokens, filled environment (`14` → `9` keys) and a step-by-step setup guide in the collection description.<br>• Executed unattended Newman `v6.2.3` CLI + `htmlextra` validation against the live Notion API (`1,566` HTTP requests, `1,345` assertions: `1,332 Passed / 13 Failed`, `3` skipped, `99.03%` pass rate, `18m 7.7s`) and classified the `13` failures (`1` Notion API finding, `9` outdated test expectations, `2` test script defects, `1` non-deterministic rate-limit check).<br>• Migrated the `12` stateless Pages cases to Axios + Vitest (`act5_stateless_pages.test.ts`, `26` tests), including a raw-body helper because Axios re-serializes malformed JSON.<br>• Migrated `100%` of the Postman suite (`145` preconditioned cases in `5` files) through a typed `pagesKit.ts` (Postman runtime replacement + `45` shared helpers) and Zod schemas (`pageSchemas.ts`), and implemented the `16` chained E2E flows of the test case document (`57` steps) that were missing from the Postman export: `173` test cases / `228` Vitest tests, `0` errors under `tsc --strict`, and `1,059/1,059` checks with the same result in Newman and Vitest against the same mock API. | • Activity #1 (`1.1.5`, `1.2.5`, `1.3.5`)<br>• Activity #5 (`5.4.5`)<br>• Activity #6 (`6.2.5`, plus the Pages contributions to `6.1` and `6.3`) | • Refactored Lab 03 Postman artifacts committed under `labs/lab03/postman/kevin_uruchi/`.<br>• Pages kit and schemas under `labs/lab03/automation/src/pages/`, `7` Vitest suites under `labs/lab03/automation/tests/kevin_uruchi/`.<br>• Activities #1 and #5 (Kevin's sections) completed.<br>• **Pending:** live Vitest run against Notion (metrics tables of `5.4.5` and `6.2.5`), Newman and Vitest screenshots, and revoking the integration token exposed in `caps/Kevin/actividad3-1.png`. |
