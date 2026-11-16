@@ -1,0 +1,485 @@
+{
+	"info": {
+		"_postman_id": "0f812efa-cdd2-45d1-9e00-be0a87e8eb7c",
+		"name": "Lab03_Grupo2_Valentina (Refactored)",
+		"description": "Refactored collection for Lab 03. Includes: 1. Fail-fast setup, 2. Teardown for cleanup, 3. Deeper assertions (SLA & Content-Type), 4. Post-PATCH integrity checks, 5. Unified English assertions.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "58498180"
+	},
+	"item": [
+		{
+			"name": "00 - Setup & Fail-Fast",
+			"item": [
+				{
+					"name": "Setup - Create Database for Tests",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"// Fail-fast check: Do not run if we don't have a Page ID",
+									"if (!pm.environment.get(\"NOTION_PAGE_ID\")) {",
+									"    console.error(\"CRITICAL: NOTION_PAGE_ID is missing.\");",
+									"    postman.setNextRequest(null);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"TC_SETUP_001 - Status is 200 OK\", function () { pm.response.to.have.status(200); });",
+									"const responseJson = pm.response.json();",
+									"pm.test(\"TC_SETUP_001 - Database created successfully\", function () {",
+									"    pm.expect(responseJson.object).to.eql(\"database\");",
+									"    pm.expect(responseJson.id).to.be.a('string');",
+									"});",
+									"pm.environment.set(\"database_id\", responseJson.id);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"parent\": {\n        \"type\": \"page_id\",\n        \"page_id\": \"{{NOTION_PAGE_ID}}\"\n    },\n    \"title\": [\n        { \"type\": \"text\", \"text\": { \"content\": \"Refactored Test DB\" } }\n    ],\n    \"properties\": { \"Name\": { \"title\": {} } }\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{NOTION_BASE_URL}}/v1/databases",
+							"host": [
+								"{{NOTION_BASE_URL}}"
+							],
+							"path": [
+								"v1",
+								"databases"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "01 - Data Sources CRUD",
+			"item": [
+				{
+					"name": "TC_DS_CREATE_001 - Create Data Source",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"exec": [
+									"if (!pm.environment.get(\"database_id\")) {",
+									"    console.error(\"CRITICAL: database_id missing. Halting.\");",
+									"    postman.setNextRequest(null);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"TC_DS_CREATE_001 - Status is 200 OK\", function () { pm.response.to.have.status(200); });",
+									"const responseJson = pm.response.json();",
+									"pm.test(\"TC_DS_CREATE_001 - Response is a valid data source\", function () {",
+									"    pm.expect(responseJson.object).to.eql(\"data_source\");",
+									"    pm.expect(responseJson.id).to.be.a('string');",
+									"    pm.expect(responseJson.properties).to.have.property('Name');",
+									"});",
+									"pm.environment.set(\"data_source_id\", responseJson.id);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"parent\": { \"type\": \"database_id\", \"database_id\": \"{{database_id}}\" },\n    \"properties\": {\n        \"Name\": { \"title\": {} },\n        \"Count\": { \"number\": { \"format\": \"number\" } }\n    }\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{NOTION_BASE_URL}}/v1/data_sources",
+							"host": [
+								"{{NOTION_BASE_URL}}"
+							],
+							"path": [
+								"v1",
+								"data_sources"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "TC_DS_UPDATE_001 - Update Data Source (Add Column)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"TC_DS_UPDATE_001 - Status is 200 OK\", function () { pm.response.to.have.status(200); });",
+									"const responseJson = pm.response.json();",
+									"pm.test(\"TC_DS_UPDATE_001 - New property 'Status' was added\", function () {",
+									"    pm.expect(responseJson.properties).to.have.property('Status');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"properties\": {\n        \"Status\": {\n            \"select\": { \"options\": [ { \"name\": \"Active\", \"color\": \"green\" } ] }\n        }\n    }\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{NOTION_BASE_URL}}/v1/data_sources/{{data_source_id}}",
+							"host": [
+								"{{NOTION_BASE_URL}}"
+							],
+							"path": [
+								"v1",
+								"data_sources",
+								"{{data_source_id}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "TC_DS_INTEGRITY_001 - Verify Schema Persistence via GET",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"TC_DS_INTEGRITY_001 - Status is 200 OK\", function () { pm.response.to.have.status(200); });",
+									"const responseJson = pm.response.json();",
+									"pm.test(\"TC_DS_INTEGRITY_001 - The added column 'Status' persists after GET\", function () {",
+									"    pm.expect(responseJson.properties).to.have.property('Status');",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{NOTION_BASE_URL}}/v1/data_sources/{{data_source_id}}",
+							"host": [
+								"{{NOTION_BASE_URL}}"
+							],
+							"path": [
+								"v1",
+								"data_sources",
+								"{{data_source_id}}"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "02 - Comments",
+			"item": [
+				{
+					"name": "TC_CMT_CREATE_001 - Create Comment",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"TC_CMT_CREATE_001 - Status is 200 OK\", function () { pm.response.to.have.status(200); });",
+									"const responseJson = pm.response.json();",
+									"pm.test(\"TC_CMT_CREATE_001 - Comment created successfully\", function () {",
+									"    pm.expect(responseJson.object).to.eql(\"comment\");",
+									"    pm.expect(responseJson.id).to.be.a('string');",
+									"    pm.expect(responseJson.parent.type).to.eql(\"page_id\");",
+									"});",
+									"pm.environment.set(\"comment_id\", responseJson.id);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"parent\": { \"page_id\": \"{{NOTION_PAGE_ID}}\" },\n    \"rich_text\": [ { \"text\": { \"content\": \"Hello from refactored tests\" } } ]\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{NOTION_BASE_URL}}/v1/comments",
+							"host": [
+								"{{NOTION_BASE_URL}}"
+							],
+							"path": [
+								"v1",
+								"comments"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "TC_CMT_UPDATE_001 - Update Comment",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"TC_CMT_UPDATE_001 - Status is 200 OK\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"TC_CMT_UPDATE_001 - Comment updated successfully (Live API behavior)\", function () {",
+									"    const responseJson = pm.response.json();",
+									"    pm.expect(responseJson.object).to.eql(\"comment\");",
+									"    // Aquí verificamos que el texto sí se actualizó",
+									"    pm.expect(responseJson.rich_text[0].text.content).to.eql(\"Updated comment\");",
+									"});"
+								],
+								"type": "text/javascript",
+								"packages": {},
+								"requests": {}
+							}
+						}
+					],
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"rich_text\": [ { \"text\": { \"content\": \"Updated comment\" } } ]\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{NOTION_BASE_URL}}/v1/comments/{{comment_id}}",
+							"host": [
+								"{{NOTION_BASE_URL}}"
+							],
+							"path": [
+								"v1",
+								"comments",
+								"{{comment_id}}"
+							]
+						},
+						"description": "Endpoint works"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "03 - File Uploads",
+			"item": [
+				{
+					"name": "TC_FU_CREATE_001 - Initialize File Upload",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"TC_FU_CREATE_001 - Status is 200 OK\", function () { pm.response.to.have.status(200); });",
+									"const responseJson = pm.response.json();",
+									"pm.test(\"TC_FU_CREATE_001 - File upload initialized to pending\", function () {",
+									"    pm.expect(responseJson.object).to.eql(\"file_upload\");",
+									"    pm.expect(responseJson.status).to.eql(\"pending\");",
+									"});",
+									"pm.environment.set(\"file_upload_id\", responseJson.id);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"report.pdf\",\n    \"content_type\": \"application/pdf\",\n    \"mode\": \"single_part\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{NOTION_BASE_URL}}/v1/file_uploads",
+							"host": [
+								"{{NOTION_BASE_URL}}"
+							],
+							"path": [
+								"v1",
+								"file_uploads"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "99 - Teardown",
+			"item": [
+				{
+					"name": "Teardown - Archive Database and Clear Variables",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Teardown - Database archived successfully\", function () {",
+									"    pm.response.to.have.status(200);",
+									"    const responseJson = pm.response.json();",
+									"    pm.expect(responseJson.in_trash).to.eql(true);",
+									"});",
+									"// Clear environment variables",
+									"pm.environment.unset(\"database_id\");",
+									"pm.environment.unset(\"data_source_id\");",
+									"pm.environment.unset(\"comment_id\");",
+									"pm.environment.unset(\"file_upload_id\");"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"in_trash\": true\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{NOTION_BASE_URL}}/v1/databases/{{database_id}}",
+							"host": [
+								"{{NOTION_BASE_URL}}"
+							],
+							"path": [
+								"v1",
+								"databases",
+								"{{database_id}}"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"pm.request.headers.upsert({ key: 'Notion-Version', value: pm.environment.get('NOTION_VERSION') });",
+					"pm.request.headers.upsert({ key: 'Authorization', value: 'Bearer ' + pm.environment.get('NOTION_TOKEN') });"
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Collection-level assertions for DRY (Content-Type & SLA)",
+					"pm.test(\"[Common] Response Content-Type is application/json\", function () {",
+					"    if (pm.response.code !== 204 && pm.response.code !== 404) {",
+					"        pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+					"    }",
+					"});",
+					"pm.test(\"[Common] Response time is within 5000 ms SLA\", function () {",
+					"    pm.expect(pm.response.responseTime).to.be.below(5000);",
+					"});"
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "NOTION_BASE_URL",
+			"value": "https://api.notion.com"
+		}
+	]
+}
