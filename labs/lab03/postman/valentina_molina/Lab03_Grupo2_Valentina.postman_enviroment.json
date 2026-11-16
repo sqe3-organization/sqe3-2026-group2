@@ -1,0 +1,33 @@
+{
+	"id": "542d0241-12ea-4eab-8b01-2830e28d8449",
+	"name": "Lab03_Grupo2_Valentina.postman_enviroment",
+	"values": [
+		{
+			"key": "NOTION_BASE_URL",
+			"value": "https://api.notion.com",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "NOTION_VERSION",
+			"value": "2025-09-03",
+			"type": "default",
+			"enabled": true
+		},
+		{
+			"key": "NOTION_TOKEN",
+			"value": "ntn_c878992576115FlJDkWjKlFRKbrIWaoEcooxLnqVBdfbqD",
+			"type": "secret",
+			"enabled": true
+		},
+		{
+			"key": "NOTION_PAGE_ID",
+			"value": "41220beb9f8180d18597d589ec4e5adc",
+			"type": "default",
+			"enabled": true
+		}
+	],
+	"_postman_variable_scope": "environment",
+	"_postman_exported_at": "2026-11-16T03:21:26.482Z",
+	"_postman_exported_using": "Postman/11.72.3"
+}
