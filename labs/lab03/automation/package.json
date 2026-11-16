@@ -9,6 +9,9 @@
     "test:gabriel": "vitest run tests/gabriel_guaman",
     "test:act5": "vitest run tests/gabriel_guaman/act5_stateless_users_oauth.test.ts",
     "test:act6": "vitest run tests/gabriel_guaman/act6_preconditioned_and_e2e.test.ts",
+    "test:karen:act5": "vitest run tests/karen_cruz/act5_stateless_blocks.test.ts --reporter=verbose",
+    "test:karen:act6": "vitest run tests/karen_cruz/act6_preconditioned_and_e2e_blocks.test.ts --reporter=verbose",
+    "test:karen": "vitest run tests/karen_cruz/ --reporter=verbose",
     "test:report": "vitest run --reporter=verbose --reporter=json --outputFile=../reports/vitest_execution_report.json",
     "test:ui": "vitest --ui"
   },
