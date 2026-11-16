@@ -477,6 +477,7 @@ newman run "Valentina_Collection.json" \
 
 Following the four structural refactorings documented in Section `1.1.3`, the consolidated `Blocks` suite [`Notion_Blocks_KarenCruz.postman_collection.json`](./postman/karen_cruz/Notion_Blocks_KarenCruz.postman_collection.json) was executed unattended via **Newman CLI (`v6.2.3`)** paired with **`newman-reporter-htmlextra`** against the live **Notion REST API (`2025-09-03`)** workspace using [`Notion_Blocks_Env.postman_environment.json`](./postman/karen_cruz/Notion_Blocks_Env.postman_environment.json).
 
+```bash
 npx newman run labs/lab03/postman/karen_cruz/Notion_Blocks_KarenCruz.postman_collection.json \
   -e labs/lab03/postman/karen_cruz/Notion_Blocks_Env.postman_environment.json \
   --delay-request 400 \
