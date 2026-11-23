@@ -1,0 +1,220 @@
+[
+  {
+    "case_id": "DS_VALID_001",
+    "description": "Create a data source with title and number properties",
+    "payload": {
+      "parent": { "type": "database_id", "database_id": "{{DATABASE_ID}}" },
+      "properties": {
+        "Name": { "title": {} },
+        "Count": { "number": { "format": "number" } }
+      }
+    },
+    "expected_status": 200,
+    "category": "happy_path"
+  },
+  {
+    "case_id": "DS_VALID_002",
+    "description": "Create a data source with title, checkbox and date property",
+    "payload": {
+      "parent": { "type": "database_id", "database_id": "{{DATABASE_ID}}" },
+      "properties": {
+        "Name": { "title": {} },
+        "Done": { "checkbox": {} },
+        "DueDate": { "date": {} }
+      }
+    },
+    "expected_status": 200,
+    "category": "happy_path"
+  },
+  {
+    "case_id": "DS_VALID_003",
+    "description": "Create a data source with title, select and multi_select property",
+    "payload": {
+      "parent": { "type": "database_id", "database_id": "{{DATABASE_ID}}" },
+      "properties": {
+        "Name": { "title": {} },
+        "Status": { "select": { "options": [{ "name": "To Do" }, { "name": "Done" }] } },
+        "Tags": { "multi_select": { "options": [{ "name": "Bug" }, { "name": "Feature" }] } }
+      }
+    },
+    "expected_status": 200,
+    "category": "happy_path"
+  },
+  {
+    "case_id": "DS_VALID_004",
+    "description": "Create a data source with 101 properties (boundary accepted by Notion)",
+    "payload": {
+        "parent": { "type": "database_id", "database_id": "{{DATABASE_ID}}" },
+        "properties": {
+        "Name": { "title": {} },
+        "Prop_001": { "rich_text": {} },
+        "Prop_002": { "rich_text": {} },
+        "Prop_003": { "rich_text": {} },
+        "Prop_004": { "rich_text": {} },
+        "Prop_005": { "rich_text": {} },
+        "Prop_006": { "rich_text": {} },
+        "Prop_007": { "rich_text": {} },
+        "Prop_008": { "rich_text": {} },
+        "Prop_009": { "rich_text": {} },
+        "Prop_010": { "rich_text": {} },
+        "Prop_011": { "rich_text": {} },
+        "Prop_012": { "rich_text": {} },
+        "Prop_013": { "rich_text": {} },
+        "Prop_014": { "rich_text": {} },
+        "Prop_015": { "rich_text": {} },
+        "Prop_016": { "rich_text": {} },
+        "Prop_017": { "rich_text": {} },
+        "Prop_018": { "rich_text": {} },
+        "Prop_019": { "rich_text": {} },
+        "Prop_020": { "rich_text": {} },
+        "Prop_021": { "rich_text": {} },
+        "Prop_022": { "rich_text": {} },
+        "Prop_023": { "rich_text": {} },
+        "Prop_024": { "rich_text": {} },
+        "Prop_025": { "rich_text": {} },
+        "Prop_026": { "rich_text": {} },
+        "Prop_027": { "rich_text": {} },
+        "Prop_028": { "rich_text": {} },
+        "Prop_029": { "rich_text": {} },
+        "Prop_030": { "rich_text": {} },
+        "Prop_031": { "rich_text": {} },
+        "Prop_032": { "rich_text": {} },
+        "Prop_033": { "rich_text": {} },
+        "Prop_034": { "rich_text": {} },
+        "Prop_035": { "rich_text": {} },
+        "Prop_036": { "rich_text": {} },
+        "Prop_037": { "rich_text": {} },
+        "Prop_038": { "rich_text": {} },
+        "Prop_039": { "rich_text": {} },
+        "Prop_040": { "rich_text": {} },
+        "Prop_041": { "rich_text": {} },
+        "Prop_042": { "rich_text": {} },
+        "Prop_043": { "rich_text": {} },
+        "Prop_044": { "rich_text": {} },
+        "Prop_045": { "rich_text": {} },
+        "Prop_046": { "rich_text": {} },
+        "Prop_047": { "rich_text": {} },
+        "Prop_048": { "rich_text": {} },
+        "Prop_049": { "rich_text": {} },
+        "Prop_050": { "rich_text": {} },
+        "Prop_051": { "rich_text": {} },
+        "Prop_052": { "rich_text": {} },
+        "Prop_053": { "rich_text": {} },
+        "Prop_054": { "rich_text": {} },
+        "Prop_055": { "rich_text": {} },
+        "Prop_056": { "rich_text": {} },
+        "Prop_057": { "rich_text": {} },
+        "Prop_058": { "rich_text": {} },
+        "Prop_059": { "rich_text": {} },
+        "Prop_060": { "rich_text": {} },
+        "Prop_061": { "rich_text": {} },
+        "Prop_062": { "rich_text": {} },
+        "Prop_063": { "rich_text": {} },
+        "Prop_064": { "rich_text": {} },
+        "Prop_065": { "rich_text": {} },
+        "Prop_066": { "rich_text": {} },
+        "Prop_067": { "rich_text": {} },
+        "Prop_068": { "rich_text": {} },
+        "Prop_069": { "rich_text": {} },
+        "Prop_070": { "rich_text": {} },
+        "Prop_071": { "rich_text": {} },
+        "Prop_072": { "rich_text": {} },
+        "Prop_073": { "rich_text": {} },
+        "Prop_074": { "rich_text": {} },
+        "Prop_075": { "rich_text": {} },
+        "Prop_076": { "rich_text": {} },
+        "Prop_077": { "rich_text": {} },
+        "Prop_078": { "rich_text": {} },
+        "Prop_079": { "rich_text": {} },
+        "Prop_080": { "rich_text": {} },
+        "Prop_081": { "rich_text": {} },
+        "Prop_082": { "rich_text": {} },
+        "Prop_083": { "rich_text": {} },
+        "Prop_084": { "rich_text": {} },
+        "Prop_085": { "rich_text": {} },
+        "Prop_086": { "rich_text": {} },
+        "Prop_087": { "rich_text": {} },
+        "Prop_088": { "rich_text": {} },
+        "Prop_089": { "rich_text": {} },
+        "Prop_090": { "rich_text": {} },
+        "Prop_091": { "rich_text": {} },
+        "Prop_092": { "rich_text": {} },
+        "Prop_093": { "rich_text": {} },
+        "Prop_094": { "rich_text": {} },
+        "Prop_095": { "rich_text": {} },
+        "Prop_096": { "rich_text": {} },
+        "Prop_097": { "rich_text": {} },
+        "Prop_098": { "rich_text": {} },
+        "Prop_099": { "rich_text": {} },
+        "Prop_100": { "rich_text": {} }
+        }
+    },
+    "expected_status": 200,
+    "category": "happy_path"
+  },
+  {
+    "case_id": "DS_INVALID_001",
+    "description": "Reject a data source with an empty properties object",
+    "payload": {
+      "parent": { "type": "database_id", "database_id": "{{DATABASE_ID}}" },
+      "properties": {}
+    },
+    "expected_status": 400,
+    "category": "negative"
+  },
+  {
+    "case_id": "DS_INVALID_002",
+    "description": "Reject a data source with an unsupported property type",
+    "payload": {
+      "parent": { "type": "database_id", "database_id": "{{DATABASE_ID}}" },
+      "properties": {
+        "Name": { "title": {} },
+        "InvalidProp": { "unsupported_type": {} }
+      }
+    },
+    "expected_status": 400,
+    "category": "negative"
+  },
+  {
+    "case_id": "DS_INVALID_003",
+    "description": "Reject a data source with an invalid database_id format",
+    "payload": {
+      "parent": { "type": "database_id", "database_id": "not-a-valid-uuid" },
+      "properties": { "Name": { "title": {} } }
+    },
+    "expected_status": 400,
+    "category": "negative"
+  },
+  {
+    "case_id": "DS_INVALID_004",
+    "description": "Reject a data source without the parent field",
+    "payload": {
+      "properties": { "Name": { "title": {} } }
+    },
+    "expected_status": 400,
+    "category": "negative"
+  },
+  {
+    "case_id": "DS_INVALID_005",
+    "description": "Reject a data source with a null property value",
+    "payload": {
+      "parent": { "type": "database_id", "database_id": "{{DATABASE_ID}}" },
+      "properties": { "Name": { "title": {} }, "Count": null }
+    },
+    "expected_status": 400,
+    "category": "negative"
+  },
+  {
+    "case_id": "DS_INVALID_006",
+    "description": "Reject a data source with a number property using an invalid format",
+    "payload": {
+      "parent": { "type": "database_id", "database_id": "{{DATABASE_ID}}" },
+      "properties": {
+        "Name": { "title": {} },
+        "Count": { "number": { "format": "invalid_format" } }
+      }
+    },
+    "expected_status": 400,
+    "category": "negative"
+  }
+]
