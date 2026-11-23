@@ -463,7 +463,32 @@ The Lab 03 test file (`act5_act6_valentina_modules.test.ts`) was split and refac
 
 #### 1.3.3 Karen Ivonne Cruz Alvarez — Module: Blocks
 
-> TODO 
+In Lab 03, the Blocks test suites lived in two monolithic files under `labs/lab03/automation/tests/karen_cruz/` (`act5_stateless_blocks.test.ts` and `act6_preconditioned_and_e2e_blocks.test.ts`) where HTTP calls (`notionBearerClient`, `createCustomNotionClient`), inline payload builders, rate-limit throttling, Zod schemas, and lifecycle hooks were tightly coupled inside the test files. During Lab 05, the module was refactored into the proposed **three-layer architecture** (`core/` → `main/` → `tests/`), preserving 100% of the Lab 03 coverage while adding data-driven edge cases.
+
+**Before / After Refactoring Mapping:**
+
+| Aspect | Before (Lab 03 — `labs/lab03/automation/tests/karen_cruz/`) | After (Lab 05 — Three-Layer Architecture) |
+|---|---|---|
+| **HTTP Transport** | Direct `notionBearerClient` and `createCustomNotionClient` calls inside tests | `BlocksAPI` (`main/api/endpoints/blocksAPI.ts`) delegates exclusively to `RequestManager.getInstance()` (`getDefaultClient()` and `getClient(options)`) |
+| **Schema Validation** | Imported shared schemas from legacy `src/core/assertions.ts` | Module-specific Zod v4 schemas (`BlockObjectSchema`, `BlockChildrenListSchema`) in `main/api/resources/schemas/blocksSchemas.ts`, reusing `NotionErrorSchema` and `SchemaValidator.assertValid()` |
+| **Test Data & Edge Cases** | Hardcoded constants and inline arrays inside test suites | Dynamic GenAI dataset in `main/api/resources/data/blocks_dataset.json` consumed by data-driven loops across `get`, `append`, `children`, and `update` suites |
+| **Preconditions, Context & Teardown** | Duplicated `beforeAll`/`beforeEach`/`afterEach`/`afterAll` hooks and mutable suite variables per file | Centralized `tests/hooks/blocks/blocksHooks.ts` with typed `BlocksTestContext`, `createBlocksTestContext()`, `setupBlocksContext()`, `throttleBlocksRequest()`, `recordBlocksTelemetry()`, and `cleanupBlocksContext()` |
+| **Test Organization** | 2 monolithic files (`act5_stateless_blocks.test.ts`, `act6_preconditioned_and_e2e_blocks.test.ts`) | 5 endpoint-scoped suites under `tests/scenarios/blocks/` (`blocks.append.test.ts`, `blocks.get.test.ts`, `blocks.children.test.ts`, `blocks.update.test.ts`, `blocks.delete.test.ts`) |
+| **Logging & Telemetry** | Silent in-memory `telemetryLog` array cleared in `afterAll` | Structured `Logger.debug` per-test telemetry and `Logger.info` teardown summaries via `core/utils/logger.ts` |
+
+**New Files Created (Blocks Module):**
+
+| File | Layer | Responsibility |
+|---|---|---|
+| `main/api/endpoints/blocksAPI.ts` | Business | Exposes `appendChildren`, `getBlock`, `getChildren`, `updateBlock`, and `deleteBlock` via `RequestManager` |
+| `main/api/resources/schemas/blocksSchemas.ts` | Business | Defines Zod v4 `BlockObjectSchema` and `BlockChildrenListSchema`; reuses `NotionErrorSchema` from `notionSchemas.ts` |
+| `main/api/resources/data/blocks_dataset.json` | Business | GenAI-generated dataset covering invalid block IDs, invalid append/update payloads, and pagination boundaries |
+| `tests/hooks/blocks/blocksHooks.ts` | Test | Manages `BlocksTestContext`, env validation (`PARENT_PAGE_ID` / `PAGE_ID`), sandbox seeding, 350 ms throttling, telemetry, and teardown |
+| `tests/scenarios/blocks/blocks.append.test.ts` | Test | `PATCH /v1/blocks/:id/children` — happy path, rich types, `after`, nesting, boundaries, and data-driven negative payloads |
+| `tests/scenarios/blocks/blocks.get.test.ts` | Test | `GET /v1/blocks/:id` — retrieval, compact UUID normalization, auth/version errors, and data-driven invalid IDs |
+| `tests/scenarios/blocks/blocks.children.test.ts` | Test | `GET /v1/blocks/:id/children` — default & cursor pagination, nested children, E2E tree traversal, and data-driven `page_size` boundaries |
+| `tests/scenarios/blocks/blocks.update.test.ts` | Test | `PATCH /v1/blocks/:id` — text updates, `to_do` toggle, archive/restore, length boundaries, and data-driven invalid updates |
+| `tests/scenarios/blocks/blocks.delete.test.ts` | Test | `DELETE /v1/blocks/:id` — soft-delete, parent-child cascade, negative/boundary checks, and chained E2E lifecycle workflows |
 
 #### 1.3.4 Sebastián Pereyra — Modules: Databases & Search
 
@@ -550,7 +575,60 @@ The suites need `NOTION_TOKEN` and `NOTION_ROOT_PAGE_ID` in `.env`. The optional
 
 ### 1.5 Code Format Review Libraries (Linter)
 
-> TODO 
+To guarantee consistent TypeScript code style, static quality checks, and conflict-free formatting across all three architecture layers (`core/`, `main/`, and `tests/`), **ESLint v9** (flat configuration) and **Prettier** were integrated into the repository.
+
+#### Installed Libraries (`devDependencies`)
+
+| Package | Role |
+|---|---|
+| `eslint` (`^9.39.5`) | Static analysis engine using the modern v9 flat config format (`eslint.config.js`). |
+| `@eslint/js` (`^9.39.5`) | Recommended JavaScript baseline ruleset for ESLint v9. |
+| `typescript-eslint` (`^8.73.0`) | TypeScript parser and lint rules (`tseslint.configs.recommended`) supporting TypeScript syntax and Vitest test files. |
+| `prettier` (`^3.10.1`) | Opinionated code formatter ensuring uniform indentation, quotes, semicolons, and line widths. |
+| `eslint-config-prettier` (`^10.1.8`) | Disables ESLint formatting rules that could conflict with Prettier. |
+
+> **Note on TypeScript 7.0 + `typescript-eslint` compatibility:** Because the workspace uses native TypeScript 7.0 (`tsc`) while `typescript-eslint` v8 consumes the JS compiler API, `package.json` configures Microsoft's official side-by-side alias (`"@typescript/native": "npm:typescript@^7.0.2"` alongside `"typescript": "npm:@typescript/typescript6@^6.0.2"`), allowing `npx tsc --noEmit` to run natively on TypeScript 7.0 while ESLint executes cleanly without peer-dependency or runtime errors.
+
+#### Configuration Files
+
+1. **`eslint.config.js`** (repository root):
+   - Uses ESLint v9 flat config via `tseslint.config(...)`.
+   - Ignores generated and documentation directories: `node_modules/**`, `dist/**`, `labs/**`, `logs/**`, and `reports/**`.
+   - Applies `js.configs.recommended`, `tseslint.configs.recommended`, and `eslint-config-prettier` across `core/**/*.ts`, `main/**/*.ts`, and `tests/**/*.ts`.
+   - Grants a targeted override in `core/utils/logger.ts` (`'no-console': 'off'`) because `Logger` is the sanctioned console wrapper of the Core Layer.
+2. **`.prettierrc`** (repository root):
+   - Enforces `"semi": true`, `"singleQuote": true`, `"trailingComma": "es5"`, `"printWidth": 100`, `"tabWidth": 2`, `"arrowParens": "always"`, and `"endOfLine": "lf"`.
+3. **`.prettierignore`** (repository root):
+   - Excludes `node_modules/`, `labs/`, `logs/`, `reports/`, and `dist/` from formatting scans.
+
+#### Key Enforced Rules
+
+| Rule | Severity | Rationale |
+|---|---|---|
+| `@typescript-eslint/no-unused-vars` | `error` (ignores `_`-prefixed identifiers) | Prevents dead imports, unused hooks, and leaked test variables. |
+| `no-duplicate-imports` | `error` | Keeps module imports clean and consolidated. |
+| `prefer-const` / `no-var` | `error` | Enforces immutable bindings by default and modern ES2022 scoping. |
+| `eqeqeq` (`always`) | `error` | Eliminates loose-equality bugs in test assertions and helper guards. |
+| `no-console` | `warn` (`off` in `core/utils/logger.ts`) | Encourages all modules and tests to log through `Logger` instead of raw `console.log`. |
+| `@typescript-eslint/no-explicit-any` | `warn` | Nudges strict typing across endpoint classes, hooks, and scenarios while remaining pragmatic for legacy files. |
+
+#### NPM Scripts (`package.json`)
+
+```json
+{
+  "scripts": {
+    "lint": "eslint core main tests",
+    "lint:fix": "eslint core main tests --fix",
+    "format": "prettier --write \"core/**/*.ts\" \"main/**/*.ts\" \"tests/**/*.ts\"",
+    "format:check": "prettier --check \"core/**/*.ts\" \"main/**/*.ts\" \"tests/**/*.ts\""
+  }
+}
+```
+
+#### How It Enforces Team Code Quality
+
+- **Uniform PR standards:** Running `npm run lint` and `npm run format:check` before committing catches unused variables, duplicate imports, raw `console.log` calls, and formatting drift across all five team members' modules.
+- **Zero-friction auto-remediation:** Developers can run `npm run lint:fix` and `npm run format` locally to resolve fixable issues automatically without manual reformatting, keeping Git diffs focused exclusively on behavioral changes.
 
 ---
 
@@ -819,6 +897,17 @@ Every preconditioned case of the module builds its own data by API, so no case d
 
 Notion has no permanent delete for pages, so the postcondition can only send the pages to the trash. Trashing the parent page is enough for the pages, databases and rows created under it.
 
+#### Karen Ivonne Cruz Alvarez — Module: Blocks
+
+Preconditions, per-test throttling/telemetry, and postconditions for all five Blocks test suites are centralized in `tests/hooks/blocks/blocksHooks.ts`:
+
+| Lifecycle Hook | Helper Function | Responsibility |
+|---|---|---|
+| `beforeAll` (Precondition) | `setupBlocksContext(ctx, blocksAPI, { seedBlocks, suiteLabel })` | Resolves and validates the parent page UUID from `PARENT_PAGE_ID` / `PAGE_ID` / `NOTION_PAGE_ID` (with `SearchAPI` fallback if unset), provisions an isolated toggle container via `BlocksAPI.appendChildren()`, registers it in `ctx.createdBlockIds`, and seeds an active `paragraph`, nested `toggle`, and `to_do` block. |
+| `beforeEach` (Rate-Limit Guard) | `throttleBlocksRequest(350)` | Resets `ctx.lastResponse = null` and enforces a `350 ms` pause between consecutive requests to comply with Notion's ~3 req/s rate limit. |
+| `afterEach` (Telemetry) | `recordBlocksTelemetry(ctx, context.task.name)` | Appends `{ testName, status, durationMs }` to `ctx.telemetry` and logs execution latency through `Logger.debug`. |
+| `afterAll` (Postcondition) | `cleanupBlocksContext(ctx, blocksAPI)` | Iterates over all tracked `ctx.createdBlockIds`, soft-deletes each container block via `BlocksAPI.deleteBlock()` (cascading to all nested children), clears state arrays, and logs a structured teardown summary (`tracked`, `archived`, `failed`, `telemetryEntries`) via `Logger.info`. |
+
 
 ### 4.2 Test Context Variables
 
@@ -887,6 +976,28 @@ assertChecks();                                    // reports every failed check
 
 `check()` records named soft assertions, so a case reports every failed check at once (for example `TC_PAGES_002: 2 of 31 checks failed`) instead of stopping at the first one, the same way the Postman report did. Setting `PAGES_CHECK_LOG=<file>` writes one JSON line per case with the result of each check.
 
+#### Karen Ivonne Cruz Alvarez — Module: Blocks
+
+Each Blocks test suite instantiates an isolated, strongly-typed `BlocksTestContext` through the `createBlocksTestContext()` factory in `tests/hooks/blocks/blocksHooks.ts`. Isolating context per suite prevents cross-file state leakage while keeping all dynamic Notion IDs, responses, and teardown tracking in one place:
+
+| Context Variable | Type | Source & Purpose |
+|---|---|---|
+| `parentPageId` | `string` | Resolved in `beforeAll` from `PARENT_PAGE_ID` / `PAGE_ID` / `NOTION_PAGE_ID` (or `SearchAPI` fallback); root target for stateless and container creation calls. |
+| `sandboxContainerId` | `string` | Isolated toggle container created under `parentPageId` via `BlocksAPI.appendChildren()` to group seeded blocks. |
+| `createdBlockIds` | `string[]` | Tracks every top-level sandbox/isolated container block ID created during the suite so `cleanupBlocksContext()` archives all of them in `afterAll`. |
+| `activeBlockId` | `string` | Seeded `paragraph` block ID used for retrieval, childless children lookup, and `PATCH /blocks/:id` update tests. |
+| `nestedBlockId` | `string` | Seeded `toggle` block ID (with a nested paragraph child) used to verify `has_children: true` and direct child listing. |
+| `todoBlockId` | `string` | Seeded `to_do` block ID used for `checked` state toggle and invalid field-type negative tests. |
+| `lastResponse` | `TimedAxiosResponse \| null` | Stores the most recent API response in each test case so `recordBlocksTelemetry()` can log status code and latency in `afterEach`. |
+| `telemetry` | `BlocksTelemetryEntry[]` | Accumulates `{ testName, status, durationMs }` records across the suite for diagnostic reporting during teardown. |
+
+```typescript
+const blocksAPI = new BlocksAPI();
+const ctx = createBlocksTestContext();
+// Populated in beforeAll via setupBlocksContext(ctx, blocksAPI, { seedBlocks: true })
+const res = await blocksAPI.getBlock(ctx.activeBlockId);
+ctx.lastResponse = res;
+```
 ### 4.3 Dynamic Datasets Generated with GenAI
 
 #### Prompt Used
@@ -924,6 +1035,25 @@ The dataset must contain 10 test cases with the following structure:
 Include cases for: invalid property types, missing Notion-Version header, invalid auth token, and exceeding property limits.
 Return only the JSON, no explanation.
 ```
+
+#### Karen Ivonne Cruz Alvarez — Module: Blocks
+
+```text
+Act as a Senior QA Automation Engineer specializing in REST API contract testing for the Notion API (Notion-Version: 2025-09-03).
+Generate a structured JSON dataset saved as main/api/resources/data/blocks_dataset.json for data-driven testing of the Notion Blocks endpoints:
+- GET /v1/blocks/{block_id}
+- PATCH /v1/blocks/{block_id}/children
+- GET /v1/blocks/{block_id}/children
+- PATCH /v1/blocks/{block_id}
+
+Include four top-level arrays:
+1. "invalidBlockIds": syntactically invalid UUID, off-by-one 31-char and 33-char hex IDs, SQL injection-like payloads ("' OR '1'='1", "1; DROP TABLE blocks;--"), unassigned well-formed UUIDv4, and all-zero nil UUID, with expectedStatus (400 or 404) and expectedCode ("validation_error" or "object_not_found").
+2. "invalidAppendPayloads": empty object {}, empty children array [], unsupported block type, block type/payload key mismatch, and non-array rich_text field, all expecting 400 validation_error.
+3. "paginationBoundaries": valid boundaries page_size=1 and page_size=100 (expectedStatus 200, maxResults 1 and 100), plus out-of-bounds page_size=0, -1, 101, non-numeric page_size="abc", and malformed start_cursor="invalid_cursor" (expectedStatus 400 validation_error).
+4. "invalidUpdatePayloads": mismatched block type payload (to_do on paragraph), immutable type mutation, invalid boolean field type (checked: "yes" on to_do), and unsupported block key, all expecting 400 validation_error.
+
+Each entry must include caseId (matching TC_BLK_<ACTION>_<NNN>), description, category ("Negative" or "Boundary"), expectedStatus, and expectedCode. Return valid JSON only.
+```
 > TODO
 
 #### Generation and Validation Procedure
@@ -941,6 +1071,20 @@ Return only the JSON, no explanation.
    - `DS_VALID_002` and `DS_VALID_003` were updated to include a `title` property (Notion requires it).
    - `DS_INVALID_007` (101 properties) was reclassified as `DS_VALID_004` because Notion accepts more than 100 properties for data sources.
    - The test timeout was increased to 20s to accommodate slow negative responses.
+
+#### Karen Ivonne Cruz Alvarez — Module: Blocks
+
+1. **Prompt Execution:** The structured prompt above was submitted to Gemini to synthesize edge cases targeting Notion API `2025-09-03` validation rules across all four Blocks input surfaces (`block_id`, append payloads, pagination query parameters, and update payloads).
+2. **Storage:** The output was saved to `main/api/resources/data/blocks_dataset.json` following the Section `1.2.4` naming convention (`<module>_<purpose>.json`).
+3. **Static & Schema Review:**
+   - Verified JSON validity and Prettier formatting (`prettier --check main/api/resources/data/blocks_dataset.json`) and TypeScript JSON module import compatibility (`npx tsc --noEmit`).
+   - Audited every entry to guarantee unique `caseId` values (`TC_BLK_*`), exact alignment with Notion's error codes (`validation_error`, `object_not_found`), and URL-encoding safety for SQLi-like `blockId` strings (encoded via `encodeURIComponent()` in `blocks.get.test.ts`).
+   - Verified that valid pagination boundary cases (`page_size: 1`, `page_size: 100`) include explicit `maxResults` caps and `expectedStatus: 200`, while invalid boundaries (`0`, `-1`, `101`, `"abc"`, `"invalid_cursor"`) expect `400 validation_error`.
+4. **Integration with Data-Driven Suites:** The dataset drives 23 parameterized test cases directly across four scenario files:
+   - `blocks.get.test.ts` → iterates `blocksDataset.invalidBlockIds` (7 cases)
+   - `blocks.append.test.ts` → iterates `blocksDataset.invalidAppendPayloads` (5 cases)
+   - `blocks.children.test.ts` → iterates `blocksDataset.paginationBoundaries` (7 cases)
+   - `blocks.update.test.ts` → iterates `blocksDataset.invalidUpdatePayloads` (4 cases)
 > TODO 
 
 #### Gabriel Marcos Guaman Ortuño — Modules: Users & OAuth
@@ -1024,7 +1168,17 @@ The test suites for the three assigned modules were extended with additional hap
 ![Act 5 Tests Passed](./caps/valentinamolina/act5_testpassed.png)
 
 #### 5.1.3 Karen Ivonne Cruz Alvarez — Module: Blocks
-> TODO
+
+All Lab 03 Blocks scenarios (stateless, preconditioned, contract-discrepancy, and E2E lifecycle workflows) were refactored into five endpoint-scoped suites under `tests/scenarios/blocks/` and expanded with 23 GenAI data-driven edge cases from `blocks_dataset.json`. Every test invokes `BlocksAPI` (never Axios directly), validates payloads with `SchemaValidator.assertValid()` against Zod v4 schemas (`BlockObjectSchema`, `BlockChildrenListSchema`, `NotionErrorSchema`), and manages test data through `blocksHooks.ts`:
+
+| Endpoint | Test File | Scenarios Count | Categories Covered |
+|---|---|---:|---|
+| `PATCH /v1/blocks/:id/children` | `tests/scenarios/blocks/blocks.append.test.ts` | 22 | Happy Path (4: single paragraph + GET verification, 12 rich block types, `after` sibling insertion, 2-level nesting), Negative (11: auth/version, invalid/404/trashed IDs, malformed JSON, 4 data-driven invalid payloads), Boundary (7: empty `children: []`, 31-char hex ID, 101-block batch overflow, 2000 vs 2001 chars, 3-level nesting, concurrent burst) |
+| `GET /v1/blocks/:id` | `tests/scenarios/blocks/blocks.get.test.ts` | 16 | Happy Path (3: paragraph 36/32-char retrieval, toggle `has_children: true`, trashed block retrieval), Negative (8: forged/missing auth, missing/unsupported `Notion-Version`, non-UUID, unassigned UUIDv4, 2 SQLi-like IDs via dataset), Boundary (5: compact 32-char root UUID, root `child_page` lookup, 31-char/33-char hex IDs, nil UUID) |
+| `GET /v1/blocks/:id/children` | `tests/scenarios/blocks/blocks.children.test.ts` | 18 | Happy Path (4: default listing, cursor pagination `page_size=1`, childless block empty list, nested toggle children), Negative (7: forged/missing auth, missing version, invalid/404 IDs, non-numeric `page_size=abc`, invalid `start_cursor`), Boundary (6: nil UUID, `page_size` `1`/`100`/`0`/`-1`/`101` via dataset), E2E (1: multi-page cursor tree traversal with zero duplicates) |
+| `PATCH /v1/blocks/:id` | `tests/scenarios/blocks/blocks.update.test.ts` | 15 | Happy Path (2: paragraph text update + GET persistence, `to_do` checked toggle), Negative (10: forged/missing auth, missing version, 404/invalid UUID, malformed JSON, 4 data-driven invalid payloads — type mismatch, immutable `type`, invalid field type, unsupported key), Boundary (3: archive/unarchive cycle, 2000 vs 2001 char text, 31-char hex ID) |
+| `DELETE /v1/blocks/:id` | `tests/scenarios/blocks/blocks.delete.test.ts` | 13 | Happy Path (3: soft-delete `in_trash: true`, removal from parent children list, parent-child cascade check), Negative (5: forged/missing auth, missing version, 404/invalid UUID), Boundary (3: update rejected on trashed block, nil UUID, 31-char hex ID), E2E (2: full Append → List → Get → Update → Delete → Verify lifecycle & ordered insert/delete/restore flow) |
+| **Total (Blocks Module)** | **5 test suites** | **84** | **16 Happy Path, 41 Negative, 24 Boundary, 3 Chained E2E (23 data-driven from `blocks_dataset.json`)** |
 
 #### 5.1.4 Sebastián Pereyra — Modules: Databases & Search
 
@@ -1286,6 +1440,6 @@ The Pages module adds its own contracts in `main/api/resources/schemas/pagesSche
 |---|---|---|---|
 | **Gabriel Marcos Guaman Ortuño** | • Refactored Users & OAuth modules into the 3-layer architecture (`usersAPI.ts`, `oauthAPI.ts`, `usersSchemas.ts`, `oauthSchemas.ts`) consuming `RequestManager.getInstance()` and `SchemaValidator`.<br>• Integrated **Pino** (`core/utils/logger.ts`) with synchronous NDJSON file + `pino-pretty` console multistreams and native secret redaction, defined team logging conventions, and implemented `LogReporter` (`core/utils/logReporter.ts`, `npm run report:logs`) generating HTML and JSON execution dashboards.<br>• Implemented `usersHooks.ts` and `oauthHooks.ts` with typed `UsersTestContext` / `OAuthTestContext`, dynamic workspace discovery, and isolated OAuth teardown.<br>• Generated and validated `users_oauth_dataset.json` with GenAI for data-driven edge cases.<br>• Implemented 6 endpoint test suites (71 scenarios) across `tests/scenarios/users/` and `tests/scenarios/oauth/`. | • Activity #1 (`1.3.1`)<br>• Activity #3 (`3.1`, `3.2`, `3.3`)<br>• Activity #4 (`4.1`–`4.3` — Users & OAuth)<br>• Activity #5 (`5.1.1`) | Completed and verified via `tsc --noEmit` & `npm run report:logs` |
 | **Valentina Molina Bustillos** | • Implemented the Singleton `RequestManager` and its UML diagram.<br>• Refactored Data Sources, Comments and File Uploads into the three-layer architecture.<br>• Added preconditions/postconditions via hooks and a module-specific context manager.<br>• Generated a GenAI dataset for data-driven testing.<br>• Extended test suites with 11 additional scenarios. | • Activity #2 (`2.1`, `2.2`, `2.3`)<br>• Activity #1 (`1.3.2`)<br>• Activity #4 (`4.1`, `4.2`, `4.3`)<br>• Activity #5 (`5.1.2`) | All 27 tests passing. |
-| **Karen Ivonne Cruz Alvarez** | > TODO | > TODO | > TODO |
+| **Karen Ivonne Cruz Alvarez** | • Configured ESLint v9 flat config (`eslint.config.js`), Prettier (`.prettierrc`, `.prettierignore`), and `lint`/`lint:fix`/`format`/`format:check` scripts across `core/`, `main/`, and `tests/`.<br>• Refactored the Blocks module into the three-layer architecture: `BlocksAPI` (`main/api/endpoints/blocksAPI.ts`), Zod v4 schemas (`main/api/resources/schemas/blocksSchemas.ts`), and 5 endpoint-scoped test suites (`tests/scenarios/blocks/`).<br>• Implemented `tests/hooks/blocks/blocksHooks.ts` with typed `BlocksTestContext`, precondition seeding, 350 ms throttling, `Logger` telemetry, and automatic `afterAll` teardown.<br>• Generated and integrated the GenAI edge-case dataset (`main/api/resources/data/blocks_dataset.json`) driving 23 parameterized scenarios across 84 total Blocks test cases. | • Activity #1 (`1.3.3`, `1.5`)<br>• Activity #4 (`4.1`, `4.2`, `4.3` — Blocks)<br>• Activity #5 (`5.1.3`) | Complete ✅ (`tsc --noEmit` & ESLint clean on all Blocks files) |
 | **Sebastián Pereyra** | • Refactored Databases & Search modules from Lab 03 into the three-layer architecture.<br>• Created `DatabasesAPI` and `SearchAPI` endpoint classes in the Business Layer.<br>• Implemented `databasesHooks.ts` with `createTestDatabase` and `archiveCreatedDatabases`.<br>• Wrote 9 test cases for Databases (create, get, query) and 6 for Search.<br>• Completed `DataFactory` utility in the Core Layer.<br>• Documented all framework components in Section 5.3. | • Activity #1 (`1.3.4`)<br>• Activity #5 (`5.1.4`, `5.3`) | Complete ✅ |
 | **Kevin Uruchi** | • Defined and diagrammed the three-layer architecture of the framework (layered diagram, class diagram and request sequence diagram in Mermaid).<br>• Defined and diagrammed the folder structure, folder responsibilities and naming conventions.<br>• Refactored the Pages module into the three-layer architecture: `PagesAPI` (Business Layer), `pagesSchemas.ts`, `pagesContext.ts` and `pagesHooks.ts`.<br>• Adapted the module to the Singleton `RequestManager` (cached clients per header combination, raw bodies, rate-limit retry in the hooks).<br>• Documented the preconditions, postconditions and context variables of the module.<br>• Migrated the `173` test cases (`228` Vitest tests) to `tests/scenarios/pages/` and reviewed the layer boundaries.<br>• Fixed the duplicated `include` of `tsconfig.json` that stopped every suite. | • Activity #1 (`1.1`, `1.2`, `1.3.5`)<br>• Activity #2 (`2.3`)<br>• Activity #4 (`4.1`, `4.2`)<br>• Activity #5 (`5.1.5`, `5.2`, `5.3`) | Stateless: `24` passed, `2` skipped. Preconditioned: `182` passed, `15` failed, `5` skipped. All failures are Notion behavior changes or outdated expectations (Section `5.1.5`). |

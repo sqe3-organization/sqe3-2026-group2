@@ -1,0 +1,297 @@
+{
+  "metadata": {
+    "module": "Blocks",
+    "notionVersion": "2025-09-03",
+    "generatedWith": "GenAI (Gemini)",
+    "author": "Karen Ivonne Cruz Alvarez",
+    "description": "Dynamic edge-case dataset for data-driven testing of Notion Blocks endpoints (invalid IDs, invalid append/update payloads, and pagination boundaries)."
+  },
+  "invalidBlockIds": [
+    {
+      "caseId": "TC_BLK_GET_008",
+      "description": "Reject syntactically invalid non-UUID block_id",
+      "blockId": "not-a-valid-uuid",
+      "expectedStatus": 400,
+      "expectedCode": "validation_error",
+      "category": "Negative"
+    },
+    {
+      "caseId": "TC_BLK_GET_010b",
+      "description": "Reject off-by-one 31-character hex block_id",
+      "blockId": "f47ac10b58cc4372a5670e02b2c3d47",
+      "expectedStatus": 400,
+      "expectedCode": "validation_error",
+      "category": "Boundary"
+    },
+    {
+      "caseId": "TC_BLK_GET_010c",
+      "description": "Reject off-by-one 33-character hex block_id",
+      "blockId": "f47ac10b58cc4372a5670e02b2c3d4799",
+      "expectedStatus": 400,
+      "expectedCode": "validation_error",
+      "category": "Boundary"
+    },
+    {
+      "caseId": "TC_BLK_GET_012",
+      "description": "Reject SQL injection-like block_id payload",
+      "blockId": "' OR '1'='1",
+      "expectedStatus": 400,
+      "expectedCode": "validation_error",
+      "category": "Negative"
+    },
+    {
+      "caseId": "TC_BLK_GET_013",
+      "description": "Reject SQL statement injection block_id payload",
+      "blockId": "1; DROP TABLE blocks;--",
+      "expectedStatus": 400,
+      "expectedCode": "validation_error",
+      "category": "Negative"
+    },
+    {
+      "caseId": "TC_BLK_GET_007",
+      "description": "Return 404 Not Found for unassigned well-formed UUIDv4",
+      "blockId": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+      "expectedStatus": 404,
+      "expectedCode": "object_not_found",
+      "category": "Negative"
+    },
+    {
+      "caseId": "TC_BLK_GET_010a",
+      "description": "Return 404 Not Found for all-zero nil UUID",
+      "blockId": "00000000-0000-0000-0000-000000000000",
+      "expectedStatus": 404,
+      "expectedCode": "object_not_found",
+      "category": "Boundary"
+    }
+  ],
+  "invalidAppendPayloads": [
+    {
+      "caseId": "TC_BLK_APP_010a",
+      "description": "Reject empty payload {} missing required children array",
+      "payload": {},
+      "expectedStatus": 400,
+      "expectedCode": "validation_error",
+      "category": "Negative"
+    },
+    {
+      "caseId": "TC_BLK_APP_015",
+      "description": "Reject empty children: [] array boundary with 400 validation_error (never 500)",
+      "payload": {
+        "children": []
+      },
+      "expectedStatus": 400,
+      "expectedCode": "validation_error",
+      "category": "Boundary"
+    },
+    {
+      "caseId": "TC_BLK_APP_010b",
+      "description": "Reject unsupported block type in children payload",
+      "payload": {
+        "children": [
+          {
+            "object": "block",
+            "type": "unsupported_custom_block",
+            "unsupported_custom_block": {
+              "rich_text": []
+            }
+          }
+        ]
+      },
+      "expectedStatus": 400,
+      "expectedCode": "validation_error",
+      "category": "Negative"
+    },
+    {
+      "caseId": "TC_BLK_APP_010c",
+      "description": "Reject block type/payload property mismatch (heading_1 type with paragraph payload)",
+      "payload": {
+        "children": [
+          {
+            "object": "block",
+            "type": "heading_1",
+            "paragraph": {
+              "rich_text": [
+                {
+                  "type": "text",
+                  "text": {
+                    "content": "Mismatch"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "expectedStatus": 400,
+      "expectedCode": "validation_error",
+      "category": "Negative"
+    },
+    {
+      "caseId": "TC_BLK_APP_019",
+      "description": "Reject paragraph block where rich_text is a string instead of an array",
+      "payload": {
+        "children": [
+          {
+            "object": "block",
+            "type": "paragraph",
+            "paragraph": {
+              "rich_text": "invalid-non-array-rich-text"
+            }
+          }
+        ]
+      },
+      "expectedStatus": 400,
+      "expectedCode": "validation_error",
+      "category": "Negative"
+    }
+  ],
+  "paginationBoundaries": [
+    {
+      "caseId": "TC_BLK_CHL_011a",
+      "description": "Accept minimum pagination boundary page_size=1 (results.length <= 1)",
+      "params": {
+        "page_size": 1
+      },
+      "expectedStatus": 200,
+      "expectedCode": null,
+      "maxResults": 1,
+      "category": "Boundary"
+    },
+    {
+      "caseId": "TC_BLK_CHL_011b",
+      "description": "Accept maximum pagination boundary page_size=100 (results.length <= 100)",
+      "params": {
+        "page_size": 100
+      },
+      "expectedStatus": 200,
+      "expectedCode": null,
+      "maxResults": 100,
+      "category": "Boundary"
+    },
+    {
+      "caseId": "TC_BLK_CHL_012a",
+      "description": "Reject out-of-bounds page_size=0 below minimum limit",
+      "params": {
+        "page_size": 0
+      },
+      "expectedStatus": 400,
+      "expectedCode": "validation_error",
+      "maxResults": null,
+      "category": "Boundary"
+    },
+    {
+      "caseId": "TC_BLK_CHL_012c",
+      "description": "Reject negative page_size=-1 below minimum limit",
+      "params": {
+        "page_size": -1
+      },
+      "expectedStatus": 400,
+      "expectedCode": "validation_error",
+      "maxResults": null,
+      "category": "Boundary"
+    },
+    {
+      "caseId": "TC_BLK_CHL_012b",
+      "description": "Reject out-of-bounds page_size=101 above maximum limit",
+      "params": {
+        "page_size": 101
+      },
+      "expectedStatus": 400,
+      "expectedCode": "validation_error",
+      "maxResults": null,
+      "category": "Boundary"
+    },
+    {
+      "caseId": "TC_BLK_CHL_010",
+      "description": "Reject non-numeric page_size=abc query parameter",
+      "params": {
+        "page_size": "abc"
+      },
+      "expectedStatus": 400,
+      "expectedCode": "validation_error",
+      "maxResults": null,
+      "category": "Negative"
+    },
+    {
+      "caseId": "TC_BLK_CHL_009",
+      "description": "Reject malformed start_cursor=invalid_cursor parameter",
+      "params": {
+        "start_cursor": "invalid_cursor"
+      },
+      "expectedStatus": 400,
+      "expectedCode": "validation_error",
+      "maxResults": null,
+      "category": "Negative"
+    }
+  ],
+  "invalidUpdatePayloads": [
+    {
+      "caseId": "TC_BLK_UPD_009a",
+      "description": "Reject updating a paragraph block with a mismatched to_do payload",
+      "targetBlock": "paragraph",
+      "payload": {
+        "to_do": {
+          "rich_text": [
+            {
+              "type": "text",
+              "text": {
+                "content": "Mismatched type update"
+              }
+            }
+          ],
+          "checked": true
+        }
+      },
+      "expectedStatus": 400,
+      "expectedCode": "validation_error",
+      "category": "Negative"
+    },
+    {
+      "caseId": "TC_BLK_UPD_009b",
+      "description": "Reject immutable block type mutation on an existing paragraph block",
+      "targetBlock": "paragraph",
+      "payload": {
+        "type": "heading_1",
+        "heading_1": {
+          "rich_text": [
+            {
+              "type": "text",
+              "text": {
+                "content": "Illegal type mutation"
+              }
+            }
+          ]
+        }
+      },
+      "expectedStatus": 400,
+      "expectedCode": "validation_error",
+      "category": "Negative"
+    },
+    {
+      "caseId": "TC_BLK_UPD_009c",
+      "description": "Reject invalid boolean field type (checked: 'yes') on a to_do block",
+      "targetBlock": "to_do",
+      "payload": {
+        "to_do": {
+          "checked": "yes"
+        }
+      },
+      "expectedStatus": 400,
+      "expectedCode": "validation_error",
+      "category": "Negative"
+    },
+    {
+      "caseId": "TC_BLK_UPD_015",
+      "description": "Reject update containing an unsupported block property key",
+      "targetBlock": "paragraph",
+      "payload": {
+        "unsupported_custom_block": {
+          "rich_text": []
+        }
+      },
+      "expectedStatus": 400,
+      "expectedCode": "validation_error",
+      "category": "Negative"
+    }
+  ]
+}
