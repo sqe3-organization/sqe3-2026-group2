@@ -438,7 +438,19 @@ The other modules follow the same pattern as `pages`. Each owner adds `tests/hoo
 
 #### 1.3.1 Gabriel Marcos Guaman Ortuño — Modules: Users & OAuth
 
-> TODO 
+The previous Lab 03 implementation for the **Users** and **OAuth** modules (`Notion-Version: 2025-09-03`) coupled HTTP transport, Zod schema definitions, rate-limit delays, precondition discovery, and Vitest assertions inside two monolithic test files (`act5_stateless_users_oauth.test.ts` and `act6_preconditioned_and_e2e.test.ts`) and a flat `src/core/` directory. During Lab 04, all Users and OAuth components were refactored into the strict top-down three-layer architecture (`tests/` → `main/` → `core/`):
+
+- **Core Layer (`core/` — consumed, unmodified):** Both endpoint classes delegate HTTP client lifecycle and timing/logging interceptors exclusively to `RequestManager.getInstance()` (`getDefaultClient()` and `getClient(options)`), while contract assertions use `SchemaValidator` and `Logger`. Neither the Business Layer nor the Test Layer imports Axios directly.
+- **Business Layer (`main/`):** Endpoint routes and auth-strategy defaults were encapsulated inside `UsersAPI` (`main/api/endpoints/usersAPI.ts`, Bearer auth by default) and `OAuthAPI` (`main/api/endpoints/oauthAPI.ts`, HTTP Basic auth by default, overridable via `CustomClientOptions` for negative contract tests). Domain Zod contracts were separated into `usersSchemas.ts` and `oauthSchemas.ts` (reusing shared `NotionErrorSchema` and `UUIDv4Regex` from `notionSchemas.ts`), and negative/boundary inputs were externalized into `main/api/resources/data/users_oauth_dataset.json`.
+- **Test Layer (`tests/`):** Lifecycle preconditions, postconditions, rate-limit throttling, telemetry, and typed Test Contexts were extracted into `tests/hooks/users/usersHooks.ts` and `tests/hooks/oauth/oauthHooks.ts`. The two monolithic Lab 03 suites were split by endpoint into six focused test suites following Section `1.2.4` naming conventions (`TC_<MODULE>_<ENDPOINT>_<NNN> - [Category] description`).
+
+| Old Lab 03 File | New Lab 04 Layered Location | Layer & Responsibility |
+|---|---|---|
+| `labs/lab03/automation/src/core/notionClient.ts` | `core/api/RequestManager.ts` (existing Singleton) + `main/api/endpoints/usersAPI.ts` & `oauthAPI.ts` | **Core / Business:** Separates generic Axios Singleton transport (`core/`) from Notion Users & OAuth endpoint methods and auth defaults (`main/`). |
+| `labs/lab03/automation/src/core/assertions.ts` (Users & OAuth schemas) | `main/api/resources/schemas/usersSchemas.ts` & `oauthSchemas.ts` | **Business:** Pure Zod schemas (`UserObjectSchema`, `PaginatedUsersListSchema`, `OAuthTokenResponseSchema`, `OAuthIntrospectResponseSchema`, `OAuthRevokeResponseSchema`, `OAuthErrorSchema`) without Vitest coupling. |
+| `labs/lab03/automation/src/core/assertions.ts` (Vitest assertion helpers) & inline `beforeAll`/`afterAll` | `tests/hooks/users/usersHooks.ts` & `tests/hooks/oauth/oauthHooks.ts` | **Test:** Typed Test Context factories, dynamic preconditions, isolated OAuth teardown, rate-limit guards, telemetry, and `SchemaValidator`-backed contract assertions. |
+| Hardcoded inline negative/boundary payloads in Lab 03 tests | `main/api/resources/data/users_oauth_dataset.json` | **Business (Resources):** Centralized GenAI-generated dataset driving parameterized Vitest scenarios (`it.each`). |
+| `labs/lab03/automation/tests/gabriel_guaman/act5_stateless_users_oauth.test.ts` & `act6_preconditioned_and_e2e.test.ts` | `tests/scenarios/users/users.{me,get,list}.test.ts` & `tests/scenarios/oauth/oauth.{token,revoke,introspect}.test.ts` | **Test:** Six modular, endpoint-scoped test suites containing zero hardcoded URLs, tokens, or Axios calls. |
 
 #### 1.3.2 Valentina Molina Bustillos — Modules: Data Sources, Comments & File Uploads
 
@@ -665,6 +677,18 @@ The test code from Lab 03 (`act5_act6_valentina_modules.test.ts`) was refactored
 | **Comments** | `CommentsHooks.setup()` validates that `NOTION_PAGE_ID` is present and shared with the integration. | `CommentsHooks.cleanup()` logs the created comments. Notion has no delete endpoint for comments, so the parent page is not modified. |
 | **File Uploads** | `FileUploadsHooks.setup()` initializes the hook context. | `FileUploadsHooks.cleanup()` logs the created file uploads. Notion has no delete endpoint for file uploads, so they expire automatically after 24 hours. |
 
+#### Gabriel Marcos Guaman Ortuño — Modules: Users & OAuth
+
+Preconditions and postconditions for both modules were reviewed and decoupled from individual test files into dedicated module hooks (`tests/hooks/users/usersHooks.ts` and `tests/hooks/oauth/oauthHooks.ts`), ensuring deterministic test isolation and compliance with Notion's ~3 requests/second rate limit (`350 ms` per-test throttle in `beforeEach`):
+
+- **Users Module (`tests/hooks/users/usersHooks.ts`):**
+  - **Precondition (`seedUsersContext` in `beforeAll`):** Dynamically discovers the active integration's `botUserId` via `UsersAPI.getMe()`, queries `UsersAPI.listUsers({ page_size: 100 })` to select a live workspace member (`person`, falling back to `bot`) as `targetUserId`, derives the hyphenless 32-character `compactUserId` (`targetUserId.replace(/-/g, '')`), and executes `UsersAPI.listUsers({ page_size: 1 })` to seed `firstPageUserId`, `nextCursor`, and `hasMoreUsers`. This guarantees that `users.get.test.ts` and `users.list.test.ts` run reliably across any Notion workspace without static UUIDs.
+  - **Per-test Hooks (`beforeEach` / `afterEach`):** `resetPerTestUsersState` clears `lastResponse` and applies the 350 ms rate-limit guard before each scenario; `recordUsersTelemetry` captures HTTP status and `durationMs` after each execution via `Logger.debug`.
+  - **Postcondition (`cleanupUsersContext` in `afterAll`):** Logs suite-level execution metrics via `Logger.info` and clears all populated identifiers, cursors, and telemetry buffers so no state leaks across suites.
+- **OAuth Module (`tests/hooks/oauth/oauthHooks.ts`):**
+  - **Precondition (`initializeOAuthContext` in `beforeAll`):** Hydrates non-hardcoded OAuth runtime configuration (`redirectUri`, `authCode`, `refreshToken`, `initialAccessToken`, and credential readiness flags) from environment variables into an isolated context instance.
+  - **Disposable Token Tracking (`registerDisposableToken`):** Whenever `POST /v1/oauth/token` issues or rotates a token during a test, the token is registered in `context.disposableTokensToRevoke` with an explicit safeguard that prevents ever registering the shared internal workspace `NOTION_TOKEN`.
+  - **Postcondition (`teardownOAuthContext` in `afterAll`):** Iterates through `disposableTokensToRevoke`, revokes every disposable token via `OAuthAPI.revokeToken` (leveraging RFC 7009 idempotency so already-revoked tokens clean up without error), logs teardown counts, and wipes all sensitive credential strings from memory.
 
 ### 4.2 Test Context Variables
 
@@ -688,6 +712,19 @@ const ctx = ValentinaTestContextManager.getInstance();
 ctx.set('dataSourceId', res.data.id);
 const id = ctx.get('dataSourceId');
 ```
+
+#### Gabriel Marcos Guaman Ortuño — Modules: Users & OAuth
+
+In Lab 03, chained scenarios relied on file-scoped mutable `let` variables (`targetUserId`, `botUserId`, `compactUserId`, `nextCursor`, `isolatedToken`, `chainedOAuthToken`), which made state ownership implicit and harder to reset consistently. In Lab 04, all dynamic state was encapsulated in strictly typed, per-suite **Test Context** objects instantiated through factory functions (`createUsersTestContext()` and `createOAuthTestContext()`):
+
+- **`UsersTestContext` (`tests/hooks/users/usersHooks.ts`):**
+  - `botUserId`, `targetUserId`, `targetUserType`, `targetUserName`, and `compactUserId`: Seeded once in `beforeAll` and consumed across `users.get.test.ts` (canonical lookup, bot lookup, 32-char compact UUID normalization, and hyphenated-vs-compact E2E equivalence) without hardcoding workspace IDs.
+  - `firstPageUserId`, `nextCursor`, `hasMoreUsers`: Shared between `seedUsersContext` and `users.list.test.ts` to validate non-overlapping cursor pagination (`start_cursor`).
+  - `lastResponse` and `telemetry`: Capture per-request latency and status codes cleanly for `afterEach` logging and `afterAll` cleanup.
+- **`OAuthTestContext` (`tests/hooks/oauth/oauthHooks.ts`):**
+  - `clientCredentialsConfigured`, `redirectUri`, `authCode`, `refreshToken`, `initialAccessToken`: Centralize OAuth runtime inputs so test files never read `process.env` or embed credentials.
+  - `issuedAccessToken`, `rotatedAccessToken`, `issuedBotId`: Propagate dynamically issued credentials across chained scenarios (token exchange → refresh rotation → RFC 7662 introspection → `/v1/users/me` verification → RFC 7009 revocation).
+  - `disposableTokensToRevoke`, `lastResponse`, `telemetry`: Drive deterministic postcondition revocation and execution telemetry without global mutable variables.
 
 ### 4.3 Dynamic Datasets Generated with GenAI
 
@@ -745,6 +782,44 @@ Return only the JSON, no explanation.
    - The test timeout was increased to 20s to accommodate slow negative responses.
 > TODO 
 
+#### Gabriel Marcos Guaman Ortuño — Modules: Users & OAuth
+
+##### Prompt Used
+
+```text
+Act as a Senior QA Automation Engineer specializing in REST API contract testing.
+Generate a structured JSON test dataset named `users_oauth_dataset.json` for automated
+Vitest + TypeScript data-driven testing of the Notion REST API (Notion-Version: 2025-09-03),
+covering exclusively the Users (`GET /v1/users/me`, `GET /v1/users/{user_id}`, `GET /v1/users`)
+and OAuth (`POST /v1/oauth/token`, `POST /v1/oauth/revoke`, `POST /v1/oauth/introspect`) modules.
+
+Include the following edge-case groups with testCaseId (`TC_<MODULE>_<ENDPOINT>_<NNN>`),
+category (`Happy Path` | `Negative` | `Boundary`), description, input payload, and expected
+Notion/RFC 6749 HTTP status & error codes:
+1. `invalidBearerTokens`: forged token, whitespace-only token, and SQLi-like Bearer token (`401 unauthorized`).
+2. `invalidUserIds`: malformed non-UUID, SQLi-like path string, whitespace-only empty segment,
+   off-by-one 31-char and 33-char hex strings, non-hex UUID-shaped string (`400 validation_error`),
+   plus nil all-zero UUID and unassigned valid UUIDv4 (`404 object_not_found`).
+3. `pageSizeValidBoundaries` (`1`, `100` -> `200 OK`) and `pageSizeInvalidBoundaries` (`0`, `-1`, `101`, `"abc"` -> `400 validation_error`).
+4. `invalidStartCursors`: malformed string, numeric string, SQLi-like cursor (`400 validation_error`).
+5. `invalidOAuthGrantPayloads`: `{}`, empty strings, unsupported `client_credentials` and `password`
+   grants, missing `code`, forged/expired `code`, and unregistered `redirect_uri` (`400`).
+6. `oauthRevokeInvalidPayloads` (`{}`, `""`, `"   "` -> `400`), malformed raw JSON string,
+   `oauthIntrospectInvalidPayloads` (`{}`, integer `token`, `null` `token`, `""` -> `400`),
+   and `oauthIntrospectTokenEdgeCases` (unknown token, malformed JWT-like token, and a
+   2048-character oversized token string expecting `200 OK` with `active: false`).
+```
+
+##### Generation and Validation Procedure
+
+1. **Structured Generation:** The prompt above was used to produce the initial candidate JSON covering boundary, equivalence-partition, type-coercion, and injection edge cases for all six endpoints, stored at `main/api/resources/data/users_oauth_dataset.json`.
+2. **Notion API `2025-09-03` Contract Filtering:** Every generated entry was audited against the official Notion REST API `2025-09-03` error envelope (`object: "error"`, `status`, `code`, `message`) and RFC 6749 / RFC 7009 / RFC 7662 OAuth specifications:
+   - *Empty `user_id` path edge case:* A literal empty string `""` resolves to `GET /v1/users/` (routing to the list endpoint with `200 OK`), so the dataset uses a whitespace-only segment (`"   "`, URL-encoded by `UsersAPI.getUser` to `%20%20%20`) to legitimately exercise the `/v1/users/{user_id}` path validator (`400 validation_error`).
+   - *Nil vs. unassigned UUIDs:* Confirmed that both `00000000-0000-0000-0000-000000000000` and unassigned valid UUIDv4 strings pass regex syntax checks and return `404 object_not_found`, whereas 31-char, 33-char, non-hex, and SQLi-like IDs fail validation with `400 validation_error`.
+   - *Dual OAuth error formats:* Allowed error arrays (`allowedErrors`) account for Notion returning RFC 6749 keys (`invalid_request`, `invalid_grant`, `unsupported_grant_type`, `invalid_client`) alongside gateway keys (`validation_error`, `missing_version`, `invalid_json`), validated through `OAuthErrorSchema`.
+   - *Oversized token representation:* Parameterized the 2048-character token (`repeatSeed: "a1b2c3d4"`, `repeatCount: 256`, `expectedLength: 2048`) to keep the dataset readable and verifiable while deterministically testing upper-length resilience without triggering HTTP `500`.
+3. **Static & Schema Verification:** Validated JSON syntax, TypeScript `resolveJsonModule` typing across all six test suites (`npx tsc --noEmit`), and 100% alignment between dataset `testCaseId` entries and Section `1.2.4` naming rules.
+
 ---
 
 <div style="page-break-after: always;"></div>
@@ -760,7 +835,18 @@ Return only the JSON, no explanation.
 ### 5.1 Continued Implementation of the Test Suites
 
 #### 5.1.1 Gabriel Marcos Guaman Ortuño — Modules: Users & OAuth
-> TODO
+
+All **6 endpoints** assigned to the **Users** and **OAuth** modules were implemented across six dedicated Vitest suites in `tests/scenarios/users/` and `tests/scenarios/oauth/`, totaling **71 automated test scenarios**. Every suite strictly follows the three-layer architecture (invoking only `UsersAPI` / `OAuthAPI`, module hooks, `users_oauth_dataset.json`, and `SchemaValidator`), verifies HTTP status codes, JSON headers, traceability headers, `< 5000 ms` latency SLAs, and Zod response contracts, and adheres to the `TC_<MODULE>_<ENDPOINT>_<NNN> - [Category] description` convention.
+
+| Endpoint | Test File | Scenarios Count | Categories Covered |
+|---|---|---:|---|
+| `GET /v1/users/me` | `tests/scenarios/users/users.me.test.ts` | 9 | Happy Path (2), Negative (5), Boundary (2) |
+| `GET /v1/users/{user_id}` | `tests/scenarios/users/users.get.test.ts` | 15 | Happy Path (2), Negative (6), Boundary (6), E2E (1) |
+| `GET /v1/users` | `tests/scenarios/users/users.list.test.ts` | 14 | Happy Path (2), Negative (6), Boundary (5), E2E (1) |
+| `POST /v1/oauth/token` | `tests/scenarios/oauth/oauth.token.test.ts` | 14 | Happy Path (2), Negative (8), Boundary (3), E2E (1) |
+| `POST /v1/oauth/revoke` | `tests/scenarios/oauth/oauth.revoke.test.ts` | 8 | Happy Path (1), Negative (4), Boundary (3) |
+| `POST /v1/oauth/introspect` | `tests/scenarios/oauth/oauth.introspect.test.ts` | 11 | Happy Path (2), Negative (5), Boundary (3), E2E (1) |
+| **Total (Users & OAuth)** | **6 test suites** | **71** | **Happy Path (11), Negative (34), Boundary (22), E2E (4)** |
 
 #### 5.1.2 Valentina Molina Bustillos — Modules: Data Sources, Comments & File Uploads
 
@@ -959,7 +1045,7 @@ These schemas are shared across all modules and used in both positive tests (ass
 
 | Team Member | Lab 05 Contributions & Implemented Scope | Section / Item Worked On | Additional Comments & Status |
 |---|---|---|---|
-| **Gabriel Marcos Guaman Ortuño** | > TODO | > TODO | > TODO |
+| **Gabriel Marcos Guaman Ortuño** | • Refactored Users & OAuth modules into the 3-layer architecture (`usersAPI.ts`, `oauthAPI.ts`, `usersSchemas.ts`, `oauthSchemas.ts`) consuming `RequestManager.getInstance()` and `SchemaValidator`.<br>• Implemented `usersHooks.ts` and `oauthHooks.ts` with typed `UsersTestContext` / `OAuthTestContext`, dynamic workspace discovery, and isolated OAuth teardown.<br>• Generated and validated `users_oauth_dataset.json` with GenAI for data-driven edge cases.<br>• Implemented 6 endpoint test suites (71 scenarios) across `tests/scenarios/users/` and `tests/scenarios/oauth/`. | • Activity #1 (`1.3.1`)<br>• Activity #4 (`4.1`–`4.3` — Users & OAuth)<br>• Activity #5 (`5.1.1`) | Completed and verified via `tsc --noEmit` |
 | **Valentina Molina Bustillos** | • Implemented the Singleton `RequestManager` and its UML diagram.<br>• Refactored Data Sources, Comments and File Uploads into the three-layer architecture.<br>• Added preconditions/postconditions via hooks and a module-specific context manager.<br>• Generated a GenAI dataset for data-driven testing.<br>• Extended test suites with 11 additional scenarios. | • Activity #2 (`2.1`, `2.2`, `2.3`)<br>• Activity #1 (`1.3.2`)<br>• Activity #4 (`4.1`, `4.2`, `4.3`)<br>• Activity #5 (`5.1.2`) | All 27 tests passing. |
 | **Karen Ivonne Cruz Alvarez** | > TODO | > TODO | > TODO |
 | **Sebastián Pereyra** | • Refactored Databases & Search modules from Lab 03 into the three-layer architecture.<br>• Created `DatabasesAPI` and `SearchAPI` endpoint classes in the Business Layer.<br>• Implemented `databasesHooks.ts` with `createTestDatabase` and `archiveCreatedDatabases`.<br>• Wrote 9 test cases for Databases (create, get, query) and 6 for Search.<br>• Completed `DataFactory` utility in the Core Layer.<br>• Documented all framework components in Section 5.3. | • Activity #1 (`1.3.4`)<br>• Activity #5 (`5.1.4`, `5.3`) | Complete ✅ |
