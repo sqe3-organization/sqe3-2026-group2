@@ -450,7 +450,29 @@ The other modules follow the same pattern as `pages`. Each owner adds `tests/hoo
 
 #### 1.3.4 Sebastián Pereyra — Modules: Databases & Search
 
-> TODO
+The existing Lab 03 code for Databases and Search was organized under `tests/sebastian_pereyra/` with no layer separation — Axios calls, assertion helpers and test logic were mixed in the same files.
+
+**Changes made during Lab 05 refactoring:**
+
+| Before (Lab 03) | After (Lab 05) |
+|---|---|
+| Axios called directly inside test files | `DatabasesAPI` and `SearchAPI` classes in `main/api/endpoints/` wrap every endpoint |
+| Hardcoded headers and `baseURL` per file | `RequestManager.getInstance().getDefaultClient()` provides a pre-configured client |
+| No schema validation | `SchemaValidator.assertValid()` + Zod schemas in `main/api/resources/schemas/` |
+| No data cleanup | `databasesHooks.ts` archives created databases in `afterAll` |
+| `DataFactory`-like helpers were inline | `DataFactory` from `core/utils/` now generates titles and UUIDs |
+
+**New files created:**
+
+| File | Layer | Description |
+|---|---|---|
+| `main/api/endpoints/databasesAPI.ts` | Business | Wraps `POST /databases`, `GET /databases/:id`, `PATCH /databases/:id`, `POST /databases/:id/query` |
+| `main/api/endpoints/searchAPI.ts` | Business | Wraps `POST /search` with typed `SearchBody` interface |
+| `tests/hooks/databases/databasesHooks.ts` | Test | `createTestDatabase()` precondition and `archiveCreatedDatabases()` postcondition |
+| `tests/scenarios/databases/databases.create.test.ts` | Test | 3 test cases for database creation |
+| `tests/scenarios/databases/databases.get.test.ts` | Test | 3 test cases for database retrieval |
+| `tests/scenarios/databases/databases.query.test.ts` | Test | 3 test cases for database queries |
+| `tests/scenarios/search/search.test.ts` | Test | 6 test cases for the Search endpoint |
 
 #### 1.3.5 Kevin Uruchi — Module: Pages
 
@@ -638,7 +660,27 @@ classDiagram
 > TODO
 
 #### 5.1.4 Sebastián Pereyra — Modules: Databases & Search
-> TODO
+
+**Databases module** — 9 test cases across 3 files:
+
+| Test File | Test Cases | Coverage |
+|---|---|---|
+| `databases.create.test.ts` | TC_DB_POST_001 to TC_DB_POST_003 | Happy path creation, missing parent (400), invalid parent UUID |
+| `databases.get.test.ts` | TC_DB_GET_001 to TC_DB_GET_003 | Retrieve existing DB (200 + schema), non-existent UUID (404), malformed ID |
+| `databases.query.test.ts` | TC_DB_QUERY_001 to TC_DB_QUERY_003 | Query empty DB (paginated list), `page_size` limit, non-existent DB (404) |
+
+**Search module** — 6 test cases in 1 file:
+
+| Test Case | Category | Assertion |
+|---|---|---|
+| TC_SEARCH_001 | Positive | Empty body → 200, `PaginatedListSchema` |
+| TC_SEARCH_002 | Positive | Filter `page` → all results are `object: "page"` |
+| TC_SEARCH_003 | Positive | Filter `database` → all results are `object: "database"` |
+| TC_SEARCH_004 | Positive | Query with sort by `last_edited_time` → 200 |
+| TC_SEARCH_005 | Positive | `page_size: 1` → results length ≤ 1 |
+| TC_SEARCH_006 | Negative | Invalid sort direction → 400 or 422, `NotionErrorSchema` |
+
+All test cases use `SchemaValidator.assertValid()` to verify the response body against Zod schemas and check `response.durationMs` against the SLA threshold.
 
 #### 5.1.5 Kevin Uruchi — Module: Pages
 > TODO
@@ -649,7 +691,145 @@ classDiagram
 
 ### 5.3 Framework Functionality and Component Documentation
 
-> TODO 
+This section documents the functionality of each component in the automation framework, organized by layer.
+
+---
+
+#### Core Layer — `core/`
+
+The Core Layer is **application-agnostic**. It knows nothing about Notion and can be reused with any REST API by writing a new Business Layer on top.
+
+##### `RequestManager` (`core/api/RequestManager.ts`)
+
+The single point of access to Axios in the entire framework.
+
+| Method | Description |
+|---|---|
+| `RequestManager.getInstance()` | Returns the global Singleton instance. Creates it on first call. |
+| `.getClient(options)` | Returns a cached `AxiosInstance` for the given `CustomClientOptions`. Creates and caches a new one if not found. |
+| `.getDefaultClient()` | Shorthand for `getClient({ authType: 'bearer', bearerToken: env.token })`. Used by all endpoint classes. |
+
+**`CustomClientOptions` interface:**
+
+| Field | Type | Purpose |
+|---|---|---|
+| `authType` | `'bearer' \| 'basic' \| 'none'` | Authentication strategy |
+| `bearerToken` | `string` | Token for Bearer auth |
+| `basicClientId / basicClientSecret` | `string` | Credentials for Basic auth (OAuth) |
+| `notionVersion` | `string \| null` | Overrides the `Notion-Version` header |
+| `omitNotionVersion` | `boolean` | Removes the `Notion-Version` header entirely (negative tests) |
+| `extraHeaders` | `Record<string, string>` | Arbitrary additional headers |
+
+Every Axios instance created by `RequestManager` has **timing interceptors** that measure request latency and expose it as `response.durationMs` on the `TimedAxiosResponse` type. The `validateStatus: () => true` option disables Axios error throwing so that 4xx/5xx responses are returned as normal responses, allowing the Test Layer to assert on them.
+
+---
+
+##### `EnvConfig` (`core/utils/envConfig.ts`)
+
+Loads environment variables from `.env` once and exposes them as typed, read-only properties.
+
+| Property | Env Variable | Default |
+|---|---|---|
+| `baseUrl` | `NOTION_BASE_URL` | `https://api.notion.com/v1` |
+| `notionVersion` | `NOTION_VERSION` | `2025-09-03` |
+| `token` | `NOTION_TOKEN` | _(required, throws if missing)_ |
+| `timeoutMs` | `TIMEOUT_MS` | `15000` |
+
+`EnvConfig.load()` is a Singleton factory method: it creates the instance once and returns it on every subsequent call, ensuring `.env` is parsed only once per test run.
+
+---
+
+##### `Logger` (`core/utils/logger.ts`)
+
+A static logging utility used throughout the framework.
+
+| Method | Console channel | Condition |
+|---|---|---|
+| `Logger.info(msg, meta?)` | `console.log` | Always |
+| `Logger.warn(msg, meta?)` | `console.warn` | Always |
+| `Logger.error(msg, meta?)` | `console.error` | Always |
+| `Logger.debug(msg, meta?)` | `console.debug` | Only when `DEBUG=true` in `.env` |
+
+All messages include an ISO-8601 timestamp and a severity prefix (`[INFO]`, `[WARN]`, etc.). `RequestManager` calls `Logger.debug()` on every outgoing request and incoming response, so setting `DEBUG=true` produces a full HTTP trace without changing any test code.
+
+---
+
+##### `SchemaValidator` (`core/utils/schemaValidator.ts`)
+
+A generic wrapper around Zod's `safeParse`.
+
+| Method | Returns | Behavior |
+|---|---|---|
+| `validate(schema, data)` | `{ success, data?, error? }` | Never throws; returns a result object |
+| `assertValid(schema, data)` | Parsed `T` | Throws an `Error` with Zod issues if validation fails; used in `expect()` chains |
+
+Both methods are generic, accepting any `z.ZodSchema<T>`, which makes them reusable across all Notion object types.
+
+---
+
+##### `DataFactory` (`core/utils/dataFactory.ts`)
+
+Generates dynamic fake values for use in test bodies and preconditions.
+
+| Method | Returns | Example output |
+|---|---|---|
+| `DataFactory.title(prefix?)` | `string` | `"Test DB 4f2a"` |
+| `DataFactory.uuid()` | `string` | `"550e8400-e29b-41d4-a716-446655440000"` |
+| `DataFactory.text(length?)` | `string` | `"aBcD3fGhIjKl"` |
+| `DataFactory.url()` | `string` | `"https://example.com/xY2kPqRs"` |
+| `DataFactory.integer(min?, max?)` | `number` | `42` |
+| `DataFactory.pick(items)` | `T` | Random element from array |
+
+`DataFactory` has **no dependency on `@faker-js/faker`**, relying instead on `Math.random()` and Node's `crypto.randomUUID()`, keeping the Core Layer lightweight.
+
+---
+
+#### Business Layer — `main/`
+
+The Business Layer models the **Notion REST API (`2025-09-03`)**. Each class exposes one method per endpoint and uses `RequestManager` to send the request. It knows nothing about Vitest or test assertions.
+
+##### `DatabasesAPI` (`main/api/endpoints/databasesAPI.ts`)
+
+| Method | HTTP | Endpoint |
+|---|---|---|
+| `createDatabase(body)` | `POST` | `/databases` |
+| `getDatabase(databaseId)` | `GET` | `/databases/:id` |
+| `updateDatabase(databaseId, body)` | `PATCH` | `/databases/:id` |
+| `queryDatabase(databaseId, body)` | `POST` | `/databases/:id/query` |
+
+##### `SearchAPI` (`main/api/endpoints/searchAPI.ts`)
+
+| Method | HTTP | Endpoint |
+|---|---|---|
+| `search(body)` | `POST` | `/search` |
+
+The `SearchBody` interface constrains the request body to valid Notion search parameters (`query`, `sort`, `filter`, `start_cursor`, `page_size`), providing TypeScript compile-time safety for test authors.
+
+---
+
+#### Test Layer — `tests/`
+
+The Test Layer contains only test logic (assertions, `describe`/`it` blocks) and hooks (preconditions/postconditions). It never calls Axios directly.
+
+##### Databases Hooks (`tests/hooks/databases/databasesHooks.ts`)
+
+| Function | Called In | Purpose |
+|---|---|---|
+| `createTestDatabase(parentPageId)` | `beforeAll` / `beforeEach` | Creates a minimal database in the workspace and records its ID |
+| `archiveCreatedDatabases()` | `afterAll` | Archives all databases created during the suite, cleaning up the workspace |
+
+The `createdDatabaseIds` array acts as the shared test context between hooks and test files, ensuring every resource created is tracked and cleaned up.
+
+---
+
+#### Schemas — `main/api/resources/schemas/notionSchemas.ts`
+
+| Schema | Validates |
+|---|---|
+| `NotionErrorSchema` | Error envelope: `{ object: "error", status, code, message }` |
+| `PaginatedListSchema` | Paginated response: `{ object: "list", results, next_cursor, has_more }` |
+
+These schemas are shared across all modules and used in both positive tests (asserting the success shape) and negative tests (asserting the error envelope). 
 
 ---
 
@@ -662,5 +842,5 @@ classDiagram
 | **Gabriel Marcos Guaman Ortuño** | > TODO | > TODO | > TODO |
 | **Valentina Molina Bustillos** | > TODO | > TODO | > TODO |
 | **Karen Ivonne Cruz Alvarez** | > TODO | > TODO | > TODO |
-| **Sebastián Pereyra** | > TODO | > TODO | > TODO |
+| **Sebastián Pereyra** | • Refactored Databases & Search modules from Lab 03 into the three-layer architecture.<br>• Created `DatabasesAPI` and `SearchAPI` endpoint classes in the Business Layer.<br>• Implemented `databasesHooks.ts` with `createTestDatabase` and `archiveCreatedDatabases`.<br>• Wrote 9 test cases for Databases (create, get, query) and 6 for Search.<br>• Completed `DataFactory` utility in the Core Layer.<br>• Documented all framework components in Section 5.3. | • Activity #1 (`1.3.4`)<br>• Activity #5 (`5.1.4`, `5.3`) | Complete ✅ |
 | **Kevin Uruchi** | • Defined and diagrammed the three-layer architecture of the framework (layered diagram, class diagram and request sequence diagram in Mermaid).<br>• Defined and diagrammed the folder structure, folder responsibilities and naming conventions. | • Activity #1 (`1.1`, `1.2`) | > TODO |

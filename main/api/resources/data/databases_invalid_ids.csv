@@ -1,0 +1,16 @@
+id,test_case_id,category,input_value,expected_status_code,description
+1,TC_DB_DD_001,invalid_format,abc123,400,Short non-UUID alphanumeric string
+2,TC_DB_DD_002,invalid_format,not-a-valid-database-uuid,400,Hyphenated non-UUID text string
+3,TC_DB_DD_003,invalid_format,"   ",400,Whitespace string without characters
+4,TC_DB_DD_004,nonexistent_uuid,a1b2c3d4-e5f6-4a1b-8c2d-3e4f5a6b7c8d,404,Syntactically valid UUIDv4 not registered in workspace
+5,TC_DB_DD_005,nonexistent_uuid,f47ac10b-58cc-4372-a567-0e02b2c3d479,404,Syntactically valid UUIDv4 not registered in workspace
+6,TC_DB_DD_006,nonexistent_uuid,9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d,404,Syntactically valid UUIDv4 not registered in workspace
+7,TC_DB_DD_007,nonexistent_uuid,3c9909af-72ee-4eed-87b6-e4d74c3d22e7,404,Syntactically valid UUIDv4 not registered in workspace
+8,TC_DB_DD_008,nonexistent_uuid,6ba7b810-9dad-41d1-80b4-00c04fd430c8,404,Syntactically valid UUIDv4 not registered in workspace
+9,TC_DB_DD_009,injection_attempt,"'; DROP TABLE databases; --",400,Classic SQL injection statement payload
+10,TC_DB_DD_010,injection_attempt,"' OR '1'='1",400,Boolean-based SQL injection string
+11,TC_DB_DD_011,special_characters,"<script>alert(1)</script>",400,Cross-site scripting (XSS) payload
+12,TC_DB_DD_012,special_characters,../../etc/passwd,400,Path traversal sequence
+13,TC_DB_DD_013,boundary_value,x,400,Single character minimum length boundary
+14,TC_DB_DD_014,boundary_value,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,400,Oversized boundary string exceeding 250 characters
+15,TC_DB_DD_015,boundary_value,データベース_🔥_error,400,Multi-byte Unicode and emoji character payload
