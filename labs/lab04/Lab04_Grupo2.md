@@ -482,11 +482,78 @@ The other modules follow the same pattern as `pages`. Each owner adds `tests/hoo
 
 ### 2.1 Singleton Design Pattern for the Request Manager
 
-> TODO 
+The **Singleton** pattern was implemented in the `RequestManager` class inside `core/api/`. This class centralizes the creation and management of Axios instances across the framework.
+
+**Design decisions:**
+- **Private constructor:** Prevents any part of the code from creating a direct instance with `new RequestManager()`.
+- **Static `getInstance()` method:** The only global access point. It guarantees a single instance of the manager exists in the entire application.
+- **Client cache (`Map<string, AxiosInstance>`):** Although the Singleton guarantees a single manager instance, different parts of the code may require clients with distinct configurations (e.g., Basic auth for OAuth, or clients without the `Notion-Version` header for negative tests). To avoid redundant instances, the manager uses a cache keyed by the configuration options (`JSON.stringify(options)`). If a client with the same options is requested, the cached instance is returned.
+- **Dependency injection:** The `RequestManager` loads configuration from `EnvConfig`, keeping the Core Layer agnostic to environment implementation details.
+
+**Key files:**
+- `core/api/RequestManager.ts`: Singleton implementation.
+- `core/utils/envConfig.ts`: Environment variable loading and validation.
 
 ### 2.2 Singleton Pattern Diagram
 
-> TODO 
+[![](https://mermaid.ink/img/pako:eNqlVd9v2jAQ_lcsV5VATVgGBDKrotpo0frAJm1sDxMvxjmCtcTO7EsHq-jfPuVHIWHpWm3JQ5K77767--yL76nQIVBGl0rE3NprySPDk6UihJBQGhAotSKLd0tV2goU-QQ_MrA454pHYMh96cuvy0srVRQDajWZHM2uRY5SEKksciWAnVDUkCKWoHDKxQYYmfP0waKRKnLI263U9rYieKhFgLpj5EbdTbVay6hOpZVFkwnUptM92i-qYiLAR7pO98mCLiLAaVFTR6e5GpaRaWZRJ6X1Y2nsNutrxl_DmmfxI82TUFcY4Aj_k83liFxsFjKRKrpVCEZAitrYzlH6Rmgr07653A1Ec7VlnmLNBdRX25RSdkSxIDXlI8BOZmKH_OFJta1cIUfeBuAoNn9FyFq3rW206PiCZi54hpvFLoUrRsqtWPOtgBswC_0dVKubWynKhLfhM4DPIAxgG0jpvNavYKzUrWl0IvHDCWildQxc1VCwRcPfAw_B2Kt8AIU24WG6yudDq3CH2WrKlaGMJe4aYq24hS8mfq6LFj_mIrbZZQI6w7llRGXJqjGa1SDHmoed7ukv4NDEyd_KdScnO5qRcvDsq6TA2Na4Xm_SuoUYMSBA3j0Rlqc7CshIZnNgCT0_J1Mda0NSHgNiNX0WdzGc0qxlHLOz2Ww88z3HotHfgZ0NBoPq3f0pQ9ywfrp1RM7IztbrdZ2u2XHJNvRuvOuXsXmeV2dr06Gq0JsFs9m_cB5FKpluvPx-ORN1aGRkSBmaDByagEl4_kmLTbukuIEElpSRJTUQZlu3CF7SpdpTh6ZcfdM6eYw2Oos2lK15bMGhWRpyhOpwPFgNqBDMVGcKKfODgoOye7qlrD8Y9byRP_YCvx94w5Hv0B1l7njYG74Z-_3RaDQI-sHI3zv0V5HV6wWjwHs9Hg58bzwI_L7vUAglajMvD-jinN7_BsT5ewM?type=png)](https://mermaid.live/edit#pako:eNo9j01qwzAYRK9iZq0YWdZftE23vUDRwiL66hhiKagSpDW-e6lLu5yBecPbcM2R4DBNExjmskS4WhoxrFTW8BOx-dR1HvVGK3m4zqNQbM_TNd9z8fBpB8MjpLec1791yW2-wb2H-wcxtEcMlV6WMJew_reFUqRyyS1VOCUPBtyGJ5wYdc-1MtwqYbnUiuET7mRkL89GCa31aIXVamf4Ol55b7Xlg5GDGaQw43lgoLjUXF5_BQ_P_RvV3Ehu)
+
+```mermaid
+classDiagram
+    direction TB
+
+    class RequestManager {
+        <<singleton>>
+        -static instance: RequestManager
+        -clientCache: Map~string, AxiosInstance~
+        -env: EnvConfig
+        -constructor()
+        +static getInstance() RequestManager
+        +getClient(options: CustomClientOptions) AxiosInstance
+        +getDefaultClient() AxiosInstance
+        -createClient(options: CustomClientOptions) AxiosInstance
+        -attachTimingInterceptors(instance: AxiosInstance) AxiosInstance
+    }
+
+    class AxiosInstance {
+        <<interface>>
+        request(config)
+        get(url, config)
+        post(url, data, config)
+        patch(url, data, config)
+        interceptors
+    }
+
+    class CustomClientOptions {
+        <<interface>>
+        +authType?: string
+        +bearerToken?: string
+        +basicClientId?: string
+        +basicClientSecret?: string
+        +notionVersion?: string
+        +omitNotionVersion?: boolean
+        +extraHeaders?: Record~string, string~
+    }
+
+    class EnvConfig {
+        <<utility>>
+        +baseUrl: string
+        +notionVersion: string
+        +token: string
+        +timeoutMs: number
+        +static load() EnvConfig
+    }
+
+    RequestManager --> AxiosInstance : creates/manages
+    RequestManager ..> CustomClientOptions : receives
+    RequestManager --> EnvConfig : uses
+
+    %% Color palette
+    style RequestManager fill:#FF7F50,stroke:#333,stroke-width:2px,color:#fff
+    style AxiosInstance fill:#40E0D0,stroke:#333,stroke-width:2px,color:#000
+    style CustomClientOptions fill:#F0F8FF,stroke:#333,stroke-width:2px,color:#000
+    style EnvConfig fill:#E0E0E0,stroke:#333,stroke-width:2px,color:#000
+```
 
 ### 2.3 Refactoring in Response to the Singleton Implementation
 
