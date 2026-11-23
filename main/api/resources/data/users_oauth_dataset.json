@@ -1,0 +1,392 @@
+{
+  "metadata": {
+    "datasetName": "users_oauth_dataset",
+    "notionVersion": "2025-09-03",
+    "modules": ["Users", "OAuth"],
+    "author": "Gabriel Marcos Guaman Ortuño",
+    "generatedWith": "GenAI (structured prompt + manual Notion API 2025-09-03 contract validation)"
+  },
+  "invalidBearerTokens": [
+    {
+      "testCaseId": "TC_USERS_ME_003",
+      "category": "Negative",
+      "label": "forged_bearer_token",
+      "description": "Reject invalid or forged Bearer token",
+      "token": "ntn_forged_invalid_token_999999",
+      "expectedStatus": 401,
+      "expectedCode": "unauthorized"
+    },
+    {
+      "testCaseId": "TC_USERS_ME_007",
+      "category": "Boundary",
+      "label": "whitespace_only_bearer_token",
+      "description": "Reject Authorization header with empty/whitespace Bearer token",
+      "token": "   ",
+      "expectedStatus": 401,
+      "expectedCode": "unauthorized"
+    },
+    {
+      "testCaseId": "TC_USERS_ME_009",
+      "category": "Negative",
+      "label": "sqli_like_bearer_token",
+      "description": "Reject SQLi-like Bearer token string",
+      "token": "ntn_' OR '1'='1",
+      "expectedStatus": 401,
+      "expectedCode": "unauthorized"
+    }
+  ],
+  "invalidUserIds": [
+    {
+      "testCaseId": "TC_USERS_GET_004",
+      "category": "Negative",
+      "label": "malformed_non_uuid",
+      "description": "Reject syntactically invalid non-UUID user_id",
+      "userId": "invalid-user-id-format-123",
+      "expectedStatus": 400,
+      "expectedCode": "validation_error"
+    },
+    {
+      "testCaseId": "TC_USERS_GET_005",
+      "category": "Negative",
+      "label": "sqli_like_uuid",
+      "description": "Reject SQLi-like payload in user_id path parameter",
+      "userId": "1' OR '1'='1",
+      "expectedStatus": 400,
+      "expectedCode": "validation_error"
+    },
+    {
+      "testCaseId": "TC_USERS_GET_006",
+      "category": "Boundary",
+      "label": "empty_whitespace_user_id",
+      "description": "Reject whitespace-only empty user_id path segment",
+      "userId": "   ",
+      "expectedStatus": 400,
+      "expectedCode": "validation_error"
+    },
+    {
+      "testCaseId": "TC_USERS_GET_007",
+      "category": "Boundary",
+      "label": "off_by_one_31_char_hex",
+      "description": "Reject off-by-one 31-character hex UUID string",
+      "userId": "9a4e7c125b8d4f31a9206c1d8e4f701",
+      "expectedStatus": 400,
+      "expectedCode": "validation_error"
+    },
+    {
+      "testCaseId": "TC_USERS_GET_008",
+      "category": "Boundary",
+      "label": "off_by_one_33_char_hex",
+      "description": "Reject off-by-one 33-character hex UUID string",
+      "userId": "9a4e7c125b8d4f31a9206c1d8e4f701ab",
+      "expectedStatus": 400,
+      "expectedCode": "validation_error"
+    },
+    {
+      "testCaseId": "TC_USERS_GET_009",
+      "category": "Boundary",
+      "label": "non_hex_uuid_pattern",
+      "description": "Reject UUID-shaped string containing non-hexadecimal characters",
+      "userId": "gggggggg-gggg-4ggg-8ggg-gggggggggggg",
+      "expectedStatus": 400,
+      "expectedCode": "validation_error"
+    },
+    {
+      "testCaseId": "TC_USERS_GET_010",
+      "category": "Boundary",
+      "label": "nil_all_zero_uuid",
+      "description": "Handle all-zero nil UUID cleanly with 404 Not Found",
+      "userId": "00000000-0000-0000-0000-000000000000",
+      "expectedStatus": 404,
+      "expectedCode": "object_not_found"
+    },
+    {
+      "testCaseId": "TC_USERS_GET_011",
+      "category": "Negative",
+      "label": "non_existent_uuidv4",
+      "description": "Return 404 Not Found for unassigned well-formed UUIDv4",
+      "userId": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+      "expectedStatus": 404,
+      "expectedCode": "object_not_found"
+    }
+  ],
+  "pageSizeValidBoundaries": [
+    {
+      "testCaseId": "TC_USERS_LIST_003",
+      "category": "Boundary",
+      "label": "min_valid_page_size_1",
+      "description": "Verify minimum valid pagination boundary (page_size=1)",
+      "pageSize": 1,
+      "expectedStatus": 200,
+      "maxResultsLength": 1
+    },
+    {
+      "testCaseId": "TC_USERS_LIST_004",
+      "category": "Boundary",
+      "label": "max_valid_page_size_100",
+      "description": "Verify maximum valid pagination boundary (page_size=100)",
+      "pageSize": 100,
+      "expectedStatus": 200,
+      "maxResultsLength": 100
+    }
+  ],
+  "pageSizeInvalidBoundaries": [
+    {
+      "testCaseId": "TC_USERS_LIST_005",
+      "category": "Boundary",
+      "label": "zero_page_size",
+      "description": "Reject below-minimum pagination boundary (page_size=0)",
+      "pageSize": 0,
+      "expectedStatus": 400,
+      "expectedCode": "validation_error"
+    },
+    {
+      "testCaseId": "TC_USERS_LIST_006",
+      "category": "Boundary",
+      "label": "negative_page_size",
+      "description": "Reject negative pagination boundary (page_size=-1)",
+      "pageSize": -1,
+      "expectedStatus": 400,
+      "expectedCode": "validation_error"
+    },
+    {
+      "testCaseId": "TC_USERS_LIST_007",
+      "category": "Boundary",
+      "label": "above_max_page_size_101",
+      "description": "Reject above-maximum pagination boundary (page_size=101)",
+      "pageSize": 101,
+      "expectedStatus": 400,
+      "expectedCode": "validation_error"
+    },
+    {
+      "testCaseId": "TC_USERS_LIST_008",
+      "category": "Negative",
+      "label": "non_numeric_page_size",
+      "description": "Reject non-numeric page_size query parameter",
+      "pageSize": "abc",
+      "expectedStatus": 400,
+      "expectedCode": "validation_error"
+    }
+  ],
+  "invalidStartCursors": [
+    {
+      "testCaseId": "TC_USERS_LIST_009",
+      "category": "Negative",
+      "label": "malformed_non_uuid_cursor",
+      "description": "Reject malformed non-UUID start_cursor parameter",
+      "startCursor": "not-a-valid-uuid-cursor",
+      "expectedStatus": 400,
+      "expectedCode": "validation_error"
+    },
+    {
+      "testCaseId": "TC_USERS_LIST_010",
+      "category": "Negative",
+      "label": "numeric_start_cursor",
+      "description": "Reject numeric start_cursor parameter",
+      "startCursor": "1234567890",
+      "expectedStatus": 400,
+      "expectedCode": "validation_error"
+    },
+    {
+      "testCaseId": "TC_USERS_LIST_011",
+      "category": "Negative",
+      "label": "sqli_like_start_cursor",
+      "description": "Reject SQLi-like start_cursor parameter",
+      "startCursor": "' OR '1'='1--",
+      "expectedStatus": 400,
+      "expectedCode": "validation_error"
+    }
+  ],
+  "invalidOAuthGrantPayloads": [
+    {
+      "testCaseId": "TC_OAUTH_TOKEN_006",
+      "category": "Boundary",
+      "label": "empty_json_object",
+      "description": "Reject empty JSON object payload {} on /oauth/token",
+      "payload": {},
+      "expectedStatus": 400,
+      "allowedErrors": ["invalid_request", "unsupported_grant_type", "validation_error"]
+    },
+    {
+      "testCaseId": "TC_OAUTH_TOKEN_007",
+      "category": "Boundary",
+      "label": "empty_grant_and_code_strings",
+      "description": "Reject empty string grant_type and code attributes",
+      "payload": {
+        "grant_type": "",
+        "code": ""
+      },
+      "expectedStatus": 400,
+      "allowedErrors": ["invalid_request", "unsupported_grant_type", "validation_error"]
+    },
+    {
+      "testCaseId": "TC_OAUTH_TOKEN_008",
+      "category": "Negative",
+      "label": "unsupported_client_credentials",
+      "description": "Reject unsupported grant_type client_credentials",
+      "payload": {
+        "grant_type": "client_credentials"
+      },
+      "expectedStatus": 400,
+      "allowedErrors": ["unsupported_grant_type", "invalid_request", "validation_error"]
+    },
+    {
+      "testCaseId": "TC_OAUTH_TOKEN_009",
+      "category": "Negative",
+      "label": "unsupported_password_grant",
+      "description": "Reject unsupported grant_type password",
+      "payload": {
+        "grant_type": "password",
+        "username": "qa.user@example.com",
+        "password": "invalid_password_123"
+      },
+      "expectedStatus": 400,
+      "allowedErrors": ["unsupported_grant_type", "invalid_request", "validation_error"]
+    },
+    {
+      "testCaseId": "TC_OAUTH_TOKEN_010",
+      "category": "Negative",
+      "label": "missing_code_field",
+      "description": "Reject authorization_code grant missing required code field",
+      "payload": {
+        "grant_type": "authorization_code"
+      },
+      "expectedStatus": 400,
+      "allowedErrors": ["invalid_request", "invalid_grant", "validation_error"]
+    },
+    {
+      "testCaseId": "TC_OAUTH_TOKEN_011",
+      "category": "Negative",
+      "label": "forged_expired_code",
+      "description": "Reject forged or expired authorization_code",
+      "payload": {
+        "grant_type": "authorization_code",
+        "code": "00000000-forged-expired-auth-code",
+        "redirect_uri": "https://localhost:3000/auth/notion/callback"
+      },
+      "expectedStatus": 400,
+      "allowedErrors": ["invalid_grant", "invalid_request", "validation_error"]
+    },
+    {
+      "testCaseId": "TC_OAUTH_TOKEN_012",
+      "category": "Negative",
+      "label": "mismatched_redirect_uri",
+      "description": "Reject mismatched unregistered redirect_uri",
+      "payload": {
+        "grant_type": "authorization_code",
+        "code": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+        "redirect_uri": "https://unregistered-malicious-domain.example.com/callback"
+      },
+      "expectedStatus": 400,
+      "allowedErrors": ["invalid_grant", "invalid_request", "validation_error"]
+    }
+  ],
+  "oauthRevokeInvalidPayloads": [
+    {
+      "testCaseId": "TC_OAUTH_REVOKE_006",
+      "category": "Negative",
+      "label": "missing_token_field",
+      "description": "Reject revocation when required token field is omitted {}",
+      "payload": {},
+      "expectedStatus": 400,
+      "allowedErrors": ["validation_error", "invalid_request"]
+    },
+    {
+      "testCaseId": "TC_OAUTH_REVOKE_007",
+      "category": "Boundary",
+      "label": "empty_string_token",
+      "description": "Reject empty string token {\"token\": \"\"} on /oauth/revoke",
+      "payload": {
+        "token": ""
+      },
+      "expectedStatus": 400,
+      "allowedErrors": ["validation_error", "invalid_request"]
+    },
+    {
+      "testCaseId": "TC_OAUTH_REVOKE_008",
+      "category": "Boundary",
+      "label": "whitespace_only_token",
+      "description": "Reject whitespace-only token {\"token\": \"   \"} on /oauth/revoke",
+      "payload": {
+        "token": "   "
+      },
+      "expectedStatus": 400,
+      "allowedErrors": ["validation_error", "invalid_request"]
+    }
+  ],
+  "oauthRevokeMalformedRawJson": "{\"token\": \"unclosed_json_payload",
+  "oauthIntrospectInvalidPayloads": [
+    {
+      "testCaseId": "TC_OAUTH_INTROSPECT_005",
+      "category": "Negative",
+      "label": "missing_token_field",
+      "description": "Reject introspection when token field is missing {}",
+      "payload": {},
+      "expectedStatus": 400,
+      "allowedErrors": ["validation_error", "invalid_request"]
+    },
+    {
+      "testCaseId": "TC_OAUTH_INTROSPECT_006",
+      "category": "Negative",
+      "label": "non_string_integer_token",
+      "description": "Reject introspection when token has non-string integer type",
+      "payload": {
+        "token": 123456789
+      },
+      "expectedStatus": 400,
+      "allowedErrors": ["validation_error", "invalid_request"]
+    },
+    {
+      "testCaseId": "TC_OAUTH_INTROSPECT_007",
+      "category": "Negative",
+      "label": "null_token_value",
+      "description": "Reject introspection when token value is null",
+      "payload": {
+        "token": null
+      },
+      "expectedStatus": 400,
+      "allowedErrors": ["validation_error", "invalid_request"]
+    },
+    {
+      "testCaseId": "TC_OAUTH_INTROSPECT_008",
+      "category": "Boundary",
+      "label": "empty_string_token",
+      "description": "Reject empty string token {\"token\": \"\"} on /oauth/introspect",
+      "payload": {
+        "token": ""
+      },
+      "expectedStatus": 400,
+      "allowedErrors": ["validation_error", "invalid_request"]
+    }
+  ],
+  "oauthIntrospectTokenEdgeCases": [
+    {
+      "testCaseId": "TC_OAUTH_INTROSPECT_002",
+      "category": "Happy Path",
+      "label": "unknown_revoked_token",
+      "description": "Introspect unknown or revoked token returning active: false (200 OK)",
+      "token": "ntn_unknown_or_revoked_token_002",
+      "expectedStatus": 200,
+      "expectedActive": false
+    },
+    {
+      "testCaseId": "TC_OAUTH_INTROSPECT_003",
+      "category": "Boundary",
+      "label": "malformed_jwt_like_token",
+      "description": "Introspect malformed JWT-like token string returning active: false (200 OK)",
+      "token": "eyJhbGciOiJIUzI1NiJ9.invalid_payload_segment.forged_sig",
+      "expectedStatus": 200,
+      "expectedActive": false
+    },
+    {
+      "testCaseId": "TC_OAUTH_INTROSPECT_004",
+      "category": "Boundary",
+      "label": "oversized_2048_char_token",
+      "description": "Safely handle oversized 2048-character token string (200 OK active: false)",
+      "repeatSeed": "a1b2c3d4",
+      "repeatCount": 256,
+      "expectedLength": 2048,
+      "expectedStatus": 200,
+      "expectedActive": false
+    }
+  ]
+}
