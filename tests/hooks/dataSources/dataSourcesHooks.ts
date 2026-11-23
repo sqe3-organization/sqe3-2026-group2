@@ -1,28 +1,24 @@
 // tests/hooks/dataSources/dataSourcesHooks.ts
 import { RequestManager } from '../../../core/api/RequestManager';
 import { Logger } from '../../../core/utils/logger';
+import { ValentinaTestContextManager } from '../common/valentinaTestContext';
 
 export class DataSourcesHooks {
   private client = RequestManager.getInstance().getDefaultClient();
+  private ctx = ValentinaTestContextManager.getInstance();
   private tempDatabaseId: string | null = null;
-  private createdDataSourceIds: string[] = [];
 
   async setup(): Promise<string> {
-    const envDbId = process.env.NOTION_DATABASE_ID;
-    if (envDbId) {
-      Logger.info('DataSourcesHooks: using NOTION_DATABASE_ID from .env');
-      return envDbId;
-    }
-
-    const pageId = process.env.NOTION_PAGE_ID || '';
+    // SIEMPRE crear una DB temporal nueva (ignorar .env para evitar la DB llena)
+    const pageId = this.ctx.get('pageId') || process.env.NOTION_PAGE_ID || '';
     if (!pageId) {
       throw new Error('NOTION_PAGE_ID is required to create a temporary database');
     }
 
-    Logger.info('DataSourcesHooks: creating temporary database');
+    Logger.info('DataSourcesHooks: creating a FRESH temporary database');
     const res = await this.client.post('/databases', {
       parent: { type: 'page_id', page_id: pageId },
-      title: [{ type: 'text', text: { content: 'Temp DB for Data Sources Tests' } }],
+      title: [{ type: 'text', text: { content: `Temp DB for DS Tests - ${Date.now()}` } }],
       properties: { Name: { title: {} } },
     });
 
@@ -31,18 +27,17 @@ export class DataSourcesHooks {
     }
 
     this.tempDatabaseId = res.data.id;
-    
-    // Verificación explícita para TypeScript
     if (!this.tempDatabaseId) {
       throw new Error('Failed to extract database ID from response');
     }
-    
+
+    this.ctx.set('databaseId', this.tempDatabaseId);
     Logger.info(`DataSourcesHooks: temp database created ${this.tempDatabaseId}`);
     return this.tempDatabaseId;
   }
 
   trackDataSource(id: string) {
-    this.createdDataSourceIds.push(id);
+    this.ctx.addCreatedId(id);
   }
 
   async cleanup() {
@@ -51,6 +46,6 @@ export class DataSourcesHooks {
       await this.client.patch(`/databases/${this.tempDatabaseId}`, { in_trash: true });
       this.tempDatabaseId = null;
     }
-    this.createdDataSourceIds = [];
+    this.ctx.reset();
   }
 }
