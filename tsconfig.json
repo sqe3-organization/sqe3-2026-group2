@@ -18,6 +18,5 @@
     }
   },
   "include": ["core/**/*.ts", "main/**/*.ts", "tests/**/*.ts", "tests/hooks/fileUploads"],
-  "include": ["core/**/*.ts", "main/**/*.ts", "tests/**/*.ts"],
   "exclude": ["node_modules", "dist"]
 }
