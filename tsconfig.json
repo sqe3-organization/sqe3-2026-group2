@@ -17,6 +17,6 @@
       "@tests/*": ["./tests/*"]
     }
   },
-  "include": ["core/**/*.ts", "main/**/*.ts", "tests/**/*.ts"],
+  "include": ["core/**/*.ts", "main/**/*.ts", "tests/**/*.ts", "tests/hooks/fileUploads"],
   "exclude": ["node_modules", "dist"]
 }
