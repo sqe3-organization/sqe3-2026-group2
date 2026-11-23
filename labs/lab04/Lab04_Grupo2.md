@@ -569,7 +569,32 @@ The suites need `NOTION_TOKEN` and `NOTION_ROOT_PAGE_ID` in `.env`. The optional
 
 ### 1.4 Configuration and Environment Files
 
-> TODO 
+All runtime configuration, credentials, compiler rules, test execution scripts, and Git exclusions are centralized through dedicated environment and configuration files so that no secrets or environment-specific values are hardcoded in the Business or Test layers.
+
+#### 1.4.1 Environment Loader (`core/utils/envConfig.ts`) and `.env.example`
+
+`EnvConfig` (`core/utils/envConfig.ts`) implements a **Singleton loader** (`EnvConfig.load()`) that invokes `dotenv.config()` once per execution, validates required secrets at startup (throwing an explicit error if `NOTION_TOKEN` is missing), and exposes typed, read-only properties (`baseUrl`, `notionVersion`, `token`, `timeoutMs`) to `RequestManager`. Team members provision local credentials by copying `.env.example` to `.env` (which is excluded from Git).
+
+| Environment Variable | Required / Optional | Default | Purpose & Consuming Modules |
+|---|---|---|---|
+| `NOTION_BASE_URL` | Optional | `https://api.notion.com/v1` | Base URL for all HTTP requests created by `RequestManager`. |
+| `NOTION_VERSION` | Optional | `2025-09-03` | Default `Notion-Version` header attached to every client unless explicitly overridden/omitted in negative tests. |
+| `NOTION_TOKEN` | **Required** | _(none — throws if absent)_ | Primary Internal Integration Bearer token used by `RequestManager.getDefaultClient()`. |
+| `TIMEOUT_MS` | Optional | `15000` | Axios HTTP timeout in milliseconds configured on `RequestManager` clients. |
+| `LOG_LEVEL` | Optional | `info` | Minimum Pino log level (`debug`, `info`, `warn`, `error`) read by `core/utils/logger.ts`. |
+| `DEBUG` | Optional | `false` | When set to `true` (and `LOG_LEVEL` is unset), lowers Pino verbosity to `debug` to record full HTTP request/response traces and latency. |
+| `NOTION_PAGE_ID` / `NOTION_ROOT_PAGE_ID` / `PARENT_PAGE_ID` | Required per module | _(workspace UUID)_ | Shared root/parent page UUIDs used by `Pages`, `Blocks`, `Databases`, `Data Sources`, and `Comments` preconditions (`NOTION_DATABASE_ID` is also supported for Database-scoped checks). |
+| `OAUTH_CLIENT_ID`, `OAUTH_CLIENT_SECRET`, `OAUTH_REDIRECT_URI` | Optional (OAuth) | `https://localhost:3000/auth/notion/callback` (URI) | Public OAuth 2.0 integration credentials used by `RequestManager` HTTP Basic Auth (`OAuthAPI`) alongside optional `OAUTH_AUTH_CODE`, `OAUTH_ACCESS_TOKEN`, and `OAUTH_REFRESH_TOKEN`. |
+| `RESTRICTED_TOKEN` / `NOTION_TOKEN_READ_ONLY` / `NOTION_TOKEN_INSERT_ONLY` / `NOTION_TOKEN_B` / `NOTION_REVOKED_TOKEN` / `NOTION_UNSHARED_PAGE_ID` / `NOTION_STATUS_DATA_SOURCE_ID` / `NOTION_USER_ID` | Optional | _(none)_ | Secondary capability/permission tokens and workspace fixtures enabling conditional negative/RBAC test cases in `Users` and `Pages`. |
+
+#### 1.4.2 Framework Configuration Files
+
+| File | Role in the Automation Framework |
+|---|---|
+| `tsconfig.json` | Configures strict TypeScript compilation (`target: "ES2022"`, `module` & `moduleResolution: "NodeNext"`, `strict: true`, `resolveJsonModule: true`, `skipLibCheck: true`), defines path aliases (`@core/*`, `@main/*`, `@tests/*`), and scopes compilation to `core/**/*.ts`, `main/**/*.ts`, and `tests/**/*.ts`. |
+| `vitest.config.ts` & `package.json` (`scripts`) | Vitest v5 (`^5.1.1`) runs TypeScript test suites directly using `tsconfig.json` and the scripts in `package.json` (including `test:pages` with `--no-file-parallelism` to respect Notion's ~3 req/s rate limit, `test:pages:stateless`, `test:pages:e2e`, `report:logs`, and lint/format commands). Where extended timeouts or sequential runner defaults are required (`environment: 'node'`, `testTimeout: 30000`, `fileParallelism: false`), suites follow the `vitest.config.ts` baseline established in Lab 03 or pass per-suite Vitest timeouts explicitly. |
+| `.env.example` | Version-controlled template documenting all environment variables required across the five team members' modules without exposing real tokens or secrets. |
+| `.gitignore` | Prevents secrets and generated artifacts from entering version control, excluding `.env`, `.env.local`, `.env.*.local` (while keeping `!.env.example`), `node_modules/`, `dist/`, `logs/`, `*.log`, `reports/`, `reports/*.html`, `reports/*.json`, `coverage/`, and `.vitest/`. |
 
 ---
 
@@ -1000,9 +1025,9 @@ ctx.lastResponse = res;
 ```
 ### 4.3 Dynamic Datasets Generated with GenAI
 
-#### Prompt Used
+#### Valentina Molina Bustillos — Modules: Data Sources, Comments & File Uploads
 
-**Valentina Molina Bustillos — Modules: Data Sources, Comments & File Uploads**
+##### Prompt Used
 
 ```text
 Generate a JSON dataset for testing the Notion API endpoint POST /v1/data_sources.
@@ -1036,7 +1061,23 @@ Include cases for: invalid property types, missing Notion-Version header, invali
 Return only the JSON, no explanation.
 ```
 
+##### Generation and Validation Procedure
+
+1. The prompt was submitted to a generative AI tool (ChatGPT).
+2. The generated JSON was saved as `main/api/resources/data/dataSources_test_cases.json`.
+3. The JSON was validated with `JSON.parse` and manually reviewed to ensure:
+   - Each case has a unique `case_id`.
+   - The `payload` matches the Notion API schema for `POST /v1/data_sources`.
+   - The `expected_status` is consistent with the `category`.
+4. The dataset is consumed by `tests/scenarios/dataSources/dataSources.data-driven.test.ts`, which iterates over each case and asserts the expected status.
+5. **Validation adjustments:** After running the tests, the following cases were refined:
+   - `DS_VALID_002` and `DS_VALID_003` were updated to include a `title` property (Notion requires it).
+   - `DS_INVALID_007` (101 properties) was reclassified as `DS_VALID_004` because Notion accepts more than 100 properties for data sources.
+   - The test timeout was increased to 20s to accommodate slow negative responses.
+
 #### Karen Ivonne Cruz Alvarez — Module: Blocks
+
+##### Prompt Used
 
 ```text
 Act as a Senior QA Automation Engineer specializing in REST API contract testing for the Notion API (Notion-Version: 2025-09-03).
@@ -1054,25 +1095,8 @@ Include four top-level arrays:
 
 Each entry must include caseId (matching TC_BLK_<ACTION>_<NNN>), description, category ("Negative" or "Boundary"), expectedStatus, and expectedCode. Return valid JSON only.
 ```
-> TODO
 
-#### Generation and Validation Procedure
-
-**Valentina Molina Bustillos — Modules: Data Sources, Comments & File Uploads**
-
-1. The prompt was submitted to a generative AI tool (ChatGPT).
-2. The generated JSON was saved as `main/api/resources/data/dataSources_test_cases.json`.
-3. The JSON was validated with `JSON.parse` and manually reviewed to ensure:
-   - Each case has a unique `case_id`.
-   - The `payload` matches the Notion API schema for `POST /v1/data_sources`.
-   - The `expected_status` is consistent with the `category`.
-4. The dataset is consumed by `tests/scenarios/dataSources/dataSources.data-driven.test.ts`, which iterates over each case and asserts the expected status.
-5. **Validation adjustments:** After running the tests, the following cases were refined:
-   - `DS_VALID_002` and `DS_VALID_003` were updated to include a `title` property (Notion requires it).
-   - `DS_INVALID_007` (101 properties) was reclassified as `DS_VALID_004` because Notion accepts more than 100 properties for data sources.
-   - The test timeout was increased to 20s to accommodate slow negative responses.
-
-#### Karen Ivonne Cruz Alvarez — Module: Blocks
+##### Generation and Validation Procedure
 
 1. **Prompt Execution:** The structured prompt above was submitted to Gemini to synthesize edge cases targeting Notion API `2025-09-03` validation rules across all four Blocks input surfaces (`block_id`, append payloads, pagination query parameters, and update payloads).
 2. **Storage:** The output was saved to `main/api/resources/data/blocks_dataset.json` following the Section `1.2.4` naming convention (`<module>_<purpose>.json`).
@@ -1085,7 +1109,6 @@ Each entry must include caseId (matching TC_BLK_<ACTION>_<NNN>), description, ca
    - `blocks.append.test.ts` → iterates `blocksDataset.invalidAppendPayloads` (5 cases)
    - `blocks.children.test.ts` → iterates `blocksDataset.paginationBoundaries` (7 cases)
    - `blocks.update.test.ts` → iterates `blocksDataset.invalidUpdatePayloads` (4 cases)
-> TODO 
 
 #### Gabriel Marcos Guaman Ortuño — Modules: Users & OAuth
 
@@ -1236,6 +1259,21 @@ The fixes for these expectations (checking the URL with `notion.(so|com)`, compa
 ![alt text](caps/kevin_uruchi/act5_testpassed.png)
 
 ### 5.2 Review of the Architecture Layers in the Implementation
+
+A cross-repository static import and structural audit was performed across `core/`, `main/`, and `tests/` to verify that every implemented module enforces the top-down dependency rule (`tests/` → `main/` → `core/` → Notion REST API) defined in Section `1.1`.
+
+#### Layer Compliance Audit Table
+
+| Layer | Audited Scope | Dependency & Separation Rules Verified | Audit Result |
+|---|---|---|---|
+| **Core Layer (`core/`)** | `core/api/RequestManager.ts`, `core/utils/{envConfig,logger,logReporter,dataFactory,schemaValidator,assertions}.ts` | • Zero imports from `main/` or `tests/`.<br>• `RequestManager.ts` is the sole file in the entire repository calling `axios.create()`, centralizing client caching, timing interceptors (`durationMs`), and auth headers.<br>• `Logger` (Pino multistream + redaction) and `LogReporter` (NDJSON → HTML/JSON) remain completely Notion-agnostic. | **Compliant** *(note below)* |
+| **Business Layer (`main/`)** | All 9 endpoint classes (`PagesAPI`, `BlocksAPI`, `DatabasesAPI`, `SearchAPI`, `UsersAPI`, `OAuthAPI`, `DataSourcesAPI`, `CommentsAPI`, `FileUploadsAPI`), 5 schema files (`main/api/resources/schemas/`), and 4 datasets (`main/api/resources/data/`) | • All 9 endpoint classes obtain HTTP clients exclusively via `RequestManager.getInstance()` (`getDefaultClient()` / `getClient(options)`), with zero `axios.create()` calls.<br>• Zero `vitest` or test-assertion imports across `main/` (`pagesAPI.ts` imports only Axios TypeScript interfaces for type annotations).<br>• Zod response/error schemas and GenAI JSON/CSV datasets are cleanly isolated under `main/api/resources/`. | **Compliant** |
+| **Test Layer (`tests/`)** | 10 hook/context files (`tests/hooks/{common,pages,blocks,databases,dataSources,comments,fileUploads,users,oauth}/`) and 26 scenario suites (`tests/scenarios/<module>/*.test.ts`) | • Zero runtime Axios instantiation (`axios.create()`) across all 36 TypeScript files in `tests/` (`pagesHooks.ts` imports only the `AxiosResponse` type).<br>• Scenarios invoke only Business Layer endpoint classes, module hooks/contexts, datasets, and `SchemaValidator`/assertion helpers, with zero hardcoded API base URLs or committed credentials. | **Compliant** |
+
+#### Architectural Findings & Refinement Notes
+- **Strict transport encapsulation:** Centralizing Axios inside `RequestManager` allowed the team to upgrade `Logger` to Pino and add `LogReporter` in Activity #3 without modifying a single endpoint class or test scenario.
+- **Cross-module Business Layer reuse:** `PagesHooks` and `BlocksHooks` directly reuse teammates' endpoint classes (`DatabasesAPI`, `DataSourcesAPI`, `SearchAPI`), confirming that per-module endpoint encapsulation scales cleanly across the team.
+- **Planned Core hygiene improvement:** `core/utils/assertions.ts` (retained during the Lab 03 → Lab 04 migration for shared helpers consumed by `Pages`, `Data Sources`, `Comments`, and `File Uploads`) currently houses Vitest `expect` helpers and legacy Notion schemas inside `core/utils/`. Newer modules (`Users`, `OAuth`, `Blocks`, `Databases`, `Search`) already isolate assertions in `tests/hooks/<module>/` and schemas in `main/api/resources/schemas/`; relocating the remaining legacy helpers out of `core/utils/assertions.ts` into `tests/hooks/common/` is queued as a minor follow-up cleanup.
 
 ### 5.3 Framework Functionality and Component Documentation
 
@@ -1440,6 +1478,6 @@ The Pages module adds its own contracts in `main/api/resources/schemas/pagesSche
 |---|---|---|---|
 | **Gabriel Marcos Guaman Ortuño** | • Refactored Users & OAuth modules into the 3-layer architecture (`usersAPI.ts`, `oauthAPI.ts`, `usersSchemas.ts`, `oauthSchemas.ts`) consuming `RequestManager.getInstance()` and `SchemaValidator`.<br>• Integrated **Pino** (`core/utils/logger.ts`) with synchronous NDJSON file + `pino-pretty` console multistreams and native secret redaction, defined team logging conventions, and implemented `LogReporter` (`core/utils/logReporter.ts`, `npm run report:logs`) generating HTML and JSON execution dashboards.<br>• Implemented `usersHooks.ts` and `oauthHooks.ts` with typed `UsersTestContext` / `OAuthTestContext`, dynamic workspace discovery, and isolated OAuth teardown.<br>• Generated and validated `users_oauth_dataset.json` with GenAI for data-driven edge cases.<br>• Implemented 6 endpoint test suites (71 scenarios) across `tests/scenarios/users/` and `tests/scenarios/oauth/`. | • Activity #1 (`1.3.1`)<br>• Activity #3 (`3.1`, `3.2`, `3.3`)<br>• Activity #4 (`4.1`–`4.3` — Users & OAuth)<br>• Activity #5 (`5.1.1`) | Completed and verified via `tsc --noEmit` & `npm run report:logs` |
 | **Valentina Molina Bustillos** | • Implemented the Singleton `RequestManager` and its UML diagram.<br>• Refactored Data Sources, Comments and File Uploads into the three-layer architecture.<br>• Added preconditions/postconditions via hooks and a module-specific context manager.<br>• Generated a GenAI dataset for data-driven testing.<br>• Extended test suites with 11 additional scenarios. | • Activity #2 (`2.1`, `2.2`, `2.3`)<br>• Activity #1 (`1.3.2`)<br>• Activity #4 (`4.1`, `4.2`, `4.3`)<br>• Activity #5 (`5.1.2`) | All 27 tests passing. |
-| **Karen Ivonne Cruz Alvarez** | • Configured ESLint v9 flat config (`eslint.config.js`), Prettier (`.prettierrc`, `.prettierignore`), and `lint`/`lint:fix`/`format`/`format:check` scripts across `core/`, `main/`, and `tests/`.<br>• Refactored the Blocks module into the three-layer architecture: `BlocksAPI` (`main/api/endpoints/blocksAPI.ts`), Zod v4 schemas (`main/api/resources/schemas/blocksSchemas.ts`), and 5 endpoint-scoped test suites (`tests/scenarios/blocks/`).<br>• Implemented `tests/hooks/blocks/blocksHooks.ts` with typed `BlocksTestContext`, precondition seeding, 350 ms throttling, `Logger` telemetry, and automatic `afterAll` teardown.<br>• Generated and integrated the GenAI edge-case dataset (`main/api/resources/data/blocks_dataset.json`) driving 23 parameterized scenarios across 84 total Blocks test cases. | • Activity #1 (`1.3.3`, `1.5`)<br>• Activity #4 (`4.1`, `4.2`, `4.3` — Blocks)<br>• Activity #5 (`5.1.3`) | Complete ✅ (`tsc --noEmit` & ESLint clean on all Blocks files) |
-| **Sebastián Pereyra** | • Refactored Databases & Search modules from Lab 03 into the three-layer architecture.<br>• Created `DatabasesAPI` and `SearchAPI` endpoint classes in the Business Layer.<br>• Implemented `databasesHooks.ts` with `createTestDatabase` and `archiveCreatedDatabases`.<br>• Wrote 9 test cases for Databases (create, get, query) and 6 for Search.<br>• Completed `DataFactory` utility in the Core Layer.<br>• Documented all framework components in Section 5.3. | • Activity #1 (`1.3.4`)<br>• Activity #5 (`5.1.4`, `5.3`) | Complete ✅ |
+| **Karen Ivonne Cruz Alvarez** | • Configured ESLint v9 flat config (`eslint.config.js`), Prettier (`.prettierrc`, `.prettierignore`), and `lint`/`lint:fix`/`format`/`format:check` scripts across `core/`, `main/`, and `tests/`.<br>• Refactored the Blocks module into the three-layer architecture: `BlocksAPI` (`main/api/endpoints/blocksAPI.ts`), Zod v4 schemas (`main/api/resources/schemas/blocksSchemas.ts`), and 5 endpoint-scoped test suites (`tests/scenarios/blocks/`).<br>• Implemented `tests/hooks/blocks/blocksHooks.ts` with typed `BlocksTestContext`, precondition seeding, 350 ms throttling, `Logger` telemetry, and automatic `afterAll` teardown.<br>• Generated and integrated the GenAI edge-case dataset (`main/api/resources/data/blocks_dataset.json`) driving 23 parameterized scenarios across 84 total Blocks test cases. | • Activity #1 (`1.3.3`, `1.5`)<br>• Activity #4 (`4.1`, `4.2`, `4.3` — Blocks)<br>• Activity #5 (`5.1.3`) | Completed (`tsc --noEmit` & ESLint clean on all Blocks files) |
+| **Sebastián Pereyra** | • Refactored Databases & Search modules from Lab 03 into the three-layer architecture.<br>• Created `DatabasesAPI` and `SearchAPI` endpoint classes in the Business Layer.<br>• Implemented `databasesHooks.ts` with `createTestDatabase` and `archiveCreatedDatabases`.<br>• Wrote 9 test cases for Databases (create, get, query) and 6 for Search.<br>• Completed `DataFactory` utility in the Core Layer.<br>• Documented all framework components in Section 5.3. | • Activity #1 (`1.3.4`)<br>• Activity #5 (`5.1.4`, `5.3`) | Completed |
 | **Kevin Uruchi** | • Defined and diagrammed the three-layer architecture of the framework (layered diagram, class diagram and request sequence diagram in Mermaid).<br>• Defined and diagrammed the folder structure, folder responsibilities and naming conventions.<br>• Refactored the Pages module into the three-layer architecture: `PagesAPI` (Business Layer), `pagesSchemas.ts`, `pagesContext.ts` and `pagesHooks.ts`.<br>• Adapted the module to the Singleton `RequestManager` (cached clients per header combination, raw bodies, rate-limit retry in the hooks).<br>• Documented the preconditions, postconditions and context variables of the module.<br>• Migrated the `173` test cases (`228` Vitest tests) to `tests/scenarios/pages/` and reviewed the layer boundaries.<br>• Fixed the duplicated `include` of `tsconfig.json` that stopped every suite. | • Activity #1 (`1.1`, `1.2`, `1.3.5`)<br>• Activity #2 (`2.3`)<br>• Activity #4 (`4.1`, `4.2`)<br>• Activity #5 (`5.1.5`, `5.2`, `5.3`) | Stateless: `24` passed, `2` skipped. Preconditioned: `182` passed, `15` failed, `5` skipped. All failures are Notion behavior changes or outdated expectations (Section `5.1.5`). |
