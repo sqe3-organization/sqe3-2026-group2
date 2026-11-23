@@ -442,7 +442,12 @@ The other modules follow the same pattern as `pages`. Each owner adds `tests/hoo
 
 #### 1.3.2 Valentina Molina Bustillos — Modules: Data Sources, Comments & File Uploads
 
-> TODO 
+The Lab 03 test file (`act5_act6_valentina_modules.test.ts`) was split and refactored into the three-layer architecture:
+
+- **Business Layer (`main/api/endpoints/`):** Created `dataSourcesAPI.ts`, `commentsAPI.ts` and `fileUploadsAPI.ts`. Each class exposes one method per endpoint and obtains its Axios client exclusively from `RequestManager.getInstance()`.
+- **Test Layer (`tests/scenarios/`):** Created `dataSources/`, `comments/` and `fileUploads/` folders. Tests no longer call Axios directly; they instantiate the corresponding endpoint class.
+- **Hooks Layer (`tests/hooks/`):** Created `DataSourcesHooks`, `CommentsHooks` and `FileUploadsHooks` to handle preconditions (create a temporary database, validate the parent page) and postconditions (archive temporary resources).
+- **Core Layer (`core/utils/`):** Moved `assertions.ts` and updated its imports to reference `TimedAxiosResponse` from `core/api/RequestManager.ts`. Fixed Zod v4 compatibility (`z.record` now requires key and value types).
 
 #### 1.3.3 Karen Ivonne Cruz Alvarez — Module: Blocks
 
@@ -579,7 +584,41 @@ classDiagram
 
 ### 2.3 Refactoring in Response to the Singleton Implementation
 
-> TODO 
+**Valentina Molina Bustillos — Modules: Data Sources, Comments & File Uploads**
+
+The test code from Lab 03 (`act5_act6_valentina_modules.test.ts`) was refactored to align with the three-layer architecture and the new Singleton `RequestManager`.
+
+**Changes applied:**
+
+1. **Business Layer (Endpoint classes):**
+   - Created `main/api/endpoints/dataSourcesAPI.ts`, `commentsAPI.ts`, and `fileUploadsAPI.ts`.
+   - Each class exposes one method per endpoint (`createDataSource`, `createComment`, `createFileUpload`, etc.).
+   - These classes obtain their Axios client exclusively through `RequestManager.getInstance().getDefaultClient()`. No test or endpoint class creates an Axios instance directly.
+
+2. **Test Layer (Scenarios):**
+   - Split the monolithic test file into three module-specific test files:
+     - `tests/scenarios/dataSources/dataSources.test.ts`
+     - `tests/scenarios/comments/comments.test.ts`
+     - `tests/scenarios/fileUploads/fileUploads.test.ts`
+   - Tests no longer call Axios directly. They instantiate the corresponding endpoint class and call its methods.
+   - Assertions (`assertCommonHeadersAndSla`, `assertNotionErrorContract`) remain in the Test Layer, consuming the `TimedAxiosResponse` returned by the Business Layer.
+
+3. **Negative test handling:**
+   - For the negative test that requires a request without the `Notion-Version` header (`TC_CMT_CREATE_NEG`), the `CommentsAPI` class exposes a specialized method (`createCommentWithoutVersion`) that internally requests a cached client from the `RequestManager` with `omitNotionVersion: true`. This preserves the Singleton contract: the manager creates the client once and caches it for future requests with the same options.
+
+4. **Core Layer updates:**
+   - Moved `assertions.ts` to `core/utils/assertions.ts` and updated its import to reference `TimedAxiosResponse` from `core/api/RequestManager.ts`.
+   - Fixed Zod v4 compatibility across all schemas: `z.record()` now requires both key and value types (e.g., `z.record(z.string(), z.any())`).
+
+**Benefits of the refactoring:**
+- **Single source of HTTP configuration:** All requests flow through `RequestManager`, so any change to base URL, timeout or interceptors is applied in one place.
+- **Test readability:** Test files now only describe *what* is verified, delegating *how* the API is called to the endpoint classes.
+- **Reusability:** The endpoint classes can be used by other tests, hooks or scripts without duplicating request logic.
+
+**Test execution evidence:**
+
+![Singleton Implementation Tests Passed](./caps/valentinamolina/act2_testspassed_singletonimplmentetion.png)
+
 ---
 
 <div style="page-break-after: always;"></div>
@@ -618,22 +657,92 @@ classDiagram
 
 ### 4.1 Review of Preconditions and Postconditions
 
-> TODO 
+**Valentina Molina Bustillos — Modules: Data Sources, Comments & File Uploads**
+
+| Module | Precondition | Postcondition |
+|---|---|---|
+| **Data Sources** | `DataSourcesHooks.setup()` creates a fresh temporary Database under `NOTION_PAGE_ID`. This avoids the Notion limit of 50 Data Sources per database when tests are run repeatedly. | `DataSourcesHooks.cleanup()` archives the temporary Database with `in_trash: true`, removing all Data Sources created during the tests. |
+| **Comments** | `CommentsHooks.setup()` validates that `NOTION_PAGE_ID` is present and shared with the integration. | `CommentsHooks.cleanup()` logs the created comments. Notion has no delete endpoint for comments, so the parent page is not modified. |
+| **File Uploads** | `FileUploadsHooks.setup()` initializes the hook context. | `FileUploadsHooks.cleanup()` logs the created file uploads. Notion has no delete endpoint for file uploads, so they expire automatically after 24 hours. |
+
 
 ### 4.2 Test Context Variables
 
-> TODO 
+**Valentina Molina Bustillos — Modules: Data Sources, Comments & File Uploads**
+
+A `ValentinaTestContextManager` was implemented in `tests/hooks/common/valentinaTestContext.ts`. It is a **module-specific Singleton** that centralizes the context variables of the three assigned modules:
+
+| Variable | Module | Source |
+|---|---|---|
+| `databaseId` | Data Sources | Created by `DataSourcesHooks.setup()` |
+| `dataSourceId` | Data Sources | Returned by `POST /v1/data_sources` |
+| `pageId` | Comments | `.env` (`NOTION_PAGE_ID`) |
+| `commentId` | Comments | Returned by `POST /v1/comments` |
+| `fileUploadId` | File Uploads | Returned by `POST /v1/file_uploads` |
+| `createdIds` | All | Tracked for postcondition cleanup |
+
+Because it is a Singleton, every hook and test file reads and writes to the same context instance. This avoids passing variables between hooks and scenarios and ensures that a resource created in a precondition (e.g., a temporary database) is visible in the tests and in the postcondition cleanup.
+
+```typescript
+const ctx = ValentinaTestContextManager.getInstance();
+ctx.set('dataSourceId', res.data.id);
+const id = ctx.get('dataSourceId');
+```
 
 ### 4.3 Dynamic Datasets Generated with GenAI
 
 #### Prompt Used
 
+**Valentina Molina Bustillos — Modules: Data Sources, Comments & File Uploads**
+
 ```text
-> TODO
+Generate a JSON dataset for testing the Notion API endpoint POST /v1/data_sources.
+The dataset must contain 10 test cases with the following structure:
+[
+  {
+    "case_id": "DS_VALID_001",
+    "description": "Create a data source with title and number properties",
+    "payload": {
+      "parent": { "type": "database_id", "database_id": "{{DATABASE_ID}}" },
+      "properties": {
+        "Name": { "title": {} },
+        "Count": { "number": { "format": "number" } }
+      }
+    },
+    "expected_status": 200,
+    "category": "happy_path"
+  },
+  {
+    "case_id": "DS_INVALID_001",
+    "description": "Create a data source with invalid parent (missing database_id)",
+    "payload": {
+      "parent": { "type": "database_id" },
+      "properties": { "Name": { "title": {} } }
+    },
+    "expected_status": 400,
+    "category": "negative"
+  }
+]
+Include cases for: invalid property types, missing Notion-Version header, invalid auth token, and exceeding property limits.
+Return only the JSON, no explanation.
 ```
+> TODO
 
 #### Generation and Validation Procedure
 
+**Valentina Molina Bustillos — Modules: Data Sources, Comments & File Uploads**
+
+1. The prompt was submitted to a generative AI tool (ChatGPT).
+2. The generated JSON was saved as `main/api/resources/data/dataSources_test_cases.json`.
+3. The JSON was validated with `JSON.parse` and manually reviewed to ensure:
+   - Each case has a unique `case_id`.
+   - The `payload` matches the Notion API schema for `POST /v1/data_sources`.
+   - The `expected_status` is consistent with the `category`.
+4. The dataset is consumed by `tests/scenarios/dataSources/dataSources.data-driven.test.ts`, which iterates over each case and asserts the expected status.
+5. **Validation adjustments:** After running the tests, the following cases were refined:
+   - `DS_VALID_002` and `DS_VALID_003` were updated to include a `title` property (Notion requires it).
+   - `DS_INVALID_007` (101 properties) was reclassified as `DS_VALID_004` because Notion accepts more than 100 properties for data sources.
+   - The test timeout was increased to 20s to accommodate slow negative responses.
 > TODO 
 
 ---
@@ -654,7 +763,18 @@ classDiagram
 > TODO
 
 #### 5.1.2 Valentina Molina Bustillos — Modules: Data Sources, Comments & File Uploads
-> TODO
+
+The test suites for the three assigned modules were extended with additional happy-path and negative scenarios:
+
+| Module | Test File | New Tests | Coverage |
+|---|---|---|---|
+| **Data Sources** | `dataSources.extra.test.ts` | 4 | Update title, query with no filters, invalid ID (negative), unsupported property type (negative) |
+| **Comments** | `comments.extra.test.ts` | 3 | List comments, null rich_text (negative), invalid page_id (negative) |
+| **File Uploads** | `fileUploads.extra.test.ts` | 4 | Single-part upload, invalid content_type (negative), invalid mode (negative), invalid ID (negative) |
+
+**Total new tests:** 11 (6 happy path, 5 negative).
+
+![Act 5 Tests Passed](./caps/valentinamolina/act5_testpassed.png)
 
 #### 5.1.3 Karen Ivonne Cruz Alvarez — Module: Blocks
 > TODO
@@ -840,7 +960,7 @@ These schemas are shared across all modules and used in both positive tests (ass
 | Team Member | Lab 05 Contributions & Implemented Scope | Section / Item Worked On | Additional Comments & Status |
 |---|---|---|---|
 | **Gabriel Marcos Guaman Ortuño** | > TODO | > TODO | > TODO |
-| **Valentina Molina Bustillos** | > TODO | > TODO | > TODO |
+| **Valentina Molina Bustillos** | • Implemented the Singleton `RequestManager` and its UML diagram.<br>• Refactored Data Sources, Comments and File Uploads into the three-layer architecture.<br>• Added preconditions/postconditions via hooks and a module-specific context manager.<br>• Generated a GenAI dataset for data-driven testing.<br>• Extended test suites with 11 additional scenarios. | • Activity #2 (`2.1`, `2.2`, `2.3`)<br>• Activity #1 (`1.3.2`)<br>• Activity #4 (`4.1`, `4.2`, `4.3`)<br>• Activity #5 (`5.1.2`) | All 27 tests passing. |
 | **Karen Ivonne Cruz Alvarez** | > TODO | > TODO | > TODO |
 | **Sebastián Pereyra** | • Refactored Databases & Search modules from Lab 03 into the three-layer architecture.<br>• Created `DatabasesAPI` and `SearchAPI` endpoint classes in the Business Layer.<br>• Implemented `databasesHooks.ts` with `createTestDatabase` and `archiveCreatedDatabases`.<br>• Wrote 9 test cases for Databases (create, get, query) and 6 for Search.<br>• Completed `DataFactory` utility in the Core Layer.<br>• Documented all framework components in Section 5.3. | • Activity #1 (`1.3.4`)<br>• Activity #5 (`5.1.4`, `5.3`) | Complete ✅ |
 | **Kevin Uruchi** | • Defined and diagrammed the three-layer architecture of the framework (layered diagram, class diagram and request sequence diagram in Mermaid).<br>• Defined and diagrammed the folder structure, folder responsibilities and naming conventions. | • Activity #1 (`1.1`, `1.2`) | > TODO |
