@@ -19,6 +19,7 @@ build/
 coverage/
 .nyc_output/
 test-results/
+reports/
 reports/*.html
 reports/*.json
 
