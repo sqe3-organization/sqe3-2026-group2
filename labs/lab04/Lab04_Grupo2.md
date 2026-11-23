@@ -557,7 +557,41 @@ classDiagram
 
 ### 2.3 Refactoring in Response to the Singleton Implementation
 
-> TODO 
+**Valentina Molina Bustillos — Modules: Data Sources, Comments & File Uploads**
+
+The test code from Lab 03 (`act5_act6_valentina_modules.test.ts`) was refactored to align with the three-layer architecture and the new Singleton `RequestManager`.
+
+**Changes applied:**
+
+1. **Business Layer (Endpoint classes):**
+   - Created `main/api/endpoints/dataSourcesAPI.ts`, `commentsAPI.ts`, and `fileUploadsAPI.ts`.
+   - Each class exposes one method per endpoint (`createDataSource`, `createComment`, `createFileUpload`, etc.).
+   - These classes obtain their Axios client exclusively through `RequestManager.getInstance().getDefaultClient()`. No test or endpoint class creates an Axios instance directly.
+
+2. **Test Layer (Scenarios):**
+   - Split the monolithic test file into three module-specific test files:
+     - `tests/scenarios/dataSources/dataSources.test.ts`
+     - `tests/scenarios/comments/comments.test.ts`
+     - `tests/scenarios/fileUploads/fileUploads.test.ts`
+   - Tests no longer call Axios directly. They instantiate the corresponding endpoint class and call its methods.
+   - Assertions (`assertCommonHeadersAndSla`, `assertNotionErrorContract`) remain in the Test Layer, consuming the `TimedAxiosResponse` returned by the Business Layer.
+
+3. **Negative test handling:**
+   - For the negative test that requires a request without the `Notion-Version` header (`TC_CMT_CREATE_NEG`), the `CommentsAPI` class exposes a specialized method (`createCommentWithoutVersion`) that internally requests a cached client from the `RequestManager` with `omitNotionVersion: true`. This preserves the Singleton contract: the manager creates the client once and caches it for future requests with the same options.
+
+4. **Core Layer updates:**
+   - Moved `assertions.ts` to `core/utils/assertions.ts` and updated its import to reference `TimedAxiosResponse` from `core/api/RequestManager.ts`.
+   - Fixed Zod v4 compatibility across all schemas: `z.record()` now requires both key and value types (e.g., `z.record(z.string(), z.any())`).
+
+**Benefits of the refactoring:**
+- **Single source of HTTP configuration:** All requests flow through `RequestManager`, so any change to base URL, timeout or interceptors is applied in one place.
+- **Test readability:** Test files now only describe *what* is verified, delegating *how* the API is called to the endpoint classes.
+- **Reusability:** The endpoint classes can be used by other tests, hooks or scripts without duplicating request logic.
+
+**Test execution evidence:**
+
+![Singleton Implementation Tests Passed](./caps/valentinamolina/act2_testspassed_singletonimplmentetion.png)
+
 ---
 
 <div style="page-break-after: always;"></div>
