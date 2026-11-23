@@ -645,15 +645,77 @@ The test code from Lab 03 (`act5_act6_valentina_modules.test.ts`) was refactored
 
 ### 3.1 Logging Tool for Automated Test Execution
 
-> TODO 
+To provide structured, deterministic observability across all automated test suites while preserving an application-agnostic Core Layer (`core/`), the framework integrates **Pino** (`pino`) with **`pino-pretty`** inside `core/utils/logger.ts`.
+
+**Why Pino was selected:**
+- **Structured NDJSON by default:** Emits newline-delimited JSON (`level`, `time`, `msg`, `meta`), enabling deterministic machine parsing by `LogReporter` without fragile regular expressions on plain-text logs.
+- **Minimal runtime overhead:** Low-latency serialization avoids distorting API response-time SLA measurements (`durationMs`) recorded by `RequestManager`.
+- **Native secret redaction (`redact`):** Automatically replaces sensitive credential paths with `"[REDACTED]"` before any byte reaches stdout or disk.
+- **Zero Notion coupling:** `Logger` lives exclusively in `core/utils/logger.ts` and exposes a generic static facade (`Logger.info`, `Logger.warn`, `Logger.error`, `Logger.debug`, `Logger.getLogFilePath`) so `RequestManager` interceptors, module hooks, and all teammates' suites work with full backward compatibility.
+
+**Architecture (`pino.multistream`):**
+1. **Synchronous NDJSON File Stream (`logs/test-execution.log`):** Configured via `pino.destination({ dest: logFilePath, sync: true, mkdir: true })` so buffered log lines are flushed immediately and never truncated when Vitest workers terminate.
+2. **Readable Console Stream (`pino-pretty`):** Synchronously renders `[ISO-8601] LEVEL: message` with colorized severity labels and formatted metadata for local developer runs.
+3. **Environment-Driven Verbosity:** Controlled via `LOG_LEVEL` (`debug` | `info` | `warn` | `error`) or `DEBUG=true` from `.env`, defaulting to `info` and automatically lowering to `debug` whenever `DEBUG=true`.
+4. **Automatic Secret Redaction:** Masks top-level and nested keys (`Authorization`, `authorization`, `token`, `bearerToken`, `access_token`, `refresh_token`, `client_secret`, `OAUTH_CLIENT_SECRET`, `NOTION_TOKEN`) with `censor: '[REDACTED]'`.
+
+| Configuration / Method | Purpose | Default / Behavior |
+|---|---|---|
+| `LOG_LEVEL` / `DEBUG=true` | Controls minimum emitted severity level | `info` by default; `debug` when `DEBUG=true` |
+| `LOG_FILE_PATH` | Target path for NDJSON execution log | `logs/test-execution.log` (auto-creates `logs/`) |
+| `redact.paths` | Masks tokens, secrets, and `Authorization` headers | Replaces matched fields with `"[REDACTED]"` |
+| `Logger.info(msg, meta?)` | Logs suite lifecycle and summary milestones | Pino level `30` (`INFO`) |
+| `Logger.warn(msg, meta?)` | Logs recoverable anomalies and fallbacks | Pino level `40` (`WARN`) |
+| `Logger.error(msg, meta?)` | Logs assertion/transport failures and exceptions | Pino level `50` (`ERROR`), serializes `Error` stacks |
+| `Logger.debug(msg, meta?)` | Logs HTTP request/response traces and telemetry | Pino level `20` (`DEBUG`), used by `RequestManager` |
+| `Logger.getLogFilePath()` | Exposes resolved NDJSON path to `LogReporter` | Returns absolute path to `logs/test-execution.log` |
 
 ### 3.2 Team Logger Conventions
 
-> TODO 
+To keep logs consistent, searchable, and safe across all five team members' modules (`Pages`, `Blocks`, `Databases`, `Search`, `Users`, `OAuth`, `Data Sources`, `Comments`, `File Uploads`), Group 2 enforces the following logging standards:
+
+#### Severity Level Usage
+
+| Pino Level | Label | When to Use | Typical Call Sites |
+|---:|---|---|---|
+| `50` | `ERROR` | Assertion mismatches, unhandled exceptions, unexpected HTTP `5xx` responses, or fatal teardown failures. | Test error boundaries, critical hook catch blocks |
+| `40` | `WARN` | Recoverable conditions: HTTP `429` rate-limit retries, skipped conditional OAuth tests, missing optional `.env` variables, or non-fatal cleanup warnings. | `oauthHooks.ts`, retry handlers, optional precondition checks |
+| `30` | `INFO` | High-level lifecycle milestones: suite start/end, precondition seeding summaries, created/cleaned resource counts, and teardown completions. | `beforeAll` / `afterAll` module hooks (`usersHooks`, `databasesHooks`, `dataSourcesHooks`, etc.) |
+| `20` | `DEBUG` | Fine-grained transport diagnostics: outgoing HTTP method/path, incoming HTTP status + `durationMs` latency, and per-test telemetry entries. | `RequestManager` Axios interceptors, `afterEach` telemetry hooks |
+
+#### Message Format & Structure
+- **Standardized prefix:** Start module/hook messages with a bracketed component tag followed by an imperative or past-tense action, e.g., `[UsersHooks] Seeded UsersTestContext preconditions` or `[OAuthHooks] Completed OAuthTestContext postcondition teardown`.
+- **Structured `meta` over string interpolation:** Pass contextual fields as the second argument (`Logger.info('[DatabasesHooks] Archived test databases', { count: 2 })`) rather than concatenating JSON or IDs into the message string so `LogReporter` can render and filter structured metadata cleanly.
+
+#### Security & Hygiene Rules
+1. **No raw `console.log()` in `main/` or `tests/`:** All diagnostic output must flow through `Logger` so it is captured consistently in `logs/test-execution.log` and appears in generated reports.
+2. **Never log raw credentials:** Never pass `NOTION_TOKEN`, `OAUTH_CLIENT_SECRET`, `access_token`, `refresh_token`, or raw `Authorization` headers in plain message strings. Structured fields using those keys are additionally protected by Pino's native `redact` filter (`[REDACTED]`).
+3. **Keep `core/` domain-agnostic:** Log infrastructure code in `core/utils/` must never import from `main/` or `tests/`.
 
 ### 3.3 Log Report Generation
 
-> TODO 
+Log report generation is implemented in `core/utils/logReporter.ts` through the `LogReporter` class (`LogReporter.generate(logFilePath?, outputDir?)`), fulfilling the architecture defined in Sections `1.1.3` and `1.2.1`.
+
+**Parsing & Aggregation Pipeline (`logs/test-execution.log` → `reports/`):**
+1. **NDJSON Ingestion:** Reads `logs/test-execution.log` line-by-line, safely parses each Pino JSON entry (tracking any malformed lines in `skippedLines`), and maps numeric Pino levels (`20 → DEBUG`, `30 → INFO`, `40 → WARN`, `50 → ERROR`).
+2. **Metrics Aggregation:** Computes:
+   - Total log entries and severity breakdown (`INFO`, `WARN`, `ERROR`, `DEBUG`).
+   - HTTP trace summary extracted from `RequestManager` logs (`Request:` / `Response: <status> (<durationMs>ms)`), including request count, response count, and average/max/min latency (`durationMs`, falling back to `meta.durationMs` when debug HTTP traces are disabled).
+   - Execution time window (`start`, `end`, and total elapsed `durationMs` in UTC ISO-8601).
+3. **Dual Report Artifacts (`reports/`, excluded from Git via `.gitignore`):**
+   - `reports/log-report.json`: Machine-readable JSON artifact containing `summary` metrics and normalized `entries[]` for CI pipelines or automated checks.
+   - `reports/log-report.html`: Self-contained interactive HTML dashboard featuring KPI summary cards, color-coded severity badges, HTTP/latency pills, severity filter buttons (`ALL`, `ERROR`, `WARN`, `INFO`, `DEBUG`), live text search, and formatted metadata blocks.
+
+**Execution Command:**
+```bash
+# 1. Execute automated suites (set DEBUG=true to include full HTTP request/response traces)
+npx vitest run tests/scenarios/users/users.me.test.ts
+
+# 2. Generate reports/log-report.json and reports/log-report.html
+npm run report:logs
+```
+
+<!-- Optional evidence: ![Log Report HTML Dashboard](./caps/gabrielguaman/act3_log_report.png) -->
 
 ---
 
@@ -1045,7 +1107,7 @@ These schemas are shared across all modules and used in both positive tests (ass
 
 | Team Member | Lab 05 Contributions & Implemented Scope | Section / Item Worked On | Additional Comments & Status |
 |---|---|---|---|
-| **Gabriel Marcos Guaman Ortuño** | • Refactored Users & OAuth modules into the 3-layer architecture (`usersAPI.ts`, `oauthAPI.ts`, `usersSchemas.ts`, `oauthSchemas.ts`) consuming `RequestManager.getInstance()` and `SchemaValidator`.<br>• Implemented `usersHooks.ts` and `oauthHooks.ts` with typed `UsersTestContext` / `OAuthTestContext`, dynamic workspace discovery, and isolated OAuth teardown.<br>• Generated and validated `users_oauth_dataset.json` with GenAI for data-driven edge cases.<br>• Implemented 6 endpoint test suites (71 scenarios) across `tests/scenarios/users/` and `tests/scenarios/oauth/`. | • Activity #1 (`1.3.1`)<br>• Activity #4 (`4.1`–`4.3` — Users & OAuth)<br>• Activity #5 (`5.1.1`) | Completed and verified via `tsc --noEmit` |
+| **Gabriel Marcos Guaman Ortuño** | • Refactored Users & OAuth modules into the 3-layer architecture (`usersAPI.ts`, `oauthAPI.ts`, `usersSchemas.ts`, `oauthSchemas.ts`) consuming `RequestManager.getInstance()` and `SchemaValidator`.<br>• Integrated **Pino** (`core/utils/logger.ts`) with synchronous NDJSON file + `pino-pretty` console multistreams and native secret redaction, defined team logging conventions, and implemented `LogReporter` (`core/utils/logReporter.ts`, `npm run report:logs`) generating HTML and JSON execution dashboards.<br>• Implemented `usersHooks.ts` and `oauthHooks.ts` with typed `UsersTestContext` / `OAuthTestContext`, dynamic workspace discovery, and isolated OAuth teardown.<br>• Generated and validated `users_oauth_dataset.json` with GenAI for data-driven edge cases.<br>• Implemented 6 endpoint test suites (71 scenarios) across `tests/scenarios/users/` and `tests/scenarios/oauth/`. | • Activity #1 (`1.3.1`)<br>• Activity #3 (`3.1`, `3.2`, `3.3`)<br>• Activity #4 (`4.1`–`4.3` — Users & OAuth)<br>• Activity #5 (`5.1.1`) | Completed and verified via `tsc --noEmit` & `npm run report:logs` |
 | **Valentina Molina Bustillos** | • Implemented the Singleton `RequestManager` and its UML diagram.<br>• Refactored Data Sources, Comments and File Uploads into the three-layer architecture.<br>• Added preconditions/postconditions via hooks and a module-specific context manager.<br>• Generated a GenAI dataset for data-driven testing.<br>• Extended test suites with 11 additional scenarios. | • Activity #2 (`2.1`, `2.2`, `2.3`)<br>• Activity #1 (`1.3.2`)<br>• Activity #4 (`4.1`, `4.2`, `4.3`)<br>• Activity #5 (`5.1.2`) | All 27 tests passing. |
 | **Karen Ivonne Cruz Alvarez** | > TODO | > TODO | > TODO |
 | **Sebastián Pereyra** | • Refactored Databases & Search modules from Lab 03 into the three-layer architecture.<br>• Created `DatabasesAPI` and `SearchAPI` endpoint classes in the Business Layer.<br>• Implemented `databasesHooks.ts` with `createTestDatabase` and `archiveCreatedDatabases`.<br>• Wrote 9 test cases for Databases (create, get, query) and 6 for Search.<br>• Completed `DataFactory` utility in the Core Layer.<br>• Documented all framework components in Section 5.3. | • Activity #1 (`1.3.4`)<br>• Activity #5 (`5.1.4`, `5.3`) | Complete ✅ |
